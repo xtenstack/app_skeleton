@@ -7,6 +7,12 @@ use Phalcon\Mvc\Controller;
 
 class ControllerBase extends Controller
 {
+    /**
+     * Role ids allowed to use this controller, or null for "any
+     * authenticated user". Set per-subclass to restrict further.
+     */
+    protected ?array $allowedRoles = null;
+
     protected function onConstruct()
     {
         $this->response->setContentType('application/json', 'UTF-8');
@@ -20,6 +26,17 @@ class ControllerBase extends Controller
             $this->response->setJsonContent(['error' => 'Not authenticated']);
             $this->response->send();
             exit;
+        }
+
+        if ($this->allowedRoles !== null) {
+            $roleId = $this->session->get('auth')['role_id'] ?? null;
+
+            if (!in_array($roleId, $this->allowedRoles, true)) {
+                $this->response->setStatusCode(403, 'Forbidden');
+                $this->response->setJsonContent(['error' => 'Forbidden']);
+                $this->response->send();
+                exit;
+            }
         }
     }
 
