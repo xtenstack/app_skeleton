@@ -1,6 +1,6 @@
 <?php
 
-class Items extends Phalcon\Mvc\Model
+class UserProfiles extends \Phalcon\Mvc\Model
 {
 
     /**
@@ -19,19 +19,31 @@ class Items extends Phalcon\Mvc\Model
      *
      * @var string
      */
-    public $title;
+    public $avatar_path;
 
     /**
      *
      * @var string
      */
-    public $description;
+    public $phone;
 
     /**
      *
      * @var string
      */
-    public $status;
+    public $bio;
+
+    /**
+     *
+     * @var string
+     */
+    public $timezone;
+
+    /**
+     *
+     * @var string
+     */
+    public $locale;
 
     /**
      *
@@ -40,11 +52,17 @@ class Items extends Phalcon\Mvc\Model
     public $created_at;
 
     /**
+     *
+     * @var string
+     */
+    public $updated_at;
+
+    /**
      * Initialize method for model.
      */
     public function initialize()
     {
-        $this->setSource("items");
+        $this->setSource("user_profiles");
         $this->keepSnapshots(true);
         $this->belongsTo('user_id', '\Users', 'id', ['alias' => 'Users']);
     }
@@ -53,7 +71,7 @@ class Items extends Phalcon\Mvc\Model
      * Allows to query a set of records that match the specified conditions
      *
      * @param mixed $parameters
-     * @return Items[]|Items|\Phalcon\Mvc\Model\ResultSetInterface
+     * @return UserProfiles[]|UserProfiles|\Phalcon\Mvc\Model\ResultSetInterface
      */
     public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
     {
@@ -64,7 +82,7 @@ class Items extends Phalcon\Mvc\Model
      * Allows to query the first record that match the specified conditions
      *
      * @param mixed $parameters
-     * @return Items|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
+     * @return UserProfiles|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
      */
     public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
     {

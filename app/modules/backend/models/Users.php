@@ -82,8 +82,12 @@ class Users extends Phalcon\Mvc\Model
     public function initialize()
     {
         $this->setSource("users");
+        $this->keepSnapshots(true);
         $this->hasMany('id', 'Items', 'user_id', ['alias' => 'Items']);
         $this->belongsTo('role_id', '\Roles', 'id', ['alias' => 'Roles']);
+        $this->hasOne('id', '\UserProfiles', 'user_id', ['alias' => 'Profile']);
+        $this->hasMany('id', '\UserSettings', 'user_id', ['alias' => 'Settings']);
+        $this->hasMany('id', '\ApiKeys', 'user_id', ['alias' => 'ApiKeys']);
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-class Items extends Phalcon\Mvc\Model
+class Settings extends \Phalcon\Mvc\Model
 {
 
     /**
@@ -11,27 +11,15 @@ class Items extends Phalcon\Mvc\Model
 
     /**
      *
-     * @var integer
+     * @var string
      */
-    public $user_id;
+    public $setting_key;
 
     /**
      *
      * @var string
      */
-    public $title;
-
-    /**
-     *
-     * @var string
-     */
-    public $description;
-
-    /**
-     *
-     * @var string
-     */
-    public $status;
+    public $setting_value;
 
     /**
      *
@@ -40,20 +28,25 @@ class Items extends Phalcon\Mvc\Model
     public $created_at;
 
     /**
+     *
+     * @var string
+     */
+    public $updated_at;
+
+    /**
      * Initialize method for model.
      */
     public function initialize()
     {
-        $this->setSource("items");
+        $this->setSource("settings");
         $this->keepSnapshots(true);
-        $this->belongsTo('user_id', '\Users', 'id', ['alias' => 'Users']);
     }
 
     /**
      * Allows to query a set of records that match the specified conditions
      *
      * @param mixed $parameters
-     * @return Items[]|Items|\Phalcon\Mvc\Model\ResultSetInterface
+     * @return Settings[]|Settings|\Phalcon\Mvc\Model\ResultSetInterface
      */
     public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
     {
@@ -64,7 +57,7 @@ class Items extends Phalcon\Mvc\Model
      * Allows to query the first record that match the specified conditions
      *
      * @param mixed $parameters
-     * @return Items|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
+     * @return Settings|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
      */
     public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
     {

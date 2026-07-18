@@ -27,6 +27,7 @@ class Roles extends Phalcon\Mvc\Model
     public function initialize()
     {
         $this->setSource("roles");
+        $this->keepSnapshots(true);
         $this->hasMany('id', 'Users', 'role_id', ['alias' => 'Users']);
     }
 
