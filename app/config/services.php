@@ -1,10 +1,13 @@
 <?php
 declare(strict_types=1);
 
+use Phalcon\Events\Manager as EventsManager;
+use Phalcon\Mvc\Model\Manager as ModelsManager;
 use Phalcon\Mvc\Model\Metadata\Memory as MetaDataAdapter;
 use Phalcon\Mvc\View\Engine\Volt as VoltEngine;
 use Phalcon\Session\Manager as SessionManager;
 use Phalcon\Session\Adapter\Stream as SessionStream;
+use App_skeleton\Audit;
 use App_skeleton\Auth;
 
 $di->setShared('session', function () {
@@ -56,6 +59,32 @@ $di->setShared('auth', function () {
     $auth->setDI($this);
 
     return $auth;
+});
+
+/**
+ * Audit listener, attached to the models manager below so any model that
+ * opts into keepSnapshots(true) gets its inserts/updates/deletes logged to
+ * audit_log automatically.
+ */
+$di->setShared('audit', function () {
+    $audit = new Audit();
+    $audit->setDI($this);
+
+    return $audit;
+});
+
+/**
+ * Override the default modelsManager to wire up the audit events listener
+ * for every model, rather than each model having to attach it itself.
+ */
+$di->setShared('modelsManager', function () {
+    $eventsManager = new EventsManager();
+    $eventsManager->attach('model', $this->getShared('audit'));
+
+    $modelsManager = new ModelsManager();
+    $modelsManager->setEventsManager($eventsManager);
+
+    return $modelsManager;
 });
 
 /**

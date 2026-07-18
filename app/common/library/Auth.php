@@ -19,6 +19,8 @@ class Auth extends Injectable
         ]);
 
         if (!$user || !password_verify($password, $user->password_hash)) {
+            Audit::recordEvent('login_failed', $user?->id, ['email' => $email]);
+
             return false;
         }
 
@@ -27,6 +29,8 @@ class Auth extends Injectable
             'email'   => $user->email,
             'role_id' => $user->role_id,
         ]);
+
+        Audit::recordEvent('login', $user->id);
 
         return true;
     }
@@ -38,6 +42,9 @@ class Auth extends Injectable
 
     public function logout(): void
     {
+        $auth = $this->session->get('auth');
+        Audit::recordEvent('logout', $auth['id'] ?? null);
+
         $this->session->remove('auth');
     }
 }
