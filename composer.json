@@ -1,0 +1,18 @@
+{
+    "name": "travissaron/app-skeleton",
+    "description": "Phalcon 5.8 multi-module skeleton: AdminLTE backend + Aurora React frontend + JSON API, with auth, RBAC, and an audit log.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "ext-phalcon": "^5.8",
+        "ext-pdo_sqlite": "*"
+    },
+    "require-dev": {
+        "phalcon/devtools": "^5.0"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
