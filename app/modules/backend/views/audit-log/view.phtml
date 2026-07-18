@@ -1,0 +1,55 @@
+<?php
+$old = $entry->old_values ? json_decode($entry->old_values, true) : null;
+$new = $entry->new_values ? json_decode($entry->new_values, true) : null;
+$fields = array_unique(array_merge(array_keys($old ?? []), array_keys($new ?? [])));
+?>
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Audit entry #<?= $entry->id ?></h1>
+    <a href="<?= $this->url->get('backend/audit-log') ?>" class="btn btn-outline-secondary">Back</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-8">
+    <div class="card mb-3">
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-3">When</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->created_at) ?></dd>
+          <dt class="col-3">Entity</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->entity_type) ?><?= $entry->entity_id ? ' #' . $entry->entity_id : '' ?></dd>
+          <dt class="col-3">Action</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->action) ?></dd>
+          <dt class="col-3">Actor</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->Users ? $entry->Users->email : 'System / unknown') ?></dd>
+        </dl>
+      </div>
+    </div>
+
+<?php if ($fields): ?>
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Old value</th>
+              <th>New value</th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($fields as $field): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($field) ?></td>
+              <td><?= $old && array_key_exists($field, $old) ? $this->escaper->escapeHtml((string) $old[$field]) : '<span class="text-muted">—</span>' ?></td>
+              <td><?= $new && array_key_exists($field, $new) ? $this->escaper->escapeHtml((string) $new[$field]) : '<span class="text-muted">—</span>' ?></td>
+            </tr>
+<?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+<?php endif; ?>
+  </div>
+</div>

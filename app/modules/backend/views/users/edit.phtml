@@ -1,0 +1,53 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Edit user</h1>
+    <div>
+      <a href="<?= $this->url->get('backend/users/profile/' . $user->id) ?>" class="btn btn-outline-secondary">Profile</a>
+      <a href="<?= $this->url->get('backend/users/settings/' . $user->id) ?>" class="btn btn-outline-secondary">Settings</a>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/users/save') ?>">
+          <input type="hidden" name="id" value="<?= $user->id ?>">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" class="form-control" id="email" name="email" value="<?= $this->escaper->escapeHtml($user->email) ?>" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="first_name">First name</label>
+              <input type="text" class="form-control" id="first_name" name="first_name" value="<?= $this->escaper->escapeHtml($user->first_name) ?>">
+            </div>
+            <div class="form-group col-6">
+              <label for="last_name">Last name</label>
+              <input type="text" class="form-control" id="last_name" name="last_name" value="<?= $this->escaper->escapeHtml($user->last_name) ?>">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="role_id">Role</label>
+            <select class="form-control" id="role_id" name="role_id" required>
+<?php foreach ($roles as $role): ?>
+              <option value="<?= $role->id ?>" <?= (int) $role->id === (int) $user->role_id ? 'selected' : '' ?>><?= $this->escaper->escapeHtml($role->name) ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="password">New password</label>
+            <input type="password" class="form-control" id="password" name="password" minlength="8" placeholder="Leave blank to keep current password">
+          </div>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" value="1" <?= $user->is_active ? 'checked' : '' ?>>
+            <label class="form-check-label" for="is_active">Active</label>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/users') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

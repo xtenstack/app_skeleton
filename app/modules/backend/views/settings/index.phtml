@@ -1,0 +1,41 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Settings</h1>
+    <a href="<?= $this->url->get('backend/settings/new') ?>" class="btn btn-primary">New setting</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Value</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($settings as $setting): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($setting->setting_key) ?></td>
+              <td><?= $this->escaper->escapeHtml($setting->setting_value) ?></td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('backend/settings/edit/' . $setting->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <a href="<?= $this->url->get('backend/settings/delete/' . $setting->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this setting?')">Delete</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($settings)): ?>
+            <tr>
+              <td colspan="3" class="text-center text-muted">No settings yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,27 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>Edit setting</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/settings/save') ?>">
+          <input type="hidden" name="id" value="<?= $setting->id ?>">
+          <div class="form-group">
+            <label>Key</label>
+            <input type="text" class="form-control" value="<?= $this->escaper->escapeHtml($setting->setting_key) ?>" disabled>
+          </div>
+          <div class="form-group">
+            <label for="setting_value">Value</label>
+            <input type="text" class="form-control" id="setting_value" name="setting_value" value="<?= $this->escaper->escapeHtml($setting->setting_value) ?>">
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/settings') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

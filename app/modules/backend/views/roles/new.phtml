@@ -1,0 +1,22 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>New role</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/roles/create') ?>">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/roles') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

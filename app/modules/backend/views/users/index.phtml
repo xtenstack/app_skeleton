@@ -1,0 +1,46 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Users</h1>
+    <a href="<?= $this->url->get('backend/users/new') ?>" class="btn btn-primary">New user</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Active</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($users as $user): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($user->email) ?></td>
+              <td><?= $this->escaper->escapeHtml(trim($user->first_name . ' ' . $user->last_name)) ?></td>
+              <td><?= $this->escaper->escapeHtml($user->Roles ? $user->Roles->name : '—') ?></td>
+              <td><?= $user->is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>' ?></td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('backend/users/edit/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <a href="<?= $this->url->get('backend/users/profile/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Profile</a>
+                <a href="<?= $this->url->get('backend/users/settings/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Settings</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($users)): ?>
+            <tr>
+              <td colspan="5" class="text-center text-muted">No users yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

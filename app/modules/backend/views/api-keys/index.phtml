@@ -1,0 +1,72 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>API Keys</h1>
+  </div>
+</div>
+
+<?php if (!empty($newToken)): ?>
+<div class="row">
+  <div class="col-12">
+    <div class="alert alert-warning">
+      <strong>Copy this key now — it won't be shown again:</strong>
+      <pre class="mb-0 mt-2"><?= $this->escaper->escapeHtml($newToken) ?></pre>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card mb-3">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Key</th>
+              <th>Last used</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($apiKeys as $apiKey): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($apiKey->name) ?></td>
+              <td><code><?= $this->escaper->escapeHtml($apiKey->token_prefix) ?>…</code></td>
+              <td><?= $this->escaper->escapeHtml($apiKey->last_used_at ?: 'Never') ?></td>
+              <td>
+<?php if ($apiKey->revoked_at): ?>
+                <span class="badge badge-secondary">Revoked</span>
+<?php else: ?>
+                <span class="badge badge-success">Active</span>
+<?php endif; ?>
+              </td>
+              <td class="text-right">
+<?php if (!$apiKey->revoked_at): ?>
+                <a href="<?= $this->url->get('backend/api-keys/revoke/' . $apiKey->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Revoke this key?')">Revoke</a>
+<?php endif; ?>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($apiKeys)): ?>
+            <tr>
+              <td colspan="5" class="text-center text-muted">No API keys yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5>Create a new key</h5>
+        <form method="post" action="<?= $this->url->get('backend/api-keys/create') ?>" class="form-inline">
+          <input type="text" class="form-control mr-2" name="name" placeholder="Key name (e.g. My integration)" required>
+          <button type="submit" class="btn btn-primary">Generate</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

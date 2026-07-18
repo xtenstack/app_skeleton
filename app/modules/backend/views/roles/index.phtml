@@ -1,0 +1,41 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Roles</h1>
+    <a href="<?= $this->url->get('backend/roles/new') ?>" class="btn btn-primary">New role</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($roles as $role): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($role->name) ?></td>
+              <td><?= $this->escaper->escapeHtml($role->created_at) ?></td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('backend/roles/edit/' . $role->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <a href="<?= $this->url->get('backend/roles/delete/' . $role->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this role?')">Delete</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($roles)): ?>
+            <tr>
+              <td colspan="3" class="text-center text-muted">No roles yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

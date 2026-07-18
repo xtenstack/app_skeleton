@@ -1,0 +1,36 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Profile — <?= $this->escaper->escapeHtml($targetUser->email) ?></h1>
+    <a href="<?= $this->url->get('backend/users/edit/' . $targetUser->id) ?>" class="btn btn-outline-secondary">Back to user</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/users/profile/' . $targetUser->id) ?>">
+          <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="text" class="form-control" id="phone" name="phone" value="<?= $this->escaper->escapeHtml($profile->phone) ?>">
+          </div>
+          <div class="form-group">
+            <label for="bio">Bio</label>
+            <textarea class="form-control" id="bio" name="bio" rows="4"><?= $this->escaper->escapeHtml($profile->bio) ?></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label for="timezone">Timezone</label>
+              <input type="text" class="form-control" id="timezone" name="timezone" value="<?= $this->escaper->escapeHtml($profile->timezone ?: 'UTC') ?>">
+            </div>
+            <div class="form-group col-6">
+              <label for="locale">Locale</label>
+              <input type="text" class="form-control" id="locale" name="locale" value="<?= $this->escaper->escapeHtml($profile->locale ?: 'en-AU') ?>">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
