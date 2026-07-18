@@ -1,0 +1,23 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>System Log</h1>
+    <p class="text-muted">
+      logs/app.log<?= $truncated ? ' — showing the tail of the file' : '' ?>.
+      Reload the page for the latest.
+    </p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+<?php if ($contents === ''): ?>
+        <p class="text-muted mb-0">No errors logged yet.</p>
+<?php else: ?>
+        <pre class="mb-0" style="max-height: 70vh; overflow-y: auto;"><?= $this->escaper->escapeHtml($contents) ?></pre>
+<?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>

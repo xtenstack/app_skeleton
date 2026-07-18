@@ -10,17 +10,20 @@ define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/app');
 
 /**
- * Fatal-error logging is set up before anything else runs, deliberately with
- * no dependency on the DI/autoloader/database — the whole point is to still
- * capture a crash that happens before (or because) any of those come up.
+ * Point PHP's own error_log at a project-local file instead of reimplementing
+ * capture ourselves — PHP already logs warnings/notices/true fatals natively
+ * (log_errors=On), the system default just points at a shared, noisy,
+ * root-owned file mixing in every other project on the machine. This is set
+ * before anything else runs, with no dependency on the DI/autoloader/db, so
+ * it's still in effect for a crash caused by any of those.
  */
-$errorLogFile = BASE_PATH . '/logs/app.log';
+ini_set('log_errors', '1');
+ini_set('error_log', BASE_PATH . '/logs/app.log');
 
-$logThrowable = function (\Throwable $e) use ($errorLogFile): string {
+$logThrowable = function (\Throwable $e): string {
     $summary = sprintf('%s: %s in %s:%d', get_class($e), $e->getMessage(), $e->getFile(), $e->getLine());
-    $line    = sprintf("[%s] %s\n%s\n", date('Y-m-d H:i:s'), $summary, $e->getTraceAsString());
 
-    @file_put_contents($errorLogFile, $line, FILE_APPEND | LOCK_EX);
+    error_log($summary . "\n" . $e->getTraceAsString());
 
     return $summary;
 };

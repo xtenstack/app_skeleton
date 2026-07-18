@@ -59,4 +59,11 @@ return [
         'url'        => 'backend/audit-log',
         'roles'      => [1],
     ],
+    [
+        'label'      => 'System Log',
+        'icon'       => 'fas fa-bug',
+        'controller' => 'system-log',
+        'url'        => 'backend/system-log',
+        'roles'      => [1],
+    ],
 ];
