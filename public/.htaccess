@@ -2,7 +2,16 @@ AddDefaultCharset UTF-8
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # /backend/* and /api/* are the Phalcon app (admin UI + JSON API).
+    RewriteCond %{REQUEST_URI} ^/(backend|api)(/|$)
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^(.*)$ index.php?_url=/$1 [QSA,L]
+
+    # Everything else that isn't a real file (client-side React routes like
+    # /users, /account) falls back to the built SPA shell.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)$ /app/index.html [L]
 </IfModule>

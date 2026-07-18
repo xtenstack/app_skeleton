@@ -16,9 +16,9 @@ $loader->setNamespaces([
  * Register module classes
  */
 $loader->setClasses([
-    'App_skeleton\Modules\Frontend\Module' => APP_PATH . '/modules/frontend/Module.php',
-    'App_skeleton\Modules\Backend\Module'  => APP_PATH . '/modules/backend/Module.php',
-    'App_skeleton\Modules\Cli\Module'      => APP_PATH . '/modules/cli/Module.php'
+    'App_skeleton\Modules\Api\Module'     => APP_PATH . '/modules/api/Module.php',
+    'App_skeleton\Modules\Backend\Module' => APP_PATH . '/modules/backend/Module.php',
+    'App_skeleton\Modules\Cli\Module'     => APP_PATH . '/modules/cli/Module.php'
 ]);
 
 /**
@@ -28,7 +28,7 @@ $loader->setClasses([
  */
 $loader->setDirectories([
     APP_PATH . '/modules/backend/models/',
-    APP_PATH . '/modules/frontend/models/',
+    APP_PATH . '/modules/api/models/',
 ]);
 
 $loader->register();

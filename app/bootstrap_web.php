@@ -45,8 +45,8 @@ try {
      * Register application modules
      */
     $application->registerModules([
-        'frontend' => ['className' => 'App_skeleton\Modules\Frontend\Module'],
-        'backend'  => ['className' => 'App_skeleton\Modules\Backend\Module'],
+        'api'     => ['className' => 'App_skeleton\Modules\Api\Module'],
+        'backend' => ['className' => 'App_skeleton\Modules\Backend\Module'],
     ]);
 
     /**

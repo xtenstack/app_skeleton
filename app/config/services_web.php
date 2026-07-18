@@ -14,7 +14,7 @@ use Phalcon\Mvc\Url as UrlResolver;
  */
 $di->setShared('router', function () {
     $router = new Router();
-    $router->setDefaultModule('frontend');
+    $router->setDefaultModule('api');
 
     return $router;
 });
@@ -67,7 +67,7 @@ $di->setShared('flash', function () {
  */
 $di->setShared('dispatcher', function() {
     $dispatcher = new Dispatcher();
-    $dispatcher->setDefaultNamespace('App_skeleton\Modules\Frontend\Controllers');
+    $dispatcher->setDefaultNamespace('App_skeleton\Modules\Api\Controllers');
 
     return $dispatcher;
 });
