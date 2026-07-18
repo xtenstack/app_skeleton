@@ -8,10 +8,16 @@
 !/public/temp/.gitkeep
 /public/files/*
 !/public/files/.gitkeep
+/logs/*
+!/logs/.gitkeep
 
 # Node (Aurora frontend, once added)
 node_modules/
 dist/
+
+# Composer (ext-phalcon itself isn't composer-installable; this is only for
+# any regular PHP deps declared in composer.json, e.g. require-dev tooling)
+/vendor/
 
 # Local Claude Code overrides (auto-accumulated permission grants, machine-specific)
 /.claude/settings.local.json

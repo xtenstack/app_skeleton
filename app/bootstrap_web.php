@@ -9,6 +9,56 @@ error_reporting(E_ALL);
 define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/app');
 
+/**
+ * Fatal-error logging is set up before anything else runs, deliberately with
+ * no dependency on the DI/autoloader/database — the whole point is to still
+ * capture a crash that happens before (or because) any of those come up.
+ */
+$errorLogFile = BASE_PATH . '/logs/app.log';
+
+$logThrowable = function (\Throwable $e) use ($errorLogFile): string {
+    $summary = sprintf('%s: %s in %s:%d', get_class($e), $e->getMessage(), $e->getFile(), $e->getLine());
+    $line    = sprintf("[%s] %s\n%s\n", date('Y-m-d H:i:s'), $summary, $e->getTraceAsString());
+
+    @file_put_contents($errorLogFile, $line, FILE_APPEND | LOCK_EX);
+
+    return $summary;
+};
+
+$sendCrashResponse = function (string $summary) {
+    http_response_code(500);
+
+    $isApiRequest = preg_match('#^/api(/|$)#', $_SERVER['REQUEST_URI'] ?? '');
+    $detail       = ini_get('display_errors') ? $summary : null;
+
+    if ($isApiRequest) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'Internal server error', 'detail' => $detail]);
+
+        return;
+    }
+
+    echo '<h1>Something went wrong</h1>';
+    echo '<p>The error has been logged. Please try again shortly.</p>';
+
+    if ($detail) {
+        echo '<pre>' . htmlspecialchars($detail) . '</pre>';
+    }
+};
+
+set_exception_handler(function (\Throwable $e) use ($logThrowable, $sendCrashResponse): void {
+    $sendCrashResponse($logThrowable($e));
+});
+
+register_shutdown_function(function () use ($logThrowable, $sendCrashResponse): void {
+    $error = error_get_last();
+
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        $exception = new \ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);
+        $sendCrashResponse($logThrowable($exception));
+    }
+});
+
 try {
     /**
      * The FactoryDefault Dependency Injector automatically registers the services that
@@ -55,7 +105,6 @@ try {
     require APP_PATH . '/config/routes.php';
 
     echo $application->handle($_SERVER['REQUEST_URI'])->getContent();
-} catch (\Exception $e) {
-    echo $e->getMessage() . '<br>';
-    echo '<pre>' . $e->getTraceAsString() . '</pre>';
+} catch (\Throwable $e) {
+    $sendCrashResponse($logThrowable($e));
 }
