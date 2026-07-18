@@ -1,0 +1,24 @@
+# SQLite data — schema history lives in db/patches/, not the binary db
+/db/*.sqlite
+/db/*.sqlite-journal
+
+# Generated/runtime
+/cache/volt/*
+!/cache/volt/.gitkeep
+/public/temp/*
+!/public/temp/.gitkeep
+/public/files/*
+!/public/files/.gitkeep
+
+# Node (Aurora frontend, once added)
+node_modules/
+dist/
+
+# Local Claude Code overrides (auto-accumulated permission grants, machine-specific)
+/.claude/settings.local.json
+
+# Phalcon DevTools local log (machine-specific, not project config)
+/.phalcon/
+
+# OS
+.DS_Store

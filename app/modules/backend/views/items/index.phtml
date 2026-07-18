@@ -1,0 +1,45 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Items</h1>
+    <a href="<?= $this->url->get('backend/items/new') ?>" class="btn btn-primary">New item</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Owner</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($items as $item): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($item->title) ?></td>
+              <td><?= $this->escaper->escapeHtml($item->Users ? $item->Users->email : '—') ?></td>
+              <td><?= $this->escaper->escapeHtml($item->status) ?></td>
+              <td><?= $this->escaper->escapeHtml($item->created_at) ?></td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('backend/items/edit/' . $item->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <a href="<?= $this->url->get('backend/items/delete/' . $item->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this item?')">Delete</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($items)): ?>
+            <tr>
+              <td colspan="5" class="text-center text-muted">No items yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>Edit item</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/items/save') ?>">
+          <input type="hidden" name="id" value="<?= $item->id ?>">
+          <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="<?= $this->escaper->escapeHtml($item->title) ?>" required>
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="4"><?= $this->escaper->escapeHtml($item->description) ?></textarea>
+          </div>
+          <div class="form-group">
+            <label for="status">Status</label>
+            <select class="form-control" id="status" name="status">
+<?php foreach (['draft', 'active', 'archived'] as $status): ?>
+              <option value="<?= $status ?>" <?= $item->status === $status ? 'selected' : '' ?>><?= $status ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="user_id">Owner</label>
+            <select class="form-control" id="user_id" name="user_id" required>
+<?php foreach ($users as $user): ?>
+              <option value="<?= $user->id ?>" <?= (int) $user->id === (int) $item->user_id ? 'selected' : '' ?>><?= $this->escaper->escapeHtml($user->email) ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/items') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
