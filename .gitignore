@@ -1,6 +1,5 @@
 # SQLite data — schema history lives in db/patches/, not the binary db
-/db/*.sqlite
-/db/*.sqlite-journal
+/db/*.sqlite*
 
 # Generated/runtime
 /cache/volt/*
