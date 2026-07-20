@@ -1,6 +1,7 @@
 <div class="row mb-2">
   <div class="col-12">
-    <h1>API Keys</h1>
+    <h1>API Keys (Internal)</h1>
+    <p class="text-muted mb-0">Credentials other systems use to call <em>our</em> API. For connections <em>we</em> make to third-party APIs, see External Connections.</p>
   </div>
 </div>
 
@@ -44,7 +45,9 @@
               </td>
               <td class="text-right">
 <?php if (!$apiKey->revoked_at): ?>
-                <a href="<?= $this->url->get('backend/api-keys/revoke/' . $apiKey->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Revoke this key?')">Revoke</a>
+                <form method="post" action="<?= $this->url->get('backend/api-keys/revoke/' . $apiKey->id) ?>" class="d-inline" onsubmit="return confirm('Revoke this key?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                </form>
 <?php endif; ?>
               </td>
             </tr>

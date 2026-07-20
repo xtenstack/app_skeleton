@@ -27,3 +27,7 @@ dist/
 
 # OS
 .DS_Store
+
+# Symmetric key for App_skeleton\Crypto (external_connections credentials) —
+# auto-generated on first use, back it up separately from the repo/db.
+/.encryption_key

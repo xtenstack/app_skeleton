@@ -1,0 +1,53 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>External Connections</h1>
+    <a href="<?= $this->url->get('backend/external-connections/new') ?>" class="btn btn-primary">New connection</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Base URL</th>
+              <th>Auth type</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($connections as $connection): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($connection->name) ?></td>
+              <td><?= $this->escaper->escapeHtml($connection->base_url ?: '—') ?></td>
+              <td><code><?= $this->escaper->escapeHtml($connection->auth_type) ?></code></td>
+              <td>
+<?php if ($connection->is_active): ?>
+                <span class="badge badge-success">Active</span>
+<?php else: ?>
+                <span class="badge badge-secondary">Inactive</span>
+<?php endif; ?>
+              </td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('backend/external-connections/edit/' . $connection->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <form method="post" action="<?= $this->url->get('backend/external-connections/delete/' . $connection->id) ?>" class="d-inline" onsubmit="return confirm('Delete this connection?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($connections)): ?>
+            <tr>
+              <td colspan="5" class="text-center text-muted">No external connections yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

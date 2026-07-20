@@ -1,0 +1,47 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>New external connection</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/external-connections/create') ?>">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+          </div>
+          <div class="form-group">
+            <label for="base_url">Base URL</label>
+            <input type="text" class="form-control" id="base_url" name="base_url" placeholder="https://api.example.com">
+          </div>
+          <div class="form-group">
+            <label for="auth_type">Auth type</label>
+            <select class="form-control" id="auth_type" name="auth_type">
+<?php foreach ($authTypes as $type): ?>
+              <option value="<?= $type ?>"><?= $type ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="credential">Credential (API key / token / secret)</label>
+            <input type="password" class="form-control" id="credential" name="credential" autocomplete="new-password">
+            <small class="form-text text-muted">Stored encrypted at rest.</small>
+          </div>
+          <div class="form-group">
+            <label for="config">Config (JSON, optional)</label>
+            <textarea class="form-control" id="config" name="config" rows="4" placeholder='{"headers": {"X-Example": "value"}}'></textarea>
+          </div>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" value="1" checked>
+            <label class="form-check-label" for="is_active">Active</label>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/external-connections') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

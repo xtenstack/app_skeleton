@@ -46,11 +46,18 @@ return [
         'roles'      => [1],
     ],
     [
-        'label'      => 'API Keys',
+        'label'      => 'API Keys (Internal)',
         'icon'       => 'fas fa-key',
         'controller' => 'api-keys',
         'url'        => 'backend/api-keys',
         'roles'      => null,
+    ],
+    [
+        'label'      => 'External Connections',
+        'icon'       => 'fas fa-plug',
+        'controller' => 'external-connections',
+        'url'        => 'backend/external-connections',
+        'roles'      => [1],
     ],
     [
         'label'      => 'Audit Log',
