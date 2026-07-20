@@ -1,10 +1,12 @@
 <?php
 
+use App_skeleton\Models\SoftDeletes;
 use Phalcon\Filter\Validation;
 use Phalcon\Filter\Validation\Validator\Email as EmailValidator;
 
 class Users extends Phalcon\Mvc\Model
 {
+    use SoftDeletes;
 
     /**
      *
@@ -55,6 +57,42 @@ class Users extends Phalcon\Mvc\Model
     public $created_at;
 
     /**
+     *
+     * @var string
+     */
+    public $deleted_at;
+
+    /**
+     *
+     * @var string
+     */
+    public $email_verified_at;
+
+    /**
+     *
+     * @var string
+     */
+    public $verification_token;
+
+    /**
+     *
+     * @var string
+     */
+    public $verification_token_expires_at;
+
+    /**
+     *
+     * @var string
+     */
+    public $password_reset_token;
+
+    /**
+     *
+     * @var string
+     */
+    public $password_reset_expires_at;
+
+    /**
      * Validations and business logic
      *
      * @return boolean
@@ -84,32 +122,10 @@ class Users extends Phalcon\Mvc\Model
         $this->setSource("users");
         $this->keepSnapshots(true);
         $this->hasMany('id', 'Items', 'user_id', ['alias' => 'Items']);
-        $this->belongsTo('role_id', '\Roles', 'id', ['alias' => 'Roles']);
-        $this->hasOne('id', '\UserProfiles', 'user_id', ['alias' => 'Profile']);
-        $this->hasMany('id', '\UserSettings', 'user_id', ['alias' => 'Settings']);
-        $this->hasMany('id', '\ApiKeys', 'user_id', ['alias' => 'ApiKeys']);
-    }
-
-    /**
-     * Allows to query a set of records that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return Users[]|Users|\Phalcon\Mvc\Model\ResultSetInterface
-     */
-    public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
-    {
-        return parent::find($parameters);
-    }
-
-    /**
-     * Allows to query the first record that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return Users|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
-     */
-    public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
-    {
-        return parent::findFirst($parameters);
+        $this->belongsTo('role_id', 'Roles', 'id', ['alias' => 'Roles']);
+        $this->hasOne('id', 'UserProfiles', 'user_id', ['alias' => 'Profile']);
+        $this->hasMany('id', 'UserSettings', 'user_id', ['alias' => 'Settings']);
+        $this->hasMany('id', 'ApiKeys', 'user_id', ['alias' => 'ApiKeys']);
     }
 
 }

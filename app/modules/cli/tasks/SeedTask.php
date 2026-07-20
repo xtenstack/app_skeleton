@@ -56,6 +56,7 @@ class SeedTask extends \Phalcon\Cli\Task
         $defaults = [
             'site_name' => 'App Skeleton',
             'cron_mode' => 'manual',
+            'mail_from' => 'no-reply@app-skeleton.local',
         ];
 
         foreach ($defaults as $key => $value) {

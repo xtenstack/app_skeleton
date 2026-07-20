@@ -10,6 +10,7 @@ use Phalcon\Session\Adapter\Stream as SessionStream;
 use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
+use App_skeleton\Mailer;
 use App_skeleton\SettingsRegistry;
 
 $di->setShared('session', function () {
@@ -84,6 +85,17 @@ $di->setShared('cronRunner', function () {
     $runner->setDI($this);
 
     return $runner;
+});
+
+/**
+ * Sends signup verification / password reset emails via PHP's native
+ * mail() — see App_skeleton\Mailer for why no SMTP client.
+ */
+$di->setShared('mailer', function () {
+    $mailer = new Mailer();
+    $mailer->setDI($this);
+
+    return $mailer;
 });
 
 /**
