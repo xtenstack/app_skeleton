@@ -17,13 +17,6 @@ if ($path !== '/' && file_exists($root . '/public' . $path)) {
     return false;
 }
 
-// /backend/* and /api/* are the Phalcon app (admin UI + JSON API).
-if (preg_match('#^/(backend|api)(/|$)#', $path)) {
-    require $root . '/public/index.php';
-    return;
-}
-
-// Everything else that isn't a real file (client-side React routes like
-// /users, /account) falls back to the built SPA shell.
-header('Content-Type: text/html; charset=UTF-8');
-readfile($root . '/public/app/index.html');
+// Everything else goes to the Phalcon app (server-rendered AdminLTE
+// backend + JSON api module).
+require $root . '/public/index.php';

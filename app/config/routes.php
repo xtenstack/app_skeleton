@@ -2,6 +2,13 @@
 
 $router = $di->getRouter();
 
+$router->add('/', [
+    'namespace'  => 'App_skeleton\Modules\Backend\Controllers',
+    'module'     => 'backend',
+    'controller' => 'index',
+    'action'     => 'index',
+]);
+
 foreach ($application->getModules() as $key => $module) {
     $namespace = preg_replace('/Module$/', 'Controllers', $module['className']);
 

@@ -11,10 +11,6 @@
 /logs/*
 !/logs/.gitkeep
 
-# Node (Aurora frontend, once added)
-node_modules/
-dist/
-
 # Composer (ext-phalcon itself isn't composer-installable; this is only for
 # any regular PHP deps declared in composer.json, e.g. require-dev tooling)
 /vendor/
