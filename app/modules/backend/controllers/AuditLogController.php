@@ -26,5 +26,29 @@ class AuditLogController extends ControllerBase
         }
 
         $this->view->entry = $entry;
+        $this->view->isReversible = $this->audit->isReversible($entry);
+    }
+
+    public function reverseAction($id)
+    {
+        $entry = \AuditLog::findFirstById($id);
+
+        if (!$entry) {
+            $this->flash->error('Audit log entry was not found');
+
+            return $this->dispatcher->forward(['controller' => 'audit-log', 'action' => 'index']);
+        }
+
+        if ($this->audit->reverse($entry)) {
+            $this->flash->success('Audit entry #' . $entry->id . ' was reversed');
+        } else {
+            $this->flash->error('This entry cannot be reversed (already reversed, or not a reversible change)');
+        }
+
+        return $this->dispatcher->forward([
+            'controller' => 'audit-log',
+            'action'     => 'view',
+            'params'     => [$id],
+        ]);
     }
 }

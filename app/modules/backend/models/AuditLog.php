@@ -52,34 +52,21 @@ class AuditLog extends \Phalcon\Mvc\Model
     public $created_at;
 
     /**
+     * Soft reference to another audit_log.id — set on a 'reversal' row to
+     * point at the entry it undid, or found on an original row (via a
+     * lookup, not a relation) once something has reversed it.
+     *
+     * @var integer
+     */
+    public $reversed_audit_log_id;
+
+    /**
      * Initialize method for model.
      */
     public function initialize()
     {
         $this->setSource("audit_log");
-        $this->belongsTo('actor_user_id', '\Users', 'id', ['alias' => 'Users']);
-    }
-
-    /**
-     * Allows to query a set of records that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return AuditLog[]|AuditLog|\Phalcon\Mvc\Model\ResultSetInterface
-     */
-    public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
-    {
-        return parent::find($parameters);
-    }
-
-    /**
-     * Allows to query the first record that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return AuditLog|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
-     */
-    public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
-    {
-        return parent::findFirst($parameters);
+        $this->belongsTo('actor_user_id', 'Users', 'id', ['alias' => 'Users']);
     }
 
 }
