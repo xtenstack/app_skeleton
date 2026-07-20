@@ -58,7 +58,7 @@ class ApiKeys extends \Phalcon\Mvc\Model
     {
         $this->setSource("api_keys");
         $this->keepSnapshots(true);
-        $this->belongsTo('user_id', '\Users', 'id', ['alias' => 'Users']);
+        $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }
 
     /**

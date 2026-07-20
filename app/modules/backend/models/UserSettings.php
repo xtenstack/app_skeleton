@@ -46,7 +46,7 @@ class UserSettings extends \Phalcon\Mvc\Model
     {
         $this->setSource("user_settings");
         $this->keepSnapshots(true);
-        $this->belongsTo('user_id', '\Users', 'id', ['alias' => 'Users']);
+        $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }
 
     /**
