@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app-skeleton",
+      "runtimeExecutable": "php85",
+      "runtimeArgs": ["-S", "localhost:8080", "-t", "public", "bin/dev-router.php"],
+      "port": 8080
+    }
+  ]
+}
