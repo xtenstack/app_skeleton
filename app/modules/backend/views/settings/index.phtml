@@ -24,7 +24,9 @@
               <td><?= $this->escaper->escapeHtml($setting->setting_value) ?></td>
               <td class="text-right">
                 <a href="<?= $this->url->get('backend/settings/edit/' . $setting->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                <a href="<?= $this->url->get('backend/settings/delete/' . $setting->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this setting?')">Delete</a>
+                <form method="post" action="<?= $this->url->get('backend/settings/delete/' . $setting->id) ?>" class="d-inline" onsubmit="return confirm('Delete this setting?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
               </td>
             </tr>
 <?php endforeach; ?>

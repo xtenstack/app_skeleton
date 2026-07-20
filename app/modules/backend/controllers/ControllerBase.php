@@ -14,9 +14,18 @@ class ControllerBase extends Controller
      */
     protected ?array $allowedRoles = null;
 
+    /**
+     * Controllers reachable without being logged in — login itself, plus
+     * signup/email-verification/forgot-password, which by definition can't
+     * require auth.
+     */
+    private const UNAUTHENTICATED_CONTROLLERS = ['session', 'signup', 'password'];
+
     protected function onConstruct()
     {
-        if ($this->dispatcher->getControllerName() === 'session') {
+        $this->enforceCsrf();
+
+        if (in_array($this->dispatcher->getControllerName(), self::UNAUTHENTICATED_CONTROLLERS, true)) {
             return;
         }
 
@@ -35,5 +44,31 @@ class ControllerBase extends Controller
                 exit;
             }
         }
+    }
+
+    /**
+     * Every POST across the backend must carry the token the layout embeds
+     * via <meta name="csrf-token">/JS auto-injection (see index.phtml).
+     * Runs before the auth/role checks so even the unauthenticated
+     * controllers (login, signup, forgot-password) are covered.
+     */
+    private function enforceCsrf(): void
+    {
+        if (!$this->request->isPost()) {
+            return;
+        }
+
+        // checkToken() alone passes when the session has no token seeded
+        // yet (nothing to compare against) — require one to actually exist
+        // first, so a POST can't succeed without having loaded a real page.
+        if ($this->security->getSessionToken() && $this->security->checkToken()) {
+            return;
+        }
+
+        $this->flash->error('Your session expired or the form was resubmitted — please try again.');
+
+        $referer = $this->request->getHTTPReferer();
+        $this->response->redirect($referer ?: $this->url->get('backend'))->send();
+        exit;
     }
 }

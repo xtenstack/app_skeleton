@@ -23,7 +23,9 @@
               <td><?= $this->escaper->escapeHtml($setting->setting_key) ?></td>
               <td><?= $this->escaper->escapeHtml($setting->setting_value) ?></td>
               <td class="text-right">
-                <a href="<?= $this->url->get('backend/users/delete-setting/' . $targetUser->id . '/' . $setting->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this setting?')">Remove</a>
+                <form method="post" action="<?= $this->url->get('backend/users/delete-setting/' . $targetUser->id . '/' . $setting->id) ?>" class="d-inline" onsubmit="return confirm('Remove this setting?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
               </td>
             </tr>
 <?php endforeach; ?>

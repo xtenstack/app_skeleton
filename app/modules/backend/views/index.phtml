@@ -1,7 +1,7 @@
 <?php
 /** @var \Phalcon\Mvc\View\Engine\Php $this */
 $controllerName = $this->dispatcher->getControllerName();
-$isAuthPage = $controllerName === 'session';
+$isAuthPage = in_array($controllerName, ['session', 'signup', 'password'], true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -9,11 +9,39 @@ $isAuthPage = $controllerName === 'session';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>App Skeleton — Backend</title>
+    <meta name="csrf-key" content="<?= $this->escaper->escapeHtml($this->security->getTokenKey()) ?>">
+    <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
     <link rel="stylesheet" href="/assets/adminlte/plugins/fontawesome-free/css/all.min.css">
     <link rel="stylesheet" href="/assets/adminlte/css/adminlte.min.css">
   </head>
   <body class="<?= $isAuthPage ? 'hold-transition login-page' : 'sidebar-mini layout-fixed' ?>">
+<?php
+/**
+ * Phalcon\Flash\Session::output() returns an empty string in this build even
+ * though getMessages() reports the queued messages correctly, so render them
+ * by hand instead of relying on it. Rendered on every page (auth pages
+ * included) so redirects into session/signup/password — e.g. a rejected
+ * CSRF check — actually surface their flash message.
+ */
+$flashTypeClasses = [
+    'success' => 'alert-success',
+    'error'   => 'alert-danger',
+    'notice'  => 'alert-info',
+    'warning' => 'alert-warning',
+];
+$flashHtml = '';
+foreach ($this->flash->getMessages() as $flashType => $flashMessages) {
+    foreach ($flashMessages as $flashMessage) {
+        $flashHtml .= '<div class="alert alert-dismissible fade show ' . ($flashTypeClasses[$flashType] ?? 'alert-secondary') . '">'
+            . '<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>'
+            . $this->escaper->escapeHtml($flashMessage)
+            . '</div>';
+    }
+}
+$this->flash->clear();
+?>
 <?php if ($isAuthPage): ?>
+    <?= $flashHtml ?>
     <?= $this->getContent() ?>
 <?php else: ?>
     <div class="wrapper">
@@ -24,26 +52,7 @@ $isAuthPage = $controllerName === 'session';
       <div class="content-wrapper">
         <div class="content">
           <div class="container-fluid">
-<?php
-/**
- * Phalcon\Flash\Session::output() returns an empty string in this build even
- * though getMessages() reports the queued messages correctly, so render them
- * by hand instead of relying on it.
- */
-$flashTypeClasses = [
-    'success' => 'alert-success',
-    'error'   => 'alert-danger',
-    'notice'  => 'alert-info',
-    'warning' => 'alert-warning',
-];
-foreach ($this->flash->getMessages() as $flashType => $flashMessages):
-    foreach ($flashMessages as $flashMessage): ?>
-            <div class="alert <?= $flashTypeClasses[$flashType] ?? 'alert-secondary' ?>"><?= $this->escaper->escapeHtml($flashMessage) ?></div>
-<?php
-    endforeach;
-endforeach;
-$this->flash->clear();
-?>
+            <?= $flashHtml ?>
             <?= $this->getContent() ?>
           </div>
         </div>
@@ -56,5 +65,21 @@ $this->flash->clear();
     <script src="/assets/adminlte/plugins/jquery/jquery.min.js"></script>
     <script src="/assets/adminlte/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/adminlte/js/adminlte.min.js"></script>
+    <script>
+    (function () {
+      var keyMeta = document.querySelector('meta[name="csrf-key"]');
+      var tokenMeta = document.querySelector('meta[name="csrf-token"]');
+      if (!keyMeta || !tokenMeta) return;
+      document.querySelectorAll('form').forEach(function (form) {
+        if ((form.getAttribute('method') || '').toLowerCase() !== 'post') return;
+        if (form.querySelector('input[name="' + keyMeta.content + '"]')) return;
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = keyMeta.content;
+        input.value = tokenMeta.content;
+        form.appendChild(input);
+      });
+    })();
+    </script>
   </body>
 </html>

@@ -24,7 +24,9 @@
               <td><?= $this->escaper->escapeHtml($role->created_at) ?></td>
               <td class="text-right">
                 <a href="<?= $this->url->get('backend/roles/edit/' . $role->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                <a href="<?= $this->url->get('backend/roles/delete/' . $role->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this role?')">Delete</a>
+                <form method="post" action="<?= $this->url->get('backend/roles/delete/' . $role->id) ?>" class="d-inline" onsubmit="return confirm('Delete this role?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
               </td>
             </tr>
 <?php endforeach; ?>

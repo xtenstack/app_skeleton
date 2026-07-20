@@ -28,7 +28,9 @@
               <td><?= $this->escaper->escapeHtml($item->created_at) ?></td>
               <td class="text-right">
                 <a href="<?= $this->url->get('backend/items/edit/' . $item->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                <a href="<?= $this->url->get('backend/items/delete/' . $item->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this item?')">Delete</a>
+                <form method="post" action="<?= $this->url->get('backend/items/delete/' . $item->id) ?>" class="d-inline" onsubmit="return confirm('Delete this item?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
               </td>
             </tr>
 <?php endforeach; ?>
