@@ -126,7 +126,7 @@ class ItemsController extends ControllerBase
             ]);
         }
 
-        if (!$item->delete()) {
+        if (!$item->softDelete()) {
             foreach ($item->getMessages() as $message) {
                 $this->flash->error((string) $message);
             }

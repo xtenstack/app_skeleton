@@ -1,7 +1,10 @@
 <?php
 
+use App_skeleton\Models\SoftDeletes;
+
 class Items extends Phalcon\Mvc\Model
 {
+    use SoftDeletes;
 
     /**
      *
@@ -40,35 +43,19 @@ class Items extends Phalcon\Mvc\Model
     public $created_at;
 
     /**
+     *
+     * @var string
+     */
+    public $deleted_at;
+
+    /**
      * Initialize method for model.
      */
     public function initialize()
     {
         $this->setSource("items");
         $this->keepSnapshots(true);
-        $this->belongsTo('user_id', '\Users', 'id', ['alias' => 'Users']);
-    }
-
-    /**
-     * Allows to query a set of records that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return Items[]|Items|\Phalcon\Mvc\Model\ResultSetInterface
-     */
-    public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
-    {
-        return parent::find($parameters);
-    }
-
-    /**
-     * Allows to query the first record that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return Items|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
-     */
-    public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
-    {
-        return parent::findFirst($parameters);
+        $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }
 
 }
