@@ -1,0 +1,70 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="mb-0">Cron</h1>
+      <p class="text-muted mb-0">
+        Mode: <code><?= $this->escaper->escapeHtml($cronMode) ?></code>
+        — change it via <a href="<?= $this->url->get('backend/settings') ?>">Settings</a> (<code>cron_mode</code> = <code>auto</code> or <code>manual</code>).
+      </p>
+    </div>
+<?php if ($cronMode === 'manual'): ?>
+    <form method="post" action="<?= $this->url->get('backend/cron/run-now') ?>">
+      <button type="submit" class="btn btn-primary">Run now</button>
+    </form>
+<?php else: ?>
+    <button type="button" class="btn btn-secondary" disabled title="Automatic mode — set up an OS cron entry calling ./run cron run">Run now</button>
+<?php endif; ?>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Job</th>
+              <th>Frequency</th>
+              <th>Enabled</th>
+              <th>Last run</th>
+              <th>Last status</th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($jobs as $job): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($job->name) ?></td>
+              <td><code><?= $this->escaper->escapeHtml($job->task) ?> <?= $this->escaper->escapeHtml($job->task_action) ?></code></td>
+              <td><?= $this->escaper->escapeHtml($job->frequency) ?></td>
+              <td>
+<?php if ($job->enabled): ?>
+                <span class="badge badge-success">Enabled</span>
+<?php else: ?>
+                <span class="badge badge-secondary">Disabled</span>
+<?php endif; ?>
+              </td>
+              <td><?= $this->escaper->escapeHtml($job->last_run_at ?: 'Never') ?></td>
+              <td>
+<?php if ($job->last_status === 'success'): ?>
+                <span class="badge badge-success">success</span>
+<?php elseif ($job->last_status === 'error'): ?>
+                <span class="badge badge-danger" title="<?= $this->escaper->escapeHtml((string) $job->last_output) ?>">error</span>
+<?php else: ?>
+                <span class="text-muted">—</span>
+<?php endif; ?>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($jobs)): ?>
+            <tr>
+              <td colspan="6" class="text-center text-muted">No cron jobs configured.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -21,6 +21,7 @@ class SeedTask extends \Phalcon\Cli\Task
     {
         $this->seedRoles();
         $this->seedSettings();
+        $this->seedCronJobs();
 
         echo "Seeding complete." . PHP_EOL;
     }
@@ -54,6 +55,7 @@ class SeedTask extends \Phalcon\Cli\Task
     {
         $defaults = [
             'site_name' => 'App Skeleton',
+            'cron_mode' => 'manual',
         ];
 
         foreach ($defaults as $key => $value) {
@@ -76,6 +78,38 @@ class SeedTask extends \Phalcon\Cli\Task
                 echo "  settings: created '{$key}'" . PHP_EOL;
             } else {
                 echo "  settings: FAILED to create '{$key}': " . implode(', ', $setting->getMessages()) . PHP_EOL;
+            }
+        }
+    }
+
+    private function seedCronJobs(): void
+    {
+        $defaults = [
+            ['name' => 'Archive audit log', 'task' => 'audit', 'task_action' => 'archive', 'frequency' => '+1 day'],
+        ];
+
+        foreach ($defaults as $data) {
+            $exists = \CronJobs::findFirst([
+                'conditions' => 'task = :task: AND task_action = :task_action:',
+                'bind'       => ['task' => $data['task'], 'task_action' => $data['task_action']],
+            ]);
+
+            if ($exists) {
+                echo "  cron_jobs: '{$data['name']}' already exists, skipping" . PHP_EOL;
+
+                continue;
+            }
+
+            $job              = new \CronJobs();
+            $job->name        = $data['name'];
+            $job->task        = $data['task'];
+            $job->task_action = $data['task_action'];
+            $job->frequency   = $data['frequency'];
+
+            if ($job->save()) {
+                echo "  cron_jobs: created '{$data['name']}'" . PHP_EOL;
+            } else {
+                echo "  cron_jobs: FAILED to create '{$data['name']}': " . implode(', ', $job->getMessages()) . PHP_EOL;
             }
         }
     }

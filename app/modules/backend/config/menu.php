@@ -60,6 +60,13 @@ return [
         'roles'      => [1],
     ],
     [
+        'label'      => 'Cron',
+        'icon'       => 'fas fa-clock',
+        'controller' => 'cron',
+        'url'        => 'backend/cron',
+        'roles'      => [1],
+    ],
+    [
         'label'      => 'Audit Log',
         'icon'       => 'fas fa-clipboard-list',
         'controller' => 'audit-log',

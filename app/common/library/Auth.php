@@ -30,6 +30,14 @@ class Auth extends Injectable
             'role_id' => $user->role_id,
         ]);
 
+        $userSettings = [];
+
+        foreach (\UserSettings::find(['conditions' => 'user_id = :id:', 'bind' => ['id' => $user->id]]) as $setting) {
+            $userSettings[$setting->setting_key] = $setting->setting_value;
+        }
+
+        $this->session->set('user_settings', $userSettings);
+
         Audit::recordEvent('login', $user->id);
 
         return true;
@@ -46,5 +54,6 @@ class Auth extends Injectable
         Audit::recordEvent('logout', $auth['id'] ?? null);
 
         $this->session->remove('auth');
+        $this->session->remove('user_settings');
     }
 }

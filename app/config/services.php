@@ -9,6 +9,8 @@ use Phalcon\Session\Manager as SessionManager;
 use Phalcon\Session\Adapter\Stream as SessionStream;
 use App_skeleton\Audit;
 use App_skeleton\Auth;
+use App_skeleton\CronRunner;
+use App_skeleton\SettingsRegistry;
 
 $di->setShared('session', function () {
     $session = new SessionManager();
@@ -59,6 +61,29 @@ $di->setShared('auth', function () {
     $auth->setDI($this);
 
     return $auth;
+});
+
+/**
+ * Global app settings (the `settings` table), read-cached per request.
+ * $this->settings->get('key', $default) / ->set('key', $value) from any
+ * controller or view.
+ */
+$di->setShared('settings', function () {
+    $settings = new SettingsRegistry();
+    $settings->setDI($this);
+
+    return $settings;
+});
+
+/**
+ * Runs due cron_jobs — shared by the CLI runner and the manual "Run now"
+ * button so both execute identical logic.
+ */
+$di->setShared('cronRunner', function () {
+    $runner = new CronRunner();
+    $runner->setDI($this);
+
+    return $runner;
 });
 
 /**
