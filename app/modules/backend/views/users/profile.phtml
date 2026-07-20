@@ -28,6 +28,16 @@
               <input type="text" class="form-control" id="locale" name="locale" value="<?= $this->escaper->escapeHtml($profile->locale ?: 'en-AU') ?>">
             </div>
           </div>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="age_verified" name="age_verified" value="1" <?= $profile->age_verified_at ? 'checked' : '' ?>>
+            <label class="form-check-label" for="age_verified">
+              Age verified (18+, or the relevant jurisdiction's age of majority)
+<?php if ($profile->age_verified_at): ?>
+              <span class="text-muted">— set <?= $this->escaper->escapeHtml($profile->age_verified_at) ?></span>
+<?php endif; ?>
+            </label>
+            <small class="form-text text-muted">Admin-only. Not visible or settable on the user's own profile page.</small>
+          </div>
           <button type="submit" class="btn btn-primary">Save</button>
         </form>
       </div>

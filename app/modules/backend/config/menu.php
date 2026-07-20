@@ -25,6 +25,13 @@ return [
         'roles'      => null,
     ],
     [
+        'label'      => 'My Profile',
+        'icon'       => 'fas fa-id-badge',
+        'controller' => 'account',
+        'url'        => 'backend/account',
+        'roles'      => null,
+    ],
+    [
         'label'      => 'Users',
         'icon'       => 'fas fa-users',
         'controller' => 'users',

@@ -58,35 +58,21 @@ class UserProfiles extends \Phalcon\Mvc\Model
     public $updated_at;
 
     /**
+     * Admin-only — see the migration comment. Never set from the user's own
+     * self-service Account page.
+     *
+     * @var string
+     */
+    public $age_verified_at;
+
+    /**
      * Initialize method for model.
      */
     public function initialize()
     {
         $this->setSource("user_profiles");
         $this->keepSnapshots(true);
-        $this->belongsTo('user_id', '\Users', 'id', ['alias' => 'Users']);
-    }
-
-    /**
-     * Allows to query a set of records that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return UserProfiles[]|UserProfiles|\Phalcon\Mvc\Model\ResultSetInterface
-     */
-    public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
-    {
-        return parent::find($parameters);
-    }
-
-    /**
-     * Allows to query the first record that match the specified conditions
-     *
-     * @param mixed $parameters
-     * @return UserProfiles|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
-     */
-    public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
-    {
-        return parent::findFirst($parameters);
+        $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }
 
 }

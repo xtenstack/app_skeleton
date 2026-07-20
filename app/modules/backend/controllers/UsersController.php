@@ -139,6 +139,14 @@ class UsersController extends ControllerBase
             $profile->timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
             $profile->locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
 
+            $ageVerified = (bool) $this->request->getPost('age_verified');
+
+            if ($ageVerified && !$profile->age_verified_at) {
+                $profile->age_verified_at = date('Y-m-d H:i:s');
+            } elseif (!$ageVerified) {
+                $profile->age_verified_at = null;
+            }
+
             if (!$profile->save()) {
                 foreach ($profile->getMessages() as $message) {
                     $this->flash->error((string) $message);
