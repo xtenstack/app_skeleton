@@ -1,0 +1,90 @@
+/*
+ * Per-user theming layer, applied on top of AdminLTE. The effective
+ * palette/mode is resolved server-side (user_settings, falling back to the
+ * global `default_theme_*` settings, falling back to blue/auto) and written
+ * as data-palette/data-mode attributes on <html> — see index.phtml.
+ *
+ * AdminLTE 3.x ships fixed colors, not CSS custom properties, so this
+ * re-targets the handful of selectors that actually carry the brand color
+ * and page background rather than trying to theme every component.
+ */
+
+html[data-palette="blue"]   { --theme-primary: #007bff; --theme-primary-dark: #0056b3; }
+html[data-palette="purple"] { --theme-primary: #6f42c1; --theme-primary-dark: #4e2e8a; }
+html[data-palette="green"]  { --theme-primary: #28a745; --theme-primary-dark: #1e7e34; }
+html[data-palette="orange"] { --theme-primary: #fd7e14; --theme-primary-dark: #c8620a; }
+
+.main-sidebar,
+.brand-link {
+  background-color: var(--theme-primary, #007bff) !important;
+}
+
+.btn-primary {
+  background-color: var(--theme-primary, #007bff) !important;
+  border-color: var(--theme-primary-dark, #0056b3) !important;
+}
+
+.nav-sidebar > .nav-item > .nav-link.active {
+  background-color: var(--theme-primary-dark, #0056b3) !important;
+}
+
+/* Explicit dark mode */
+html[data-mode="dark"] body,
+html[data-mode="dark"] .content-wrapper {
+  background-color: #1a1d20 !important;
+  color: #e9ecef;
+}
+
+html[data-mode="dark"] .card,
+html[data-mode="dark"] .card-body,
+html[data-mode="dark"] .card-header,
+html[data-mode="dark"] .card-footer {
+  background-color: #242729 !important;
+  color: #e9ecef;
+  border-color: #33373a;
+}
+
+html[data-mode="dark"] .table,
+html[data-mode="dark"] .table td,
+html[data-mode="dark"] .table th {
+  color: #e9ecef;
+  border-color: #33373a;
+}
+
+html[data-mode="dark"] .form-control {
+  background-color: #2c2f31;
+  color: #e9ecef;
+  border-color: #444;
+}
+
+/* Auto mode: same overrides, gated by the browser's own preference instead
+   of an explicit choice, so no JS is needed to resolve "auto". */
+@media (prefers-color-scheme: dark) {
+  html[data-mode="auto"] body,
+  html[data-mode="auto"] .content-wrapper {
+    background-color: #1a1d20 !important;
+    color: #e9ecef;
+  }
+
+  html[data-mode="auto"] .card,
+  html[data-mode="auto"] .card-body,
+  html[data-mode="auto"] .card-header,
+  html[data-mode="auto"] .card-footer {
+    background-color: #242729 !important;
+    color: #e9ecef;
+    border-color: #33373a;
+  }
+
+  html[data-mode="auto"] .table,
+  html[data-mode="auto"] .table td,
+  html[data-mode="auto"] .table th {
+    color: #e9ecef;
+    border-color: #33373a;
+  }
+
+  html[data-mode="auto"] .form-control {
+    background-color: #2c2f31;
+    color: #e9ecef;
+    border-color: #444;
+  }
+}

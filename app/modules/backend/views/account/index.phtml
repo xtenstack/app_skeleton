@@ -41,6 +41,34 @@ $initial = strtoupper(substr($targetUser->first_name ?: $targetUser->email, 0, 1
 
     <div class="card">
       <div class="card-header">
+        <strong>Theme</strong>
+      </div>
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/account/save-theme') ?>">
+          <div class="form-group">
+            <label for="theme_palette">Colour palette</label>
+            <select class="form-control" id="theme_palette" name="theme_palette">
+<?php foreach (['blue' => 'Blue', 'purple' => 'Purple', 'green' => 'Green', 'orange' => 'Orange'] as $value => $label): ?>
+              <option value="<?= $value ?>" <?= $themePalette === $value ? 'selected' : '' ?>><?= $label ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mode</label>
+<?php foreach (['light' => 'Light', 'dark' => 'Dark', 'auto' => 'Auto (match system)'] as $value => $label): ?>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="theme_mode" id="theme_mode_<?= $value ?>" value="<?= $value ?>" <?= $themeMode === $value ? 'checked' : '' ?>>
+              <label class="form-check-label" for="theme_mode_<?= $value ?>"><?= $label ?></label>
+            </div>
+<?php endforeach; ?>
+          </div>
+          <button type="submit" class="btn btn-outline-primary btn-block btn-sm">Save theme</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
         <strong>API Keys</strong>
       </div>
       <div class="card-body p-0">

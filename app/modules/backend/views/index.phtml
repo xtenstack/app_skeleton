@@ -2,9 +2,32 @@
 /** @var \Phalcon\Mvc\View\Engine\Php $this */
 $controllerName = $this->dispatcher->getControllerName();
 $isAuthPage = in_array($controllerName, ['session', 'signup', 'password'], true);
+
+/**
+ * Effective theme: the logged-in user's own preference (session-cached
+ * user_settings, see Auth::check()), falling back to the admin-set global
+ * default, falling back to a hardcoded default — so a missing/corrupt
+ * setting never breaks the page, it just falls through to blue/auto.
+ */
+$allowedPalettes = ['blue', 'purple', 'green', 'orange'];
+$allowedModes    = ['light', 'dark', 'auto'];
+$userSettings    = $this->session->get('user_settings') ?? [];
+$themePalette    = $userSettings['theme_palette'] ?? $this->settings->get('default_theme_palette', 'blue');
+$themeMode       = $userSettings['theme_mode'] ?? $this->settings->get('default_theme_mode', 'auto');
+
+if (!in_array($themePalette, $allowedPalettes, true)) {
+    $themePalette = 'blue';
+}
+
+if (!in_array($themeMode, $allowedModes, true)) {
+    $themeMode = 'auto';
+}
+
+$isAdmin     = ((int) ($this->session->get('auth')['role_id'] ?? 0)) === 1;
+$debugActive = !$isAuthPage && $isAdmin && $this->settings->get('debug_mode', '0') === '1';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-palette="<?= $this->escaper->escapeHtmlAttr($themePalette) ?>" data-mode="<?= $this->escaper->escapeHtmlAttr($themeMode) ?>">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,6 +36,7 @@ $isAuthPage = in_array($controllerName, ['session', 'signup', 'password'], true)
     <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
     <link rel="stylesheet" href="/assets/adminlte/plugins/fontawesome-free/css/all.min.css">
     <link rel="stylesheet" href="/assets/adminlte/css/adminlte.min.css">
+    <link rel="stylesheet" href="/assets/css/theme.css">
   </head>
   <body class="<?= $isAuthPage ? 'hold-transition login-page' : 'sidebar-mini layout-fixed' ?>">
 <?php
@@ -81,5 +105,8 @@ $this->flash->clear();
       });
     })();
     </script>
+<?php if ($debugActive): ?>
+    <?= $this->partial('partials/debugbar') ?>
+<?php endif; ?>
   </body>
 </html>

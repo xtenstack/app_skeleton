@@ -18,14 +18,21 @@ class AccountController extends ControllerBase
 
     private const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
+    private const ALLOWED_PALETTES = ['blue', 'purple', 'green', 'orange'];
+    private const ALLOWED_MODES    = ['light', 'dark', 'auto'];
+
     public function indexAction()
     {
         $userId = $this->currentUserId();
         $user   = \Users::findFirstById($userId);
 
-        $this->view->targetUser = $user;
-        $this->view->profile    = $this->currentProfile($userId);
-        $this->view->apiKeys    = \ApiKeys::find([
+        $userSettings = $this->session->get('user_settings') ?? [];
+
+        $this->view->targetUser     = $user;
+        $this->view->profile        = $this->currentProfile($userId);
+        $this->view->themePalette   = $userSettings['theme_palette'] ?? $this->settings->get('default_theme_palette', 'blue');
+        $this->view->themeMode      = $userSettings['theme_mode'] ?? $this->settings->get('default_theme_mode', 'auto');
+        $this->view->apiKeys        = \ApiKeys::find([
             'conditions' => 'user_id = :id: AND revoked_at IS NULL',
             'bind'       => ['id' => $userId],
             'order'      => 'id DESC',
@@ -67,6 +74,51 @@ class AccountController extends ControllerBase
         }
 
         return $this->response->redirect($this->url->get('backend/account'));
+    }
+
+    public function saveThemeAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->response->redirect($this->url->get('backend/account'));
+        }
+
+        $palette = (string) $this->request->getPost('theme_palette', 'string');
+        $mode    = (string) $this->request->getPost('theme_mode', 'string');
+
+        if (!in_array($palette, self::ALLOWED_PALETTES, true) || !in_array($mode, self::ALLOWED_MODES, true)) {
+            $this->flash->error('Invalid theme selection');
+
+            return $this->response->redirect($this->url->get('backend/account'));
+        }
+
+        $userId = $this->currentUserId();
+
+        $this->upsertSetting($userId, 'theme_palette', $palette);
+        $this->upsertSetting($userId, 'theme_mode', $mode);
+
+        // Also update the session copy so the new theme applies on this
+        // response's own redirect, not just after the next login.
+        $userSettings                   = $this->session->get('user_settings') ?? [];
+        $userSettings['theme_palette']  = $palette;
+        $userSettings['theme_mode']     = $mode;
+        $this->session->set('user_settings', $userSettings);
+
+        $this->flash->success('Theme updated');
+
+        return $this->response->redirect($this->url->get('backend/account'));
+    }
+
+    private function upsertSetting(int $userId, string $key, string $value): void
+    {
+        $setting = \UserSettings::findFirst([
+            'conditions' => 'user_id = :user_id: AND setting_key = :key:',
+            'bind'       => ['user_id' => $userId, 'key' => $key],
+        ]) ?: new \UserSettings();
+
+        $setting->user_id       = $userId;
+        $setting->setting_key   = $key;
+        $setting->setting_value = $value;
+        $setting->save();
     }
 
     public function uploadAvatarAction()

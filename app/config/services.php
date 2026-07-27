@@ -29,6 +29,16 @@ $di->setShared('config', function () {
 });
 
 /**
+ * Query profiler for the debug bar — attached unconditionally (cheap: it
+ * just records SQL + elapsed time per query) so debug_mode can be toggled
+ * without needing to rebuild the db service. Only *displayed* when
+ * debug_mode is on and the viewer is an admin (see index.phtml).
+ */
+$di->setShared('dbProfiler', function () {
+    return new \Phalcon\Db\Profiler();
+});
+
+/**
  * Database connection is created based in the parameters defined in the configuration file
  */
 $di->setShared('db', function () {
@@ -43,7 +53,19 @@ $di->setShared('db', function () {
         unset($params['charset']);
     }
 
-    return new $class($params);
+    $connection = new $class($params);
+
+    $profiler = $this->getShared('dbProfiler');
+    $dbEventsManager = new EventsManager();
+    $dbEventsManager->attach('db:beforeQuery', function ($event, $connection) use ($profiler) {
+        $profiler->startProfile($connection->getSQLStatement());
+    });
+    $dbEventsManager->attach('db:afterQuery', function ($event, $connection) use ($profiler) {
+        $profiler->stopProfile();
+    });
+    $connection->setEventsManager($dbEventsManager);
+
+    return $connection;
 });
 
 /**

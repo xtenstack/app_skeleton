@@ -6,6 +6,7 @@ use Phalcon\Mvc\Application;
 
 error_reporting(E_ALL);
 
+define('APP_START', microtime(true));
 define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/app');
 
@@ -88,6 +89,18 @@ try {
      * Include Autoloader
      */
     include APP_PATH . '/config/loader.php';
+
+    /**
+     * Debug mode is read once per request here (not inside services.php)
+     * since it needs the db+models autoloader already registered. Wrapped
+     * in try/catch so a fresh install (settings table not migrated yet)
+     * doesn't crash the whole request — debug bar just stays off.
+     */
+    try {
+        \App_skeleton\Debug::configure($di->getShared('settings')->get('debug_mode', '0') === '1');
+    } catch (\Throwable $e) {
+        \App_skeleton\Debug::configure(false);
+    }
 
     /**
      * Handle the request

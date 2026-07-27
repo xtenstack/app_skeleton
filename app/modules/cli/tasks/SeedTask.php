@@ -54,9 +54,12 @@ class SeedTask extends \Phalcon\Cli\Task
     private function seedSettings(): void
     {
         $defaults = [
-            'site_name' => 'App Skeleton',
-            'cron_mode' => 'manual',
-            'mail_from' => 'no-reply@app-skeleton.local',
+            'site_name'            => 'App Skeleton',
+            'cron_mode'            => 'manual',
+            'mail_from'            => 'no-reply@app-skeleton.local',
+            'debug_mode'           => '0',
+            'default_theme_palette' => 'blue',
+            'default_theme_mode'    => 'auto',
         ];
 
         foreach ($defaults as $key => $value) {

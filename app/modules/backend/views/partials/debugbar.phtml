@@ -1,0 +1,63 @@
+<?php
+/**
+ * Only included from index.phtml when debug_mode is on and the viewer is an
+ * admin (see $debugActive there) — never shipped to members even if
+ * debug_mode is globally enabled, since query text/log lines can leak
+ * internals. Collapsed by default, plain vanilla JS toggle (no extra deps).
+ */
+$elapsedMs   = number_format((microtime(true) - APP_START) * 1000, 1);
+$peakMemory  = number_format(memory_get_peak_usage(true) / 1024 / 1024, 2);
+$queries     = $this->dbProfiler->getProfiles() ?: [];
+$queryTimeMs = number_format($this->dbProfiler->getTotalElapsedSeconds() * 1000, 1);
+$messages    = \App_skeleton\Debug::messages();
+
+$logPath  = BASE_PATH . '/logs/app.log';
+$logTail  = '';
+if (is_file($logPath)) {
+    $size   = filesize($logPath);
+    $handle = fopen($logPath, 'rb');
+    fseek($handle, -min($size, 4000), SEEK_END);
+    $logTail = stream_get_contents($handle);
+    fclose($handle);
+}
+?>
+<div id="debugbar" style="position:fixed;bottom:0;left:0;right:0;z-index:2000;font-family:monospace;font-size:12px;background:#212529;color:#e9ecef;border-top:2px solid #fd7e14;">
+  <div style="display:flex;gap:16px;padding:6px 12px;align-items:center;cursor:pointer;" onclick="var p=document.getElementById('debugbar-panel');p.style.display=p.style.display==='none'?'block':'none';">
+    <strong style="color:#fd7e14;">DEBUG</strong>
+    <span><?= $this->escaper->escapeHtml($this->dispatcher->getModuleName()) ?>/<?= $this->escaper->escapeHtml($this->dispatcher->getControllerName()) ?>/<?= $this->escaper->escapeHtml($this->dispatcher->getActionName()) ?></span>
+    <span><?= $elapsedMs ?> ms</span>
+    <span><?= $peakMemory ?> MB</span>
+    <span><?= count($queries) ?> queries (<?= $queryTimeMs ?> ms)</span>
+<?php if ($messages): ?>
+    <span><?= count($messages) ?> debug msg<?= count($messages) === 1 ? '' : 's' ?></span>
+<?php endif; ?>
+    <span style="margin-left:auto;opacity:0.6;">click to expand/collapse</span>
+  </div>
+  <div id="debugbar-panel" style="display:none;max-height:40vh;overflow:auto;padding:8px 12px;border-top:1px solid #444;">
+<?php if ($queries): ?>
+    <div><strong>Queries</strong></div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+<?php foreach ($queries as $query): ?>
+      <tr style="border-bottom:1px solid #333;">
+        <td style="padding:2px 8px 2px 0;white-space:nowrap;vertical-align:top;color:#adb5bd;"><?= number_format($query->getTotalElapsedSeconds() * 1000, 2) ?> ms</td>
+        <td style="padding:2px 0;word-break:break-all;"><?= $this->escaper->escapeHtml($query->getSqlStatement()) ?></td>
+      </tr>
+<?php endforeach; ?>
+    </table>
+<?php endif; ?>
+
+<?php if ($messages): ?>
+    <div><strong>Debug messages</strong></div>
+    <ul style="margin:4px 0 12px 16px;padding:0;">
+<?php foreach ($messages as $message): ?>
+      <li>[<?= $this->escaper->escapeHtml($message['level']) ?>] <?= $this->escaper->escapeHtml($message['message']) ?></li>
+<?php endforeach; ?>
+    </ul>
+<?php endif; ?>
+
+<?php if ($logTail !== ''): ?>
+    <div><strong>Recent log (logs/app.log tail)</strong></div>
+    <pre style="white-space:pre-wrap;margin:4px 0 0;color:#adb5bd;"><?= $this->escaper->escapeHtml($logTail) ?></pre>
+<?php endif; ?>
+  </div>
+</div>
