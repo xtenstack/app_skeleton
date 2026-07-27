@@ -2,7 +2,7 @@
     "name": "travissaron/app-skeleton",
     "description": "Phalcon 5.8 multi-module skeleton: server-rendered AdminLTE backend + JSON API module, with auth, RBAC, audit logging (with reversal), soft deletes, a cron system, and signup/verification/password-reset flows.",
     "type": "project",
-    "license": "proprietary",
+    "license": "MIT",
     "require": {
         "php": "^8.3",
         "ext-phalcon": "^5.8",
