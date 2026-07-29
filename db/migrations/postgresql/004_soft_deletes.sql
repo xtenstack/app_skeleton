@@ -3,5 +3,5 @@
 -- can flip themselves). Applied to the two existing user-managed entities;
 -- new tables (e.g. external_connections) should include deleted_at from the
 -- start rather than being retrofitted here.
-ALTER TABLE users ADD COLUMN deleted_at DATETIME;
-ALTER TABLE items ADD COLUMN deleted_at DATETIME;
+ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP;
+ALTER TABLE items ADD COLUMN deleted_at TIMESTAMP;

@@ -57,6 +57,25 @@ html[data-mode="dark"] .form-control {
   border-color: #444;
 }
 
+html[data-mode="dark"] .main-header.navbar {
+  background-color: #1e2124 !important;
+  border-bottom: 1px solid #33373a;
+}
+
+html[data-mode="dark"] .main-header.navbar .nav-link {
+  color: #e9ecef !important;
+}
+
+html[data-mode="dark"] .main-header.navbar .nav-link:hover {
+  color: #ffffff !important;
+}
+
+html[data-mode="dark"] .main-footer {
+  background-color: #1e2124 !important;
+  color: #e9ecef;
+  border-top: 1px solid #33373a;
+}
+
 /* Auto mode: same overrides, gated by the browser's own preference instead
    of an explicit choice, so no JS is needed to resolve "auto". */
 @media (prefers-color-scheme: dark) {
@@ -86,5 +105,24 @@ html[data-mode="dark"] .form-control {
     background-color: #2c2f31;
     color: #e9ecef;
     border-color: #444;
+  }
+
+  html[data-mode="auto"] .main-header.navbar {
+    background-color: #1e2124 !important;
+    border-bottom: 1px solid #33373a;
+  }
+
+  html[data-mode="auto"] .main-header.navbar .nav-link {
+    color: #e9ecef !important;
+  }
+
+  html[data-mode="auto"] .main-header.navbar .nav-link:hover {
+    color: #ffffff !important;
+  }
+
+  html[data-mode="auto"] .main-footer {
+    background-color: #1e2124 !important;
+    color: #e9ecef;
+    border-top: 1px solid #33373a;
   }
 }

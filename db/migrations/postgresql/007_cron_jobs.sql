@@ -5,15 +5,15 @@
 -- deliberately, to keep this simple. task/task_action map directly to a CLI
 -- task class + action (e.g. task='audit', task_action='archive' -> AuditTask::archiveAction()).
 CREATE TABLE cron_jobs (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              SERIAL PRIMARY KEY,
     name            VARCHAR(100) NOT NULL,
     task            VARCHAR(50) NOT NULL,
     task_action     VARCHAR(50) NOT NULL,
     frequency       VARCHAR(50) NOT NULL,
     enabled         INTEGER NOT NULL DEFAULT 1,
-    last_run_at     DATETIME,
+    last_run_at     TIMESTAMP,
     last_status     VARCHAR(20),
     last_output     TEXT,
-    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -3,6 +3,8 @@
     "description": "Phalcon 5.8 multi-module skeleton: server-rendered AdminLTE backend + JSON API module, with auth, RBAC, audit logging (with reversal), soft deletes, a cron system, and signup/verification/password-reset flows.",
     "type": "project",
     "license": "MIT",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "require": {
         "php": "^8.3",
         "ext-phalcon": "^5.8",
@@ -11,6 +13,11 @@
     },
     "require-dev": {
         "phalcon/devtools": "^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "App_skeleton\\": "app/common/library/"
+        }
     },
     "config": {
         "optimize-autoloader": true,

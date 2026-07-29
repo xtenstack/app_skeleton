@@ -8,6 +8,15 @@ define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/app');
 
 /**
+ * See app/bootstrap_web.php — same guarded Composer autoload for module
+ * packages, needed here too since MigrateTask/ModulesTask both discover
+ * modules from the CLI.
+ */
+if (file_exists(BASE_PATH . '/vendor/autoload.php')) {
+    require BASE_PATH . '/vendor/autoload.php';
+}
+
+/**
  * The FactoryDefault Dependency Injector automatically registers the services that
  * provide a full stack framework. These default services can be overidden with custom ones.
  */

@@ -35,4 +35,15 @@ foreach ($application->getModules() as $key => $module) {
         'action' => 2,
         'params' => 3
     ]);
+
+    /**
+     * Optional extension point: a module can define its own
+     * registerRoutes(Router $router) to add routes beyond the generic
+     * pattern above (e.g. a public certificate-validation URL with no
+     * :controller/:action shape). No effect on modules that don't
+     * implement it.
+     */
+    if (method_exists($module['className'], 'registerRoutes')) {
+        (new $module['className']())->registerRoutes($router);
+    }
 }

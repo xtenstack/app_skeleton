@@ -1,0 +1,65 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1 class="mb-0">Configuration</h1>
+    <p class="text-muted mb-0">Instance-level admin tools. Starts with module management — more will land here over time.</p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title mb-0">Modules</h3>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Code</th>
+              <th>Tier</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($modules as $module): ?>
+            <tr>
+              <td><code><?= $this->escaper->escapeHtml($module->module_key) ?></code></td>
+              <td><?= $this->escaper->escapeHtml((string) $module->code) ?></td>
+              <td><?= $this->escaper->escapeHtml($module->tier) ?></td>
+              <td><?= $this->escaper->escapeHtml((string) $module->version) ?></td>
+              <td>
+<?php if ($module->enabled): ?>
+                <span class="badge badge-success">Enabled</span>
+<?php else: ?>
+                <span class="badge badge-secondary">Disabled</span>
+<?php endif; ?>
+              </td>
+              <td class="text-right">
+<?php if ($module->enabled): ?>
+                <form method="post" action="<?= $this->url->get('backend/configuration/disable/' . $module->module_key) ?>">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">Disable</button>
+                </form>
+<?php else: ?>
+                <form method="post" action="<?= $this->url->get('backend/configuration/enable/' . $module->module_key) ?>">
+                  <button type="submit" class="btn btn-sm btn-primary">Enable</button>
+                </form>
+<?php endif; ?>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($modules)): ?>
+            <tr>
+              <td colspan="6" class="text-center text-muted">
+                No modules discovered yet — install a module package via Composer, then run <code>./run modules sync</code>.
+              </td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -11,6 +11,16 @@ define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/app');
 
 /**
+ * Composer-installed module packages (see App_skeleton\ModuleManager) are
+ * resolved via Composer's own PSR-4 autoload, not our hand-rolled loader.
+ * Guarded so a checkout that hasn't run `composer install` yet still boots
+ * with just the built-in api/backend modules.
+ */
+if (file_exists(BASE_PATH . '/vendor/autoload.php')) {
+    require BASE_PATH . '/vendor/autoload.php';
+}
+
+/**
  * Point PHP's own error_log at a project-local file instead of reimplementing
  * capture ourselves — PHP already logs warnings/notices/true fatals natively
  * (log_errors=On), the system default just points at a shared, noisy,
@@ -108,12 +118,25 @@ try {
     $application = new Application($di);
 
     /**
-     * Register application modules
+     * Register application modules — the two built-in ones plus whatever
+     * Composer-installed module packages are discovered and enabled (see
+     * App_skeleton\ModuleManager). Wrapped the same way the debug_mode
+     * lookup above is: a fresh install (module_registry not migrated yet)
+     * or an unreachable DB just falls back to the built-in modules only,
+     * rather than crashing the whole request.
      */
-    $application->registerModules([
+    $builtInModules = [
         'api'     => ['className' => 'App_skeleton\Modules\Api\Module'],
         'backend' => ['className' => 'App_skeleton\Modules\Backend\Module'],
-    ]);
+    ];
+
+    try {
+        $discoveredModules = $di->getShared('moduleManager')->registeredPhalconModules();
+    } catch (\Throwable $e) {
+        $discoveredModules = [];
+    }
+
+    $application->registerModules($builtInModules + $discoveredModules);
 
     /**
      * Include routes

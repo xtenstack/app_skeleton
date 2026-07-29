@@ -11,6 +11,7 @@ use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
 use App_skeleton\Mailer;
+use App_skeleton\ModuleManager;
 use App_skeleton\SettingsRegistry;
 
 $di->setShared('session', function () {
@@ -44,13 +45,21 @@ $di->setShared('dbProfiler', function () {
 $di->setShared('db', function () {
     $config = $this->getConfig();
 
-    $class = 'Phalcon\Db\Adapter\Pdo\\' . $config->database->adapter;
-    $params = [
-        'dbname'   => $config->database->dbname,
-    ];
+    $class  = 'Phalcon\Db\Adapter\Pdo\\' . $config->database->adapter;
+    $params = ['dbname' => $config->database->dbname];
 
-    if ($config->database->adapter == 'Postgresql') {
-        unset($params['charset']);
+    if ($config->database->adapter === 'Postgresql') {
+        $params['host']     = $config->database->host;
+        $params['port']     = $config->database->port;
+        $params['username'] = $config->database->username;
+        $params['password'] = $config->database->password;
+
+        // libpq's default gssencmode=prefer probes system Kerberos config on
+        // every new connection, which crashes (SIGSEGV in CFPreferences, a
+        // known macOS bug) the first time it runs inside a freshly-forked
+        // PHP dev-server worker. Not needed anyway — nothing here uses
+        // Kerberos auth. See project_app_skeleton_postgres_gssapi_crash memory.
+        $params['gssencmode'] = 'disable';
     }
 
     $connection = new $class($params);
@@ -130,6 +139,34 @@ $di->setShared('audit', function () {
     $audit->setDI($this);
 
     return $audit;
+});
+
+/**
+ * Discovers Composer-installed module packages and their module_registry
+ * enable/disable state — see App_skeleton\ModuleManager. Used by
+ * bootstrap_web.php to build the registerModules() array, by routes.php's
+ * registerRoutes() hook, by sidenav.phtml/IndexController for the merged
+ * menu, and by MigrateTask/ModulesTask from the CLI.
+ */
+$di->setShared('moduleManager', function () {
+    $moduleManager = new ModuleManager();
+    $moduleManager->setDI($this);
+
+    return $moduleManager;
+});
+
+/**
+ * Shared event bus for modules to react to each other without direct
+ * coupling (e.g. 'payment:completed', 'user:created') — modelled on how
+ * the audit listener below is attached to the models manager, but for
+ * app-level events rather than model lifecycle ones. Modules attach their
+ * own listeners inside their own Module::registerServices($di). Event
+ * names are colon-namespaced ('type:event'), matching the db:beforeQuery /
+ * db:afterQuery convention already used for the db service above and
+ * Phalcon's own EventsManager wildcard-attach semantics.
+ */
+$di->setShared('eventsBus', function () {
+    return new EventsManager();
 });
 
 /**

@@ -5,11 +5,14 @@
 </div>
 
 <div class="row">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <p>Signed in. <a href="<?= $this->url->get('backend/items') ?>">Manage items</a>.</p>
+<?php foreach ($tiles as $tile): ?>
+  <div class="col-md-4 col-sm-6 mb-4">
+    <a href="<?= $this->url->get($tile['url']) ?>" class="card text-decoration-none h-100">
+      <div class="card-body text-center py-4">
+        <i class="<?= $tile['icon'] ?> fa-2x mb-3 text-primary"></i>
+        <p class="h5 mb-0"><?= $this->escaper->escapeHtml($tile['label']) ?></p>
       </div>
-    </div>
+    </a>
   </div>
+<?php endforeach; ?>
 </div>

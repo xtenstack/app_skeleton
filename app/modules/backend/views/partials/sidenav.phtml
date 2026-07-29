@@ -2,7 +2,7 @@
 /** @var \Phalcon\Mvc\View\Engine\Php $this */
 /** @var string $controllerName */
 
-$menu   = include __DIR__ . '/../../config/menu.php';
+$menu   = $this->moduleManager->mergedMenu('backend');
 $roleId = $this->session->get('auth')['role_id'] ?? null;
 ?>
 <aside class="main-sidebar sidebar-dark-primary elevation-4">

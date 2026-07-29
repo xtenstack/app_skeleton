@@ -1,7 +1,8 @@
 <?php
 /** @var \Phalcon\Mvc\View\Engine\Php $this */
 $controllerName = $this->dispatcher->getControllerName();
-$isAuthPage = in_array($controllerName, ['session', 'signup', 'password'], true);
+$isGuestLanding = $controllerName === 'index' && !$this->session->has('auth');
+$isAuthPage = $isGuestLanding || in_array($controllerName, ['session', 'signup', 'password'], true);
 
 /**
  * Effective theme: the logged-in user's own preference (session-cached
@@ -38,7 +39,7 @@ $debugActive = !$isAuthPage && $isAdmin && $this->settings->get('debug_mode', '0
     <link rel="stylesheet" href="/assets/adminlte/css/adminlte.min.css">
     <link rel="stylesheet" href="/assets/css/theme.css">
   </head>
-  <body class="<?= $isAuthPage ? 'hold-transition login-page' : 'sidebar-mini layout-fixed' ?>">
+  <body class="<?= $isGuestLanding ? 'hold-transition' : ($isAuthPage ? 'hold-transition login-page' : 'sidebar-mini layout-fixed') ?>">
 <?php
 /**
  * Phalcon\Flash\Session::output() returns an empty string in this build even

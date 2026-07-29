@@ -27,3 +27,7 @@
 # Symmetric key for App_skeleton\Crypto (external_connections credentials) —
 # auto-generated on first use, back it up separately from the repo/db.
 /.encryption_key
+
+# Per-environment overrides (DB credentials, etc.) — never committed, see
+# app/config/config.php for how it's merged in.
+/app/config/config.local.php

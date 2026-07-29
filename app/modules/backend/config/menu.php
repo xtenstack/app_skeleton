@@ -53,6 +53,13 @@ return [
         'roles'      => [1],
     ],
     [
+        'label'      => 'Configuration',
+        'icon'       => 'fas fa-sliders-h',
+        'controller' => 'configuration',
+        'url'        => 'backend/configuration',
+        'roles'      => [1],
+    ],
+    [
         'label'      => 'API Keys (Internal)',
         'icon'       => 'fas fa-key',
         'controller' => 'api-keys',

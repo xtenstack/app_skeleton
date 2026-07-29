@@ -15,11 +15,12 @@ class ControllerBase extends Controller
     protected ?array $allowedRoles = null;
 
     /**
-     * Controllers reachable without being logged in — login itself, plus
-     * signup/email-verification/forgot-password, which by definition can't
-     * require auth.
+     * Controllers reachable without being logged in — login itself,
+     * signup/email-verification/forgot-password (which by definition can't
+     * require auth), and the landing page (serves both guests and logged-in
+     * users, branching itself on auth state rather than being gated here).
      */
-    private const UNAUTHENTICATED_CONTROLLERS = ['session', 'signup', 'password'];
+    private const UNAUTHENTICATED_CONTROLLERS = ['session', 'signup', 'password', 'index'];
 
     protected function onConstruct()
     {

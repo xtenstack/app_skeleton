@@ -6,12 +6,22 @@
 defined('BASE_PATH') || define('BASE_PATH', getenv('BASE_PATH') ?: realpath(dirname(__FILE__) . '/../..'));
 defined('APP_PATH') || define('APP_PATH', BASE_PATH . '/app');
 
-return new \Phalcon\Config\Config([
+/**
+ * Base config, safe to commit — no secrets. Per-environment values (DB
+ * password, anything else machine-specific) live in the gitignored
+ * config.local.php, merged in below if present. See db/migrations/ for
+ * schema changes — this file only says how to connect, not what's in it.
+ */
+$base = [
     'version' => '1.0',
 
     'database' => [
-        'adapter'  => 'Sqlite',
-        'dbname'   => BASE_PATH . '/db/app_skeleton.sqlite',
+        'adapter'  => 'Postgresql',
+        'host'     => 'localhost',
+        'port'     => 5432,
+        'dbname'   => 'app_skeleton',
+        'username' => 'app_skeleton',
+        'password' => '',
     ],
 
     'application' => [
@@ -31,5 +41,10 @@ return new \Phalcon\Config\Config([
      *
      * You can disable this behaviour if the output of your application needs to don't have a new line at end
      */
-    'printNewLine' => true
-]);
+    'printNewLine' => true,
+];
+
+$localConfigFile = __DIR__ . '/config.local.php';
+$local = is_file($localConfigFile) ? (array) include $localConfigFile : [];
+
+return new \Phalcon\Config\Config(array_replace_recursive($base, $local));
