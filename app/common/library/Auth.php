@@ -81,7 +81,7 @@ class Auth extends Injectable
         $row = $this->db->fetchOne(
             "SELECT COUNT(*) AS c FROM audit_log
              WHERE entity_type = 'auth' AND action = 'login_failed' AND created_at >= :since
-             AND (new_values LIKE :emailLike ESCAPE '\\' OR new_values LIKE :ipLike ESCAPE '\\')",
+             AND (new_values LIKE :emailLike ESCAPE '!' OR new_values LIKE :ipLike ESCAPE '!')",
             null,
             [
                 'since'     => $since,
@@ -93,8 +93,17 @@ class Auth extends Injectable
         return ((int) ($row['c'] ?? 0)) >= self::RATE_LIMIT_MAX;
     }
 
+    /**
+     * '!' rather than the more conventional '\' — a literal backslash
+     * immediately before the closing quote in `ESCAPE '\\'` (i.e. the SQL
+     * text `ESCAPE '\'`) confuses PDO's own named-placeholder scanner, not
+     * Postgres itself: it misreads the string-literal boundary and throws
+     * "SQLSTATE[HY093]: Invalid parameter number" on whichever placeholder
+     * comes after. Reproduced directly against PDO outside of Phalcon
+     * entirely before changing this — not a Phalcon or app-specific bug.
+     */
     private function escapeLike(string $value): string
     {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value);
     }
 }
