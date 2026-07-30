@@ -50,7 +50,13 @@ ARG DEBIAN_FRONTEND=noninteractive
 # regardless of what this app's own code calls. gd, imagick, memcached,
 # gettext are still genuinely unused (grepped the codebase to confirm) and
 # stay out. curl is kept despite being unused today, for the coming
-# ExternalConnections work.
+# ExternalConnections work. msmtp/msmtp-mta (not a PHP extension — a
+# system package, from Debian's own repo, not sury's) provide a
+# sendmail-compatible relay binary for PHP's mail(): a drop-in swap for
+# local dev's mhsendmail-to-MailHog, relaying instead to a real SMTP
+# server via entrypoint.sh's rendered /etc/msmtprc. Only actually wired up
+# (sendmail_path set) if SMTP_HOST/SMTP_PASSWORD are configured — see
+# entrypoint.sh.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg lsb-release \
     && curl -sSL https://packages.sury.org/php/apt.gpg -o /etc/apt/trusted.gpg.d/sury-php.gpg \
@@ -62,6 +68,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         php8.3-sqlite3 \
         php8.3-curl \
         php8.3-mbstring \
+        msmtp \
+        msmtp-mta \
     # Sury's default pool listens on a Unix socket (/run/php/php8.3-fpm.sock)
     # — switched to TCP :9000 since Caddy and PHP-FPM are separate
     # containers here, not sharing a filesystem for a socket.

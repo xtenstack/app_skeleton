@@ -19,6 +19,15 @@ services:
       DB_NAME: ${DB_NAME:-app_skeleton}
       DB_USER: ${DB_USER:-app_skeleton}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # Optional — mail() has no MTA to relay through until these are set
+      # (existing, pre-2026-07-30 behavior: send fails, gets logged, request
+      # still succeeds). Empty defaults rather than a required ${VAR:?...}
+      # since local dev shouldn't need real mail credentials just to run
+      # the stack.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
     volumes:
       - ./data/encryption_key:/app/.encryption_key
       - ./data/files:/app/public/files
