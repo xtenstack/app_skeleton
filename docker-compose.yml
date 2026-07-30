@@ -11,6 +11,7 @@
 services:
   app:
     build: .
+    restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-development}
       DB_HOST: db
@@ -28,6 +29,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    restart: unless-stopped
     ports:
       # Default to non-privileged local ports so this doesn't fight
       # anything already on :80/:443 during local dev. Real deployments
@@ -57,6 +59,7 @@ services:
 
   db:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-app_skeleton}
       POSTGRES_USER: ${DB_USER:-app_skeleton}
