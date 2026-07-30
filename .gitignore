@@ -31,3 +31,8 @@
 # Per-environment overrides (DB credentials, etc.) — never committed, see
 # app/config/config.php for how it's merged in.
 /app/config/config.local.php
+
+# Docker Compose local stack — DB creds and stateful volumes (uploads,
+# logs, the encryption key), see docker-compose.yml/.env.example.
+/.env
+/data/

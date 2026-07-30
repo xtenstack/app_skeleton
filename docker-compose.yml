@@ -1,0 +1,75 @@
+# Local build/test stack for app_skeleton — the same app image this
+# produces is what Internal Prod, every External Client instance, and the
+# dev droplet's own local test stack run (see
+# stack.xten.au/VPS-Two-Droplet-Deploy-Plan.md). Actual prod/client
+# deploys pull a pre-built, tagged image rather than building here — this
+# file is for local iteration and for the dev droplet's pre-prod testing.
+#
+# First-time setup (see docker/entrypoint.sh for why):
+#   mkdir -p data && touch data/encryption_key
+#   cp .env.example .env   # then fill in real values
+services:
+  app:
+    build: .
+    environment:
+      APP_ENV: development
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-app_skeleton}
+      DB_USER: ${DB_USER:-app_skeleton}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - ./data/encryption_key:/app/.encryption_key
+      - ./data/files:/app/public/files
+      - ./data/logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8080:80"
+      - "8443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Static assets (css/js/img) come straight from the host repo's
+      # public/ — the more specific mount below overrides just the
+      # files/ subpath with the same host dir the app container writes
+      # uploads into, so avatars show up without duplicating that data.
+      # The outer mount can't be :ro — Docker needs to create the inner
+      # mount's mountpoint directory inside it, which fails against an
+      # already-read-only parent mount even though the dir exists on the
+      # host (verified 2026-07-30). Caddy has no reason to write here
+      # regardless, so this isn't a meaningful loosening.
+      - ./public:/app/public
+      - ./data/files:/app/public/files:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-app_skeleton}
+      POSTGRES_USER: ${DB_USER:-app_skeleton}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      # Postgres 18's image changed its expected layout — it wants a
+      # single mount at /var/lib/postgresql (manages its own
+      # version-specific subdirectory beneath it, pg_ctlcluster-style),
+      # not the older .../data convention. Verified 2026-07-30: the
+      # container refuses to start at all against the old path, even with
+      # a freshly-created empty volume.
+      - db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app_skeleton}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
+  caddy_data:
