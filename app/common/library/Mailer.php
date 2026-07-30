@@ -19,7 +19,16 @@ class Mailer extends Injectable
     public function send(string $to, string $subject, string $body): bool
     {
         $from    = $this->settings->get('mail_from', 'no-reply@localhost');
+        $replyTo = $this->settings->get('mail_reply_to', '');
         $headers = "From: {$from}\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+
+        // Deliberately separate from `from` — lets outgoing mail be sent
+        // via a dedicated transactional domain/service while replies still
+        // land in a real, checked mailbox. Empty by default: only added if
+        // an instance has actually configured one.
+        if ($replyTo !== '') {
+            $headers .= "Reply-To: {$replyTo}\r\n";
+        }
 
         $sent = @mail($to, $subject, $body, $headers);
 

@@ -57,6 +57,7 @@ class SeedTask extends \Phalcon\Cli\Task
             'site_name'            => 'App Skeleton',
             'cron_mode'            => 'manual',
             'mail_from'            => 'no-reply@app-skeleton.local',
+            'mail_reply_to'        => 'stack@xten.au',
             'debug_mode'           => '0',
             'default_theme_palette' => 'blue',
             'default_theme_mode'    => 'auto',
