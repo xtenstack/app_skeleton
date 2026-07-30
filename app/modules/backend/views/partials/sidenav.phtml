@@ -7,7 +7,7 @@ $roleId = $this->session->get('auth')['role_id'] ?? null;
 ?>
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
   <a href="<?= $this->url->get('backend') ?>" class="brand-link">
-    <span class="brand-text font-weight-light">App Skeleton</span>
+    <span class="brand-text font-weight-light"><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?></span>
   </a>
   <div class="sidebar">
     <nav class="mt-2">

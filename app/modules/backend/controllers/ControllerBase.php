@@ -24,6 +24,7 @@ class ControllerBase extends Controller
 
     protected function onConstruct()
     {
+        $this->preventCaching();
         $this->enforceCsrf();
 
         if (in_array($this->dispatcher->getControllerName(), self::UNAUTHENTICATED_CONTROLLERS, true)) {
@@ -48,6 +49,21 @@ class ControllerBase extends Controller
     }
 
     /**
+     * Backend pages embed a one-time CSRF token that's destroyed the moment
+     * it's used (see enforceCsrf's destroyIfValid: true below). Safari's
+     * back-forward cache can resurrect an already-submitted page verbatim
+     * — no request to the server — leaving stale, already-dead tokens in
+     * any other form still on that page. That reads to the user as "session
+     * expired" on an action they never actually failed. Forbidding the
+     * cache is the fix; weakening the token to survive reuse is not.
+     */
+    private function preventCaching(): void
+    {
+        $this->response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        $this->response->setHeader('Pragma', 'no-cache');
+    }
+
+    /**
      * Every POST across the backend must carry the token the layout embeds
      * via <meta name="csrf-token">/JS auto-injection (see index.phtml).
      * Runs before the auth/role checks so even the unauthenticated
@@ -62,7 +78,9 @@ class ControllerBase extends Controller
         // checkToken() alone passes when the session has no token seeded
         // yet (nothing to compare against) — require one to actually exist
         // first, so a POST can't succeed without having loaded a real page.
-        if ($this->security->getSessionToken() && $this->security->checkToken()) {
+        // destroyIfValid: true (also the library default) is intentional —
+        // tokens are single-use; see preventCaching() for why that's safe.
+        if ($this->security->getSessionToken() && $this->security->checkToken(null, null, true)) {
             return;
         }
 

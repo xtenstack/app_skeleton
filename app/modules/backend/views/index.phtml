@@ -32,7 +32,7 @@ $debugActive = !$isAuthPage && $isAdmin && $this->settings->get('debug_mode', '0
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>App Skeleton — Backend</title>
+    <title><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?> — Backend</title>
     <meta name="csrf-key" content="<?= $this->escaper->escapeHtml($this->security->getTokenKey()) ?>">
     <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
     <link rel="stylesheet" href="/assets/adminlte/plugins/fontawesome-free/css/all.min.css">
