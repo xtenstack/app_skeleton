@@ -1,6 +1,10 @@
 <?php
 
-$router = $di->getRouter();
+// $router may already be set by the including scope (e.g. RoutesTask, which
+// builds its own Router rather than going through the CLI DI's 'router'
+// service — Phalcon\Di\FactoryDefault\Cli's getRouter() doesn't honor a
+// setShared('router', ...) override once a Cli\Console dispatch is active).
+$router = $router ?? $di->getRouter();
 
 $router->add('/', [
     'namespace'  => 'App_skeleton\Modules\Backend\Controllers',
