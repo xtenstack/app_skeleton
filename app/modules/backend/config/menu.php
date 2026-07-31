@@ -74,6 +74,13 @@ return [
         'roles'      => [1],
     ],
     [
+        'label'      => 'Tickets',
+        'icon'       => 'fas fa-ticket-alt',
+        'controller' => 'tickets',
+        'url'        => 'backend/tickets',
+        'roles'      => \Roles::idsByNames(['admin', 'operator']),
+    ],
+    [
         'label'      => 'Cron',
         'icon'       => 'fas fa-clock',
         'controller' => 'cron',
