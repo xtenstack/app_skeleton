@@ -7,6 +7,7 @@ use Phalcon\Mvc\Model\Metadata\Memory as MetaDataAdapter;
 use Phalcon\Mvc\View\Engine\Volt as VoltEngine;
 use Phalcon\Session\Manager as SessionManager;
 use Phalcon\Session\Adapter\Stream as SessionStream;
+use App_skeleton\ApiKeyAuth;
 use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
@@ -105,6 +106,18 @@ $di->setShared('settings', function () {
     $settings->setDI($this);
 
     return $settings;
+});
+
+/**
+ * API-key authentication (Authorization: Bearer / X-Api-Key header ->
+ * users row), for api module controllers to fall back to when there's no
+ * logged-in session — see ControllerBase::onConstruct().
+ */
+$di->setShared('apiKeyAuth', function () {
+    $apiKeyAuth = new ApiKeyAuth();
+    $apiKeyAuth->setDI($this);
+
+    return $apiKeyAuth;
 });
 
 /**
