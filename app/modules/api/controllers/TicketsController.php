@@ -82,6 +82,12 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => implode(', ', $ticket->getMessages())]);
         }
 
+        // created_at is DB-defaulted (see migration 011_tickets.sql), so
+        // the in-memory object right after an insert still holds the raw
+        // 'CURRENT_TIMESTAMP' default expression, not the value Postgres
+        // actually computed — reload before returning it.
+        $ticket->refresh();
+
         $this->response->setStatusCode(201, 'Created');
 
         return $this->response->setJsonContent(['ticket' => $this->serialize($ticket)]);
