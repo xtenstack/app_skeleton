@@ -28,7 +28,7 @@ class SeedTask extends \Phalcon\Cli\Task
 
     private function seedRoles(): void
     {
-        foreach (['admin', 'member'] as $name) {
+        foreach (['admin', 'member', 'operator', 'agent'] as $name) {
             $exists = \Roles::findFirst([
                 'conditions' => 'name = :name:',
                 'bind'       => ['name' => $name],
