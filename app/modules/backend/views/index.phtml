@@ -91,6 +91,18 @@ $this->flash->clear();
     <script src="/assets/adminlte/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/adminlte/js/adminlte.min.js"></script>
     <script>
+    // Cache-Control: no-store (see ControllerBase::preventCaching) stops
+    // most browsers from bfcache-restoring this page at all, but Safari
+    // has historically been inconsistent about honoring that for every
+    // back/forward navigation path (e.g. swipe-back gestures) — belt and
+    // suspenders: force a real reload if this page ever does come back
+    // from bfcache, so a stale embedded CSRF token can never be resubmitted.
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    });
+
     (function () {
       var keyMeta = document.querySelector('meta[name="csrf-key"]');
       var tokenMeta = document.querySelector('meta[name="csrf-token"]');
