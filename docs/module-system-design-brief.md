@@ -1,10 +1,60 @@
 # Module System Design Brief
 
-Status: **not started, design-only**. Written 2026-07-27 to consolidate everything
-discussed across App Skeleton sessions 1–5 so a fresh session can pick this up without
-re-deriving context. This is the single biggest architectural decision left in the
-project — treat it as its own dedicated planning pass (a real Plan), not something to
-bundle into an unrelated feature request.
+Status: **v1 built and live** (`App_skeleton\ModuleManager`, commit `5192d5f`,
+2026-07-29) — Composer-package discovery, a `module_registry` table, a shared event
+bus, and an admin Configuration page toggle, verified end-to-end with a throwaway test
+package. This brief was originally written 2026-07-27, **two days before** that build
+landed, and was never updated afterwards — the rest of this document (written
+2026-07-27) is the original design discussion and is now partially superseded. See
+"What v1 actually built" below (added Session 10, 2026-08-01) for what's real today and
+what's still genuinely open.
+
+## What v1 actually built (added Session 10, 2026-08-01)
+
+Reconciling this brief against `app/common/library/ModuleManager.php`,
+`app/modules/cli/tasks/ModulesTask.php`, `app/config/routes.php`, `app/config/services.php`,
+and `app/modules/backend/controllers/{ConfigurationController,IndexController}.php`:
+
+- **Discovery**: Composer-only — `Composer\InstalledVersions::getInstalledPackages()`,
+  filtered to packages with a `module.json` manifest (`key`, `tier`, `className`,
+  `surface`, `menu`, `code`). **Gap**: a module that isn't an installed Composer package
+  (someone hand-writing one directly in the app tree, per this brief's own "someone who
+  installs the base may wish to write their own module" requirement) is invisible to
+  discovery as it stands. Likely cleanest fix: point `composer.json`'s `repositories` at
+  a local `path` repo and `require` it like any other package — live-editable locally,
+  still "a package" for discovery — rather than adding a second, parallel filesystem-scan
+  code path. Not yet decided.
+- **Enable/disable state**: `module_registry` table (migration `010`) — confirms this
+  brief's own open question 4 (a thin shared table is unavoidable) the way it predicted:
+  no FKs into any module's domain tables, just key/tier/package/version/enabled.
+- **Routes**: module-scoped, resolving open question 1 in the direction this brief
+  leaned — Phalcon's `registerModules()` gives every module the generic
+  `/module/:controller/:action/:params` pattern automatically, plus an opt-in
+  `registerRoutes(Router $router)` extension point per module class for anything
+  non-generic (e.g. a public URL with no controller/action shape).
+- **Event bus**: built — shared `eventsBus` service (Phalcon `EventsManager`),
+  colon-namespaced (`payment:completed`, `user:created`), modules attach listeners in
+  their own `Module::registerServices($di)`. Resolves the event-bus half of open
+  question 2.
+- **Menu**: `ModuleManager::mergedMenu($surface)` **merges** the base menu with every
+  *enabled* module's declared menu file into one combined, always-visible sidebar.
+  **This is not the same thing as open question 3** (nav *switching* when a user selects
+  one module — a full reload with a rebuilt sidebar, or something more dynamic). v1 only
+  merges; it doesn't switch. Still open.
+- **Dashboard**: `IndexController::indexAction()` already builds a **single per-user
+  dashboard** with each enabled/permitted module's menu entry rendered as a tile —
+  confirming the user's Session 10 clarification (one dashboard per user, modules
+  widgetized on it) was already how this got built, not the "one dashboard per module"
+  reading. The "Per-module structure" section below, which still says "every module
+  should have a dashboard view," is the stale part — superseded by this.
+- **Guest-visible module content**: not built. `index/guest.phtml` today is a static
+  splash (logo, welcome copy, login/signup links) with no module surface at all — the
+  Session 10 ask (e.g. guest-visible LMS courses) needs its own pass whenever the LMS
+  module is scoped.
+- **Blank starter module**: still not built, correctly per this brief's own sequencing
+  ("after the base structure is proven with at least one real module") — v1's throwaway
+  test package during development already satisfies that gate, so this is unblocked
+  whenever it's wanted.
 
 ## Why this exists
 
@@ -53,9 +103,10 @@ Each module should define, at minimum:
 - **Routes**: open design question — module-scoped routes (each module defines and registers
   its own) vs. one global route table. Leaning module-scoped since it matches the
   self-contained/no-cross-contamination requirement, but not decided.
-- **Dashboard**: every module should have a dashboard view, and dashboard should default to
-  the first nav item for all navs globally (already true for the existing single backend
-  dashboard — needs to generalize once multiple module dashboards exist).
+- **Dashboard**: ~~every module should have a dashboard view~~ — **superseded, see "What
+  v1 actually built" above**: this was a miscommunication clarified in Session 10. It's
+  one dashboard per *user*, with enabled modules appearing as tiles on it (already how
+  `IndexController` works today), not a dashboard per module.
 
 **Not yet decided, needs a design pass**: a `ModuleManager` that discovers/registers plugin
 modules (routes/models/migrations/menu entries) plus a lightweight event bus (e.g.
@@ -130,18 +181,21 @@ Requested functionality, roughly in the shape of the domain model:
 
 ## Open questions for the new session to resolve early
 
-1. Module-scoped routes vs. a global route table — recommendation leans module-scoped, not
-   decided.
-2. Exact ModuleManager discovery mechanism (config-file registration vs. filesystem scan vs.
-   Composer package discovery) and the event-bus shape (`payment.completed`-style names).
-3. How nav/menu actually switches when a user selects a different module — a full page
-   reload with a rebuilt sidebar, or something more dynamic.
-4. Whether application modules can genuinely coexist with zero shared schema, or whether a
-   thin shared "module registry" table is unavoidable (e.g. to know what's installed/enabled
-   per instance).
+1. ~~Module-scoped routes vs. a global route table~~ — **resolved, built**: module-scoped,
+   see above.
+2. ~~Exact ModuleManager discovery mechanism ... and the event-bus shape~~ — **resolved,
+   built**: Composer package discovery + `module.json`; event bus shipped. Still open:
+   the Composer-only discovery gap for hand-written, non-packaged modules (see above).
+3. **Still open**: how nav/menu actually switches when a user selects a different module —
+   v1 only merges all enabled modules' menus into one sidebar; it doesn't implement
+   per-module switching (full page reload with a rebuilt sidebar, or something more
+   dynamic).
+4. ~~Whether application modules can genuinely coexist with zero shared schema~~ —
+   **resolved, built**: no, `module_registry` is the thin shared table, exactly as
+   predicted.
 5. LMS-specific: exact certificate validation URL shape and whether validation pages need to
    be public (no login) — almost certainly yes, since third parties (employers) need to
-   check a certificate without an account.
+   check a certificate without an account. **Still open** — LMS moved to its own session.
 
 ## Licensing note (ties to the T&Cs draft and the MIT decision)
 
