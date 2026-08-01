@@ -77,7 +77,7 @@ class Audit extends Injectable
      * entity_type always comes from our own models, not user input.
      */
     private const REVERSIBLE_TABLES = [
-        'users', 'items', 'roles', 'settings', 'api_keys', 'user_profiles', 'user_settings',
+        'users', 'items', 'roles', 'settings', 'api_keys', 'user_profiles', 'user_settings', 'tickets',
     ];
 
     /**

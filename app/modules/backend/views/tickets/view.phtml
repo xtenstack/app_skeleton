@@ -1,0 +1,129 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Ticket #<?= $ticket->id ?>: <?= $this->escaper->escapeHtml($ticket->title) ?></h1>
+    <a href="<?= $this->url->get('backend/tickets') ?>" class="btn btn-outline-secondary">Back</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-7">
+    <div class="card mb-3">
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-3">Status</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->status) ?></dd>
+          <dt class="col-3">Severity</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->severity) ?></dd>
+          <dt class="col-3">Description</dt>
+          <dd class="col-9"><?= $ticket->description ? nl2br($this->escaper->escapeHtml($ticket->description)) : '<span class="text-muted">—</span>' ?></dd>
+          <dt class="col-3">Source ref</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->source_ref ?: '—') ?></dd>
+          <dt class="col-3">Reporter</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->Reporter ? $ticket->Reporter->email : '—') ?></dd>
+          <dt class="col-3">Reported via</dt>
+          <dd class="col-9"><?= $ticket->ReporterApiKey ? 'API key: ' . $this->escaper->escapeHtml($ticket->ReporterApiKey->name) : '<span class="text-muted">backend UI</span>' ?></dd>
+          <dt class="col-3">Assignee</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->Assignee ? $ticket->Assignee->email : '—') ?></dd>
+<?php if ($ticket->consolidated_into_ticket_id): ?>
+          <dt class="col-3">Consolidated into</dt>
+          <dd class="col-9"><a href="<?= $this->url->get('backend/tickets/view/' . $ticket->consolidated_into_ticket_id) ?>">Ticket #<?= $ticket->consolidated_into_ticket_id ?></a></dd>
+<?php endif; ?>
+          <dt class="col-3">Created</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->created_at) ?></dd>
+<?php if ($ticket->closed_at): ?>
+          <dt class="col-3">Closed</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->closed_at) ?> (<?= $this->escaper->escapeHtml((string) $ticket->close_reason) ?>)</dd>
+<?php endif; ?>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Retest</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-3">Retest ref</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->retest_ref ?: '—') ?></dd>
+          <dt class="col-3">Retest agent key</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->retest_agent_key ?: '—') ?></dd>
+          <dt class="col-3">Last result</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->last_retest_result ?: '—') ?></dd>
+          <dt class="col-3">Last retest at</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->last_retest_at ?: '—') ?></dd>
+          <dt class="col-3">Notes</dt>
+          <dd class="col-9"><?= $ticket->last_retest_notes ? nl2br($this->escaper->escapeHtml($ticket->last_retest_notes)) : '<span class="text-muted">—</span>' ?></dd>
+        </dl>
+      </div>
+    </div>
+
+<?php if ($ticket->auto_closed_at): ?>
+    <div class="card mb-3">
+      <div class="card-header">QA spot-check</div>
+      <div class="card-body">
+        <p>Auto-closed at <?= $this->escaper->escapeHtml($ticket->auto_closed_at) ?> via passing retest.</p>
+<?php if ($ticket->qa_reviewed_at): ?>
+        <p class="mb-3">Reviewed <?= $this->escaper->escapeHtml($ticket->qa_reviewed_at) ?> by <?= $this->escaper->escapeHtml($ticket->QaReviewer ? $ticket->QaReviewer->email : 'unknown') ?> — outcome: <strong><?= $this->escaper->escapeHtml((string) $ticket->qa_outcome) ?></strong></p>
+<?php else: ?>
+        <p class="text-warning mb-3">Not yet spot-checked by a human.</p>
+<?php endif; ?>
+        <form method="post" action="<?= $this->url->get('backend/tickets/qa-review/' . $ticket->id) ?>" class="form-inline">
+          <select name="outcome" class="form-control mr-2">
+            <option value="confirmed">Confirm — correctly auto-closed</option>
+            <option value="reopened">Reopen — auto-close was wrong</option>
+          </select>
+          <button type="submit" class="btn btn-primary">Record QA outcome</button>
+        </form>
+      </div>
+    </div>
+<?php endif; ?>
+  </div>
+
+  <div class="col-12 col-md-5">
+    <div class="card mb-3">
+      <div class="card-header">Assign</div>
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/tickets/assign/' . $ticket->id) ?>" class="form-inline">
+          <select name="assigned_to_user_id" class="form-control mr-2">
+            <option value="">— choose —</option>
+<?php foreach ($assignableUsers as $user): ?>
+            <option value="<?= $user->id ?>" <?= (int) $ticket->assigned_to_user_id === (int) $user->id ? 'selected' : '' ?>><?= $this->escaper->escapeHtml($user->email) ?></option>
+<?php endforeach; ?>
+          </select>
+          <button type="submit" class="btn btn-primary">Assign</button>
+        </form>
+      </div>
+    </div>
+
+<?php if ($ticket->status !== 'consolidated'): ?>
+    <div class="card mb-3">
+      <div class="card-header">Consolidate</div>
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/tickets/consolidate/' . $ticket->id) ?>" class="form-inline">
+          <select name="consolidated_into_ticket_id" class="form-control mr-2">
+            <option value="">— choose ticket —</option>
+<?php foreach ($otherOpenTickets as $other): ?>
+            <option value="<?= $other->id ?>">#<?= $other->id ?> — <?= $this->escaper->escapeHtml($other->title) ?></option>
+<?php endforeach; ?>
+          </select>
+          <button type="submit" class="btn btn-secondary">Consolidate</button>
+        </form>
+      </div>
+    </div>
+<?php endif; ?>
+
+    <div class="card mb-3">
+      <div class="card-header">Status</div>
+      <div class="card-body d-flex" style="gap: .5rem;">
+<?php if ($ticket->status !== 'closed'): ?>
+        <form method="post" action="<?= $this->url->get('backend/tickets/close/' . $ticket->id) ?>" onsubmit="return confirm('Close this ticket?')">
+          <button type="submit" class="btn btn-outline-danger">Close</button>
+        </form>
+<?php else: ?>
+        <form method="post" action="<?= $this->url->get('backend/tickets/reopen/' . $ticket->id) ?>">
+          <button type="submit" class="btn btn-outline-primary">Reopen</button>
+        </form>
+<?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>

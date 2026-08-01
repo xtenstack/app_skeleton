@@ -44,17 +44,4 @@ class SessionController extends ControllerBase
 
         return $this->response->setJsonContent(['ok' => true]);
     }
-
-    private function getJsonBody(): array
-    {
-        $raw = $this->request->getRawBody();
-
-        if ($raw === '') {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-
-        return is_array($decoded) ? $decoded : [];
-    }
 }

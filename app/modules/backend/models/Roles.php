@@ -53,4 +53,28 @@ class Roles extends Phalcon\Mvc\Model
         return parent::findFirst($parameters);
     }
 
+    /**
+     * Resolves role ids by name, for code that needs to check/filter by
+     * role without hardcoding ids. Only role 1 (admin) is guaranteed by
+     * 001_initial_schema.sql's literal insert order — anything seeded
+     * later via SeedTask (e.g. 'operator', 'agent') has no such guarantee
+     * and must be looked up by name instead.
+     *
+     * @return int[]
+     */
+    public static function idsByNames(array $names): array
+    {
+        if (!$names) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach (self::find(['conditions' => 'name IN ({names:array})', 'bind' => ['names' => $names]]) as $role) {
+            $ids[] = (int) $role->id;
+        }
+
+        return $ids;
+    }
+
 }
