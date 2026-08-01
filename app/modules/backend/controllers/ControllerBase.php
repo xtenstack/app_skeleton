@@ -78,9 +78,16 @@ class ControllerBase extends Controller
         // checkToken() alone passes when the session has no token seeded
         // yet (nothing to compare against) — require one to actually exist
         // first, so a POST can't succeed without having loaded a real page.
-        // destroyIfValid: true (also the library default) is intentional —
-        // tokens are single-use; see preventCaching() for why that's safe.
-        if ($this->security->getSessionToken() && $this->security->checkToken(null, null, true)) {
+        // destroyIfValid: false is intentional, not the library default —
+        // pages with more than one form (e.g. My Profile: avatar upload,
+        // theme, and profile-details are three separate <form>s sharing one
+        // embedded token) need that token to survive being used once, or
+        // every form after the first 500s with a bogus "session expired" on
+        // the very page it was issued for. preventCaching()'s no-store
+        // headers are what actually stop the stale-token bfcache-replay
+        // scenario a destroy-on-use token was guarding against; the token
+        // itself still only lives until the next real page render.
+        if ($this->security->getSessionToken() && $this->security->checkToken(null, null, false)) {
             return;
         }
 
