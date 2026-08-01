@@ -37,7 +37,15 @@ jobs:
         # Dockerfile's own composer install uses --no-scripts). Migrations
         # for the deployed Azure app still need their own solution; this
         # only gets the package-install step itself passing.
-        run: composer validate --no-check-publish && composer install --prefer-dist --no-progress --no-scripts
+        #
+        # --ignore-platform-req=ext-phalcon: this generic ubuntu-latest +
+        # setup-php runner has no way to have the Phalcon extension
+        # installed — it's a compiled C extension only available via
+        # sury.org's custom package, which is exactly why this repo's own
+        # Dockerfile builds a custom PHP-FPM image from source rather than
+        # using a stock one (see Dockerfile's top comment). Same flag,
+        # same reason, as that Dockerfile's own composer install step.
+        run: composer validate --no-check-publish && composer install --prefer-dist --no-progress --no-scripts --ignore-platform-req=ext-phalcon
 
 
       - name: Upload artifact for deployment job
