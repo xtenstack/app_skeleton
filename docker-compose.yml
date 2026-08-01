@@ -32,6 +32,15 @@ services:
       - ./data/encryption_key:/app/.encryption_key
       - ./data/files:/app/public/files
       - ./data/logs:/app/logs
+      # PHP sessions default to the container's own filesystem
+      # (session.save_path=/var/lib/php/sessions) — every deploy does a
+      # full container recreate (`docker compose up -d --build`), which
+      # wipes anything not bind-mounted. Without this, every deploy
+      # silently logs everyone out and invalidates any in-flight CSRF
+      # token, which read as a recurring, unfixable "session expired" bug
+      # rather than what it actually was: normal redeploys during active
+      # testing (found 2026-08-01, session 10).
+      - ./data/sessions:/var/lib/php/sessions
     depends_on:
       db:
         condition: service_healthy
