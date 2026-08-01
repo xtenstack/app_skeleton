@@ -11,7 +11,7 @@ set -eu
 # itself drops to www-data per the pool config), so fixing ownership here
 # on every start means it can never again depend on whoever ran `mkdir`
 # on the host getting it right.
-chown -R www-data:www-data /app/logs /app/public/files /var/lib/php/sessions
+chown -R www-data:www-data /app/logs /app/public/files /app/sessions
 
 # Renders app/config/config.local.php from env vars on every container
 # start — same gitignored-override mechanism config.php already uses for

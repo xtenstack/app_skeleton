@@ -87,8 +87,8 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 # www-data (the pool's configured run user) needs to write here at
 # runtime — everything else in /app stays read-only, which is the point.
 RUN chmod +x /usr/local/bin/entrypoint.sh \
-    && mkdir -p public/files public/temp cache/volt logs \
-    && chown -R www-data:www-data public/files public/temp cache/volt logs
+    && mkdir -p public/files public/temp cache/volt logs sessions \
+    && chown -R www-data:www-data public/files public/temp cache/volt logs sessions
 
 EXPOSE 9000
 

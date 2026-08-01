@@ -17,7 +17,13 @@ use App_skeleton\SettingsRegistry;
 
 $di->setShared('session', function () {
     $session = new SessionManager();
-    $files = new SessionStream(['savePath' => sys_get_temp_dir()]);
+    // Not sys_get_temp_dir() (was, until 2026-08-01) — that's the
+    // container's own ephemeral filesystem, wiped on every recreate
+    // (every `docker compose up -d --build`), silently logging everyone
+    // out and invalidating any in-flight CSRF token on every deploy. See
+    // BASE_PATH . '/sessions' bind-mounted in docker-compose.yml, same
+    // reasoning as logs/public/files.
+    $files = new SessionStream(['savePath' => BASE_PATH . '/sessions']);
     $session->setAdapter($files);
     $session->start();
     return $session;
