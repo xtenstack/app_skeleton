@@ -1,8 +1,8 @@
 name: Mirror main to azure-test
 
 # Keeps `azure-test` an exact, always-current copy of `main`, so the Azure
-# "cptest" test pipeline (main_cptest.yml, triggered on push to
-# `azure-test`) always builds current code without being wired directly to
+# "cptest" test pipeline (Deployment-Center-managed, filename varies — see
+# below) always builds current code without being wired directly to
 # `main` itself — see Session 10 notes (2026-08-01) for why: Azure's
 # Deployment Center has full push/admin access to this repo and has
 # already committed its own workflow file straight to `main` twice.
@@ -34,9 +34,16 @@ jobs:
       - name: Trigger the Azure test build on azure-test
         # A push made with the default GITHUB_TOKEN (the line above) does not
         # itself trigger other workflows — GitHub suppresses that to prevent
-        # recursive runs. main_cptest.yml's push-on-azure-test trigger would
-        # otherwise never fire, so kick it explicitly via its
-        # workflow_dispatch trigger instead.
+        # recursive runs. The Azure workflow's push-on-azure-test trigger
+        # would otherwise never fire, so kick it explicitly via
+        # workflow_dispatch instead. Looked up by its display name (the
+        # `name:` field inside that file, stable across Azure's own
+        # renames) rather than a hardcoded filename — Azure's Deployment
+        # Center has already renamed this file once when the connection's
+        # branch changed (main_cptest.yml -> azure-test_cptest.yml).
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run main_cptest.yml --ref azure-test
+        run: |
+          workflow_id=$(gh api repos/${{ github.repository }}/actions/workflows \
+            --jq '.workflows[] | select(.name == "Build and deploy PHP app to Azure Web App - cptest") | .id')
+          gh api repos/${{ github.repository }}/actions/workflows/"$workflow_id"/dispatches -f ref=azure-test
