@@ -6,7 +6,7 @@ name: Build and deploy PHP app to Azure Web App - cptest
 on:
   push:
     branches:
-      - main
+      - dev
   workflow_dispatch:
 
 jobs:
@@ -31,7 +31,13 @@ jobs:
 
       - name: Run composer install if composer.json exists
         if: steps.check_files.outputs.files_exists == 'true'
-        run: composer validate --no-check-publish && composer install --prefer-dist --no-progress
+        # --no-scripts: composer.json's post-install-cmd runs bin/install.php,
+        # which requires a live, reachable Postgres to apply migrations/seed
+        # data — there's no database in this CI job (same reason the
+        # Dockerfile's own composer install uses --no-scripts). Migrations
+        # for the deployed Azure app still need their own solution; this
+        # only gets the package-install step itself passing.
+        run: composer validate --no-check-publish && composer install --prefer-dist --no-progress --no-scripts
 
 
       - name: Upload artifact for deployment job
