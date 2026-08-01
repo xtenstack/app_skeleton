@@ -75,6 +75,51 @@ class TicketsController extends ControllerBase
         $this->view->needsQaPercent = $totalAutoClosed > 0 ? (int) round($needsQaCount / $totalAutoClosed * 100) : 0;
     }
 
+    public function newAction()
+    {
+        $this->view->ticket = new \Tickets();
+    }
+
+    public function createAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
+        }
+
+        $title = trim((string) $this->request->getPost('title', 'string'));
+
+        if ($title === '') {
+            $this->flash->error('Title is required');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'new']);
+        }
+
+        $ticket              = new \Tickets();
+        $ticket->title       = $title;
+        $ticket->description = (string) $this->request->getPost('description', 'string') ?: null;
+        $ticket->severity    = (string) $this->request->getPost('severity', 'string') ?: 'normal';
+
+        // Staff filing via the backend UI — reporter is always whoever's
+        // logged in, never client-supplied, same principle as the API
+        // controller's own createAction (see its docblock note re:
+        // reporter_api_key_id staying null for backend-filed tickets).
+        $ticket->reporter_user_id = $this->session->get('auth')['id'];
+
+        if (!$ticket->save()) {
+            foreach ($ticket->getMessages() as $message) {
+                $this->flash->error((string) $message);
+            }
+
+            $this->view->ticket = $ticket;
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'new']);
+        }
+
+        $this->flash->success('Ticket created');
+
+        return $this->response->redirect($this->url->get('backend/tickets/view/' . $ticket->id));
+    }
+
     public function viewAction($id)
     {
         $ticket = \Tickets::findFirstById($id);

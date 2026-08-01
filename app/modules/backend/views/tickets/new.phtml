@@ -1,0 +1,34 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>New ticket</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/tickets/create') ?>">
+          <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="<?= $this->escaper->escapeHtml((string) $ticket->title) ?>" required>
+          </div>
+          <div class="form-group">
+            <label for="severity">Severity</label>
+            <select class="form-control" id="severity" name="severity">
+<?php foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'] as $value => $label): ?>
+              <option value="<?= $value ?>" <?= ($ticket->severity ?: 'normal') === $value ? 'selected' : '' ?>><?= $label ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="5"><?= $this->escaper->escapeHtml((string) $ticket->description) ?></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Create ticket</button>
+          <a href="<?= $this->url->get('backend/tickets') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

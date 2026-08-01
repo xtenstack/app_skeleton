@@ -1,7 +1,8 @@
 <?php $baseUrl = $this->url->get('backend/tickets'); ?>
 <div class="row mb-2">
-  <div class="col-12">
+  <div class="col-12 d-flex justify-content-between align-items-center">
     <h1>Tickets</h1>
+    <a href="<?= $this->url->get('backend/tickets/new') ?>" class="btn btn-primary">New Ticket</a>
   </div>
 </div>
 
