@@ -1,6 +1,6 @@
 <div class="row mb-2">
   <div class="col-12">
-    <h1>New ticket</h1>
+    <h1>Edit ticket #<?= $ticket->id ?></h1>
   </div>
 </div>
 
@@ -8,7 +8,7 @@
   <div class="col-12 col-md-6">
     <div class="card">
       <div class="card-body">
-        <form method="post" action="<?= $this->url->get('backend/tickets/create') ?>">
+        <form method="post" action="<?= $this->url->get('backend/tickets/update/' . $ticket->id) ?>">
           <div class="form-group">
             <label for="title">Title</label>
             <input type="text" class="form-control" id="title" name="title" value="<?= $this->escaper->escapeHtml((string) $ticket->title) ?>" required>
@@ -34,8 +34,12 @@
             <label for="description">Description</label>
             <textarea class="form-control" id="description" name="description" rows="5"><?= $this->escaper->escapeHtml((string) $ticket->description) ?></textarea>
           </div>
-          <button type="submit" class="btn btn-primary">Create ticket</button>
-          <a href="<?= $this->url->get('backend/tickets') ?>" class="btn btn-link">Cancel</a>
+          <div class="form-group">
+            <label for="notes">Internal notes <span class="text-muted">(staff only, not visible via the API)</span></label>
+            <textarea class="form-control" id="notes" name="notes" rows="4"><?= $this->escaper->escapeHtml((string) $ticket->notes) ?></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Save changes</button>
+          <a href="<?= $this->url->get('backend/tickets/view/' . $ticket->id) ?>" class="btn btn-link">Cancel</a>
         </form>
       </div>
     </div>

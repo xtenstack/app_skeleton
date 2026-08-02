@@ -42,6 +42,13 @@ services:
       # it actually was: normal redeploys during active testing (found
       # 2026-08-01, session 10).
       - ./data/sessions:/app/sessions
+      # Ticket attachments — deliberately NOT under public/files (see
+      # migration 013_ticket_attachments.sql and
+      # TicketsController::downloadAttachmentAction): attachments can
+      # contain sensitive content (e.g. a customer's phpinfo() dump), so
+      # they're served through an authenticated action rather than Caddy's
+      # static file_server, and this mount is app-only — no caddy mount.
+      - ./data/ticket-attachments:/app/storage/ticket-attachments
     depends_on:
       db:
         condition: service_healthy

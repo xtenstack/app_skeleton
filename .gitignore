@@ -10,6 +10,10 @@
 !/public/files/.gitkeep
 /logs/*
 !/logs/.gitkeep
+/sessions/*
+!/sessions/.gitkeep
+/storage/*
+!/storage/.gitkeep
 
 # Composer (ext-phalcon itself isn't composer-installable; this is only for
 # any regular PHP deps declared in composer.json, e.g. require-dev tooling)

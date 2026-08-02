@@ -19,6 +19,8 @@ class Tickets extends \Phalcon\Mvc\Model
     public $description;
     public $severity;
     public $status;
+    public $ticket_type;
+    public $notes;
     public $source_ref;
     public $reporter_user_id;
     public $reporter_api_key_id;
@@ -48,6 +50,7 @@ class Tickets extends \Phalcon\Mvc\Model
         $this->belongsTo('qa_reviewed_by', 'Users', 'id', ['alias' => 'QaReviewer']);
         $this->belongsTo('reporter_api_key_id', 'ApiKeys', 'id', ['alias' => 'ReporterApiKey']);
         $this->belongsTo('consolidated_into_ticket_id', 'Tickets', 'id', ['alias' => 'ConsolidatedInto']);
+        $this->hasMany('id', 'TicketAttachments', 'ticket_id', ['alias' => 'Attachments']);
     }
 
     public function beforeSave()

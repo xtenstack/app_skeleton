@@ -39,6 +39,7 @@
             <tr>
               <th>#</th>
               <th>Title</th>
+              <th>Type</th>
               <th>Severity</th>
               <th>Status</th>
               <th>Reporter</th>
@@ -52,6 +53,7 @@
             <tr>
               <td><?= $ticket->id ?></td>
               <td><?= $this->escaper->escapeHtml($ticket->title) ?></td>
+              <td><span class="badge badge-light"><?= $this->escaper->escapeHtml(ucfirst($ticket->ticket_type ?: 'bug')) ?></span></td>
               <td><span class="badge badge-<?= $ticket->severity === 'critical' ? 'danger' : ($ticket->severity === 'high' ? 'warning' : 'secondary') ?>"><?= $this->escaper->escapeHtml($ticket->severity) ?></span></td>
               <td><span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
 <?php if ($ticket->auto_closed_at && !$ticket->qa_reviewed_at): ?>
@@ -63,12 +65,16 @@
               <td><?= $this->escaper->escapeHtml($ticket->created_at) ?></td>
               <td class="text-right">
                 <a href="<?= $this->url->get('backend/tickets/view/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
+                <a href="<?= $this->url->get('backend/tickets/edit/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <form method="post" action="<?= $this->url->get('backend/tickets/delete/' . $ticket->id) ?>" class="d-inline" onsubmit="return confirm('Delete ticket #<?= $ticket->id ?>?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
               </td>
             </tr>
 <?php endforeach; ?>
 <?php if (!count($tickets)): ?>
             <tr>
-              <td colspan="8" class="text-center text-muted">No tickets yet.</td>
+              <td colspan="9" class="text-center text-muted">No tickets yet.</td>
             </tr>
 <?php endif; ?>
           </tbody>

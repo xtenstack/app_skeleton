@@ -64,10 +64,13 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'title is required']);
         }
 
+        $ticketType = isset($body['ticket_type']) ? (string) $body['ticket_type'] : 'bug';
+
         $ticket                   = new \Tickets();
         $ticket->title            = $title;
         $ticket->description      = isset($body['description']) ? (string) $body['description'] : null;
         $ticket->severity         = isset($body['severity']) ? (string) $body['severity'] : 'normal';
+        $ticket->ticket_type      = in_array($ticketType, ['bug', 'issue', 'feature', 'support'], true) ? $ticketType : 'bug';
         $ticket->source_ref       = isset($body['source_ref']) ? (string) $body['source_ref'] : null;
         $ticket->retest_agent_key = isset($body['retest_agent_key']) ? (string) $body['retest_agent_key'] : null;
 
@@ -162,6 +165,7 @@ class TicketsController extends ControllerBase
             'title'                       => $ticket->title,
             'description'                 => $ticket->description,
             'severity'                    => $ticket->severity,
+            'ticket_type'                 => $ticket->ticket_type,
             'status'                      => $ticket->status,
             'source_ref'                  => $ticket->source_ref,
             'reporter_user_id'            => $ticket->reporter_user_id !== null ? (int) $ticket->reporter_user_id : null,

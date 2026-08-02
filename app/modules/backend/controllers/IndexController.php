@@ -24,4 +24,26 @@ class IndexController extends ControllerBase
             return $item['roles'] === null || in_array($roleId, $item['roles'], true);
         }));
     }
+
+    /**
+     * The router's default action (see services_web.php) — reached for any
+     * URL that doesn't match a registered route at all, plus forwarded here
+     * by the dispatcher's beforeException listener for a valid route whose
+     * controller/action doesn't exist.
+     */
+    public function notFoundAction()
+    {
+        $this->response->setStatusCode(404, 'Not Found');
+    }
+
+    /**
+     * Forwarded here by the dispatcher's beforeException listener for any
+     * other exception an action lets escape. The exception itself is
+     * already logged by that listener before forwarding — this action just
+     * renders the page.
+     */
+    public function serverErrorAction()
+    {
+        $this->response->setStatusCode(500, 'Internal Server Error');
+    }
 }
