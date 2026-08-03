@@ -90,6 +90,12 @@ services:
       POSTGRES_DB: ${DB_NAME:-app_skeleton}
       POSTGRES_USER: ${DB_USER:-app_skeleton}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      # Bound to loopback only — lets the host's own psql/pg_dump (see
+      # docker/backup-db.sh) reach the database directly, without
+      # exposing Postgres beyond the machine itself. Never publish this
+      # without the 127.0.0.1 prefix.
+      - "127.0.0.1:5432:5432"
     volumes:
       # Postgres 18's image changed its expected layout — it wants a
       # single mount at /var/lib/postgresql (manages its own
