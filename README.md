@@ -62,7 +62,6 @@ Full install options (Docker, Composer-only, plain download) are in
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose a change.
 - [SECURITY.md](SECURITY.md) — how to report a vulnerability.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community expectations.
-- [docs/](docs) — design briefs and module plans for larger features.
 
 ## License
 

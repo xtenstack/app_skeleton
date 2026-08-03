@@ -34,21 +34,28 @@ simply doesn't install (or disables) the package; core code never
 changes.
 
 Ticketing (customer support tickets) currently ships as a *built-in*
-feature rather than a real optional module — a deliberate, documented
-exception (see `docs/ticketing-module-plan.md`'s Context section):
+feature rather than a real optional module — a deliberate exception:
 `ModuleManager`'s own design was still unsettled when Ticketing was
 built, so guessing at module boundaries from nothing was avoided in
-favor of shipping a working feature first. The Requirements module
-(`docs/requirements-module-plan.md`) is the first feature built as a
-*real* optional module, now that `ModuleManager` v1 is proven — treat it
-as the current worked example for the pattern below, not Ticketing.
+favor of shipping a working feature first. The Requirements module is
+the first feature built as a *real* optional module, now that
+`ModuleManager` v1 is proven — treat it as the current worked example
+for the pattern below, not Ticketing.
 
 ## Building your own module
 
 1. A Composer package (its own repo, or a local `path` repository during
-   development) with a `module.json` manifest — see
-   `docs/module-system-design-brief.md` for the manifest shape
-   `ModuleManager::discover()` expects.
+   development) with a `module.json` manifest at its root. Required
+   fields: `key` (unique, used as the `module_registry` key) and `tier`
+   (`'application'` for a module contributing a full Phalcon module —
+   also needs `className` — vs. a lighter-weight extension). Optional:
+   `surface` (defaults to `'backend'`) and `menu` (a path to a PHP file
+   returning the module's menu entries, picked up automatically by
+   `ModuleManager::mergedMenu()`). See
+   `App_skeleton\ModuleManager::parseManifest()`/`discover()`
+   (`app/common/library/ModuleManager.php`) for the authoritative,
+   current field list — that source is the source of truth, this list
+   just orients you.
 2. Your own `Module.php` implementing `registerAutoloaders()` /
    `registerServices()`, the same shape every module here already uses
    (`app/modules/*/Module.php` are all real examples to copy from).
@@ -61,23 +68,28 @@ as the current worked example for the pattern below, not Ticketing.
    `app/modules/cli/tasks/MigrateTask.php`) applies any installed
    module's migrations alongside the base engine's own, tracked
    separately.
-5. A menu entry your `Module.php` (or a `registerRoutes()`/menu hook —
-   see the design brief) contributes; `ModuleManager::mergedMenu()`
-   merges every enabled module's items into the sidebar automatically.
+5. A menu entry via your manifest's `menu` field (see step 1);
+   `ModuleManager::mergedMenu()` merges every enabled module's items
+   into the sidebar automatically.
 6. `composer require` it, `./run modules sync`, enable it from the
    Configuration page (or `./run modules enable <key>`).
 
-Follow `docs/requirements-module-plan.md`'s shape when drafting a plan
-for your own module before building it — context, design decisions,
-schema, controllers, menu entry, "what this plan explicitly does not
-do," and a verification checklist. That structure is what makes an
-autonomous or human build reviewable before code exists, not just after.
+Draft a short plan before building anything non-trivial: context, design
+decisions, schema, controllers, menu entry, what the plan deliberately
+doesn't cover, and a verification checklist. That structure is what
+makes an autonomous or human build reviewable before code exists, not
+just after — worth doing even if the plan itself doesn't ship with the
+module.
 
 ## Standard conventions your module should follow
 
-- List views: `docs/runbooks/RB-03-list-view-conventions.md` — row
-  actions, bulk operations, the checkbox/form pattern.
-- Branching/commits: `docs/runbooks/RB-01-branching-and-release-strategy.md`.
+- List views: row actions (View/Edit/Delete) right-aligned per record, a
+  New button top-right, a "with selected" bulk-operations dropdown
+  top-left for batch update/delete — see `TicketsController`/`tickets/index.phtml`
+  for the reference implementation.
+- Branching/commits: trunk-based off `main`, `feature/<REQ-id>-short-name`
+  or `fix/<issue>` branch names, Conventional Commits — see
+  CODING-STANDARDS.md's Git workflow section.
 - Soft deletes, audit logging, CSRF, RBAC: CODING-STANDARDS.md.
 
 ## Why the split

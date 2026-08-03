@@ -49,13 +49,13 @@ breakdown once you need it.
 - `Requirements-List.md` (in the private session-docs folder, not this
   repo) is the single running requirement log — `REQ-NNN` ids, never
   reused. Branch names reference them: `feature/REQ-020-short-name`.
-- `docs/runbooks/` — this repo's own process runbooks (`RB-00-index.md`
-  first), branching/release strategy, dev-environment sync. Not the same
-  thing as deploy.xten.au's client-operations runbooks, which are a
-  separate private repo referenced only for numbering convention.
-- `docs/*.md` (not `runbooks/`) — one-off design/plan documents for
-  bigger features (e.g. `ticketing-module-plan.md`), not repeatable
-  procedures.
+- Process runbooks (branching/release strategy, dev-environment sync,
+  list-view conventions) and one-off design/plan docs for bigger
+  features (e.g. the ticketing and Requirements-module plans) live
+  privately in `stack.xten.au/docs/`, not in this repo — not published
+  with the OSS release. `docs/guide-to-xten-stack-modules.md` is the one
+  exception: it's user-facing product documentation, meant to ship with
+  the product, so it stays in-repo.
 
 ## Sessions
 

@@ -18,13 +18,11 @@ considered and set aside) — `main` plus branch protection (required
 review, no direct pushes) gives the same safety without adding a branch
 contributors have to track and rebase against separately.
 
-**Branching strategy** (REQ-022, finalized — see
-[docs/runbooks/RB-01-branching-and-release-strategy.md](docs/runbooks/RB-01-branching-and-release-strategy.md)
-for the full writeup): trunk-based development. `main` is the only
-ongoing branch; a short-lived `release` branch is cut only when actually
-preparing to ship a tagged version, frozen except for bugfixes. Name
-your branch `feature/<REQ-id>-short-name` or `fix/<issue>` — matches the
-XTen Coding Standard's convention.
+**Branching strategy** (REQ-022, finalized): trunk-based development.
+`main` is the only ongoing branch; a short-lived `release` branch is cut
+only when actually preparing to ship a tagged version, frozen except
+for bugfixes. Name your branch `feature/<REQ-id>-short-name` or
+`fix/<issue>` — matches the XTen Coding Standard's convention.
 
 1. Fork and branch from `main` as `feature/<REQ-id>-short-name` or
    `fix/<issue>`.

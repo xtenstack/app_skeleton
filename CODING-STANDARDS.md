@@ -100,13 +100,13 @@ see any existing migration for the expected level of detail.
 
 ## Git workflow
 
-Branch naming, commit-message convention, and the trunk-based branching
-model are documented in
-[docs/runbooks/RB-01-branching-and-release-strategy.md](docs/runbooks/RB-01-branching-and-release-strategy.md)
-rather than duplicated here — short version: `feature/<REQ-id>-short-name`
-or `fix/<issue>` branches off `main`, Conventional Commits
-(`feat:`/`fix:`/`docs:`/`refactor:`), every merge to `main` through a
-reviewed PR.
+Trunk-based: `main` is the only ongoing branch, always releasable; a
+short-lived `release` branch is cut only when actually preparing to
+ship a tagged version, frozen except for bugfixes. Branch names:
+`feature/<REQ-id>-short-name` or `fix/<issue>`. Commits follow
+[Conventional Commits](https://www.conventionalcommits.org/)
+(`feat:`/`fix:`/`docs:`/`refactor:`/`chore:`/`test:`). Every merge to
+`main` goes through a reviewed PR.
 
 ## AI-augmented development
 
