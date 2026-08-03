@@ -126,8 +126,9 @@ try {
      * rather than crashing the whole request.
      */
     $builtInModules = [
-        'api'     => ['className' => 'App_skeleton\Modules\Api\Module'],
-        'backend' => ['className' => 'App_skeleton\Modules\Backend\Module'],
+        'api'      => ['className' => 'App_skeleton\Modules\Api\Module'],
+        'backend'  => ['className' => 'App_skeleton\Modules\Backend\Module'],
+        'frontend' => ['className' => 'App_skeleton\Modules\Frontend\Module'],
     ];
 
     try {

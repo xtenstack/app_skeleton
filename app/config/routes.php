@@ -7,8 +7,8 @@
 $router = $router ?? $di->getRouter();
 
 $router->add('/', [
-    'namespace'  => 'App_skeleton\Modules\Backend\Controllers',
-    'module'     => 'backend',
+    'namespace'  => 'App_skeleton\Modules\Frontend\Controllers',
+    'module'     => 'frontend',
     'controller' => 'index',
     'action'     => 'index',
 ]);

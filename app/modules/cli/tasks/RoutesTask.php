@@ -37,8 +37,9 @@ class RoutesTask extends \Phalcon\Cli\Task
         $application = new Application($di);
 
         $builtInModules = [
-            'api'     => ['className' => 'App_skeleton\Modules\Api\Module'],
-            'backend' => ['className' => 'App_skeleton\Modules\Backend\Module'],
+            'api'      => ['className' => 'App_skeleton\Modules\Api\Module'],
+            'backend'  => ['className' => 'App_skeleton\Modules\Backend\Module'],
+            'frontend' => ['className' => 'App_skeleton\Modules\Frontend\Module'],
         ];
 
         try {

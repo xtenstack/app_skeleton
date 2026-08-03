@@ -5,14 +5,13 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 class IndexController extends ControllerBase
 {
+    /**
+     * Unreachable by guests — ControllerBase's onConstruct() already
+     * redirects an unauthenticated request to login before this runs
+     * (the guest splash moved to the `frontend` module, REQ-020/031).
+     */
     public function indexAction()
     {
-        if (!$this->auth->isLoggedIn()) {
-            $this->view->pick('index/guest');
-
-            return;
-        }
-
         $menu   = $this->moduleManager->mergedMenu('backend');
         $roleId = $this->session->get('auth')['role_id'] ?? null;
 

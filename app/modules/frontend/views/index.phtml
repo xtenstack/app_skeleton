@@ -1,0 +1,67 @@
+<?php
+/** @var \Phalcon\Mvc\View\Engine\Php $this */
+
+/**
+ * Standalone shell, not shared with backend's AdminLTE layout on purpose
+ * — cross-module reach-ins are forbidden (see CLAUDE.md), and this
+ * module's audience (guests, and logged-in members on their own
+ * dashboard) doesn't need the admin sidebar/topnav anyway. Reuses the
+ * same public asset paths (theme.css) for visual consistency without
+ * coupling to backend's view code.
+ */
+$flashTypeClasses = [
+    'success' => 'alert-success',
+    'error'   => 'alert-danger',
+    'notice'  => 'alert-info',
+    'warning' => 'alert-warning',
+];
+$flashHtml = '';
+foreach ($this->flash->getMessages() as $flashType => $flashMessages) {
+    foreach ($flashMessages as $flashMessage) {
+        $flashHtml .= '<div class="alert alert-dismissible fade show ' . ($flashTypeClasses[$flashType] ?? 'alert-secondary') . '">'
+            . '<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>'
+            . $this->escaper->escapeHtml($flashMessage)
+            . '</div>';
+    }
+}
+$this->flash->clear();
+?>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?></title>
+    <meta name="csrf-key" content="<?= $this->escaper->escapeHtml($this->security->getTokenKey()) ?>">
+    <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
+    <link rel="stylesheet" href="/assets/adminlte/plugins/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="/assets/adminlte/css/adminlte.min.css">
+    <link rel="stylesheet" href="/assets/css/theme.css">
+  </head>
+  <body class="hold-transition">
+    <?= $flashHtml ?>
+    <?= $this->getContent() ?>
+    <script>
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+          window.location.reload();
+        }
+      });
+
+      (function () {
+        var keyMeta = document.querySelector('meta[name="csrf-key"]');
+        var tokenMeta = document.querySelector('meta[name="csrf-token"]');
+        if (!keyMeta || !tokenMeta) return;
+        document.querySelectorAll('form').forEach(function (form) {
+          if ((form.getAttribute('method') || '').toLowerCase() !== 'post') return;
+          if (form.querySelector('input[name="' + keyMeta.content + '"]')) return;
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = keyMeta.content;
+          input.value = tokenMeta.content;
+          form.appendChild(input);
+        });
+      })();
+    </script>
+  </body>
+</html>

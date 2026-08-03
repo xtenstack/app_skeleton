@@ -15,19 +15,40 @@ class ControllerBase extends Controller
     protected ?array $allowedRoles = null;
 
     /**
-     * Controllers reachable without being logged in — login itself,
-     * signup/email-verification/forgot-password (which by definition can't
-     * require auth), and the landing page (serves both guests and logged-in
-     * users, branching itself on auth state rather than being gated here).
+     * Controllers reachable without being logged in — login itself, and
+     * signup/email-verification/forgot-password (which by definition
+     * can't require auth). The guest landing page now lives in the
+     * `frontend` module (REQ-020/031), so 'index' as a whole no longer
+     * needs a blanket exemption here — a guest hitting /backend directly
+     * gets the normal redirect-to-login below, same as any other
+     * protected controller.
      */
-    private const UNAUTHENTICATED_CONTROLLERS = ['session', 'signup', 'password', 'index'];
+    private const UNAUTHENTICATED_CONTROLLERS = ['session', 'signup', 'password'];
+
+    /**
+     * Unlike the controller-wide exemptions above, these two actions on
+     * 'index' must stay reachable by guests specifically — they're the
+     * general 404/500 handler (REQ-024/026), reached via the router's
+     * unmatched-route fallback and the dispatcher's beforeException
+     * listener. Gating them behind login would mean a guest hitting a
+     * mistyped URL gets bounced to the login page instead of a themed
+     * error page — the exact bug REQ-024 fixed, reintroduced by
+     * over-broadly removing 'index' from the controller list above.
+     */
+    private const UNAUTHENTICATED_INDEX_ACTIONS = ['notFound', 'serverError'];
 
     protected function onConstruct()
     {
         $this->preventCaching();
         $this->enforceCsrf();
 
-        if (in_array($this->dispatcher->getControllerName(), self::UNAUTHENTICATED_CONTROLLERS, true)) {
+        $controllerName = $this->dispatcher->getControllerName();
+
+        if (in_array($controllerName, self::UNAUTHENTICATED_CONTROLLERS, true)) {
+            return;
+        }
+
+        if ($controllerName === 'index' && in_array($this->dispatcher->getActionName(), self::UNAUTHENTICATED_INDEX_ACTIONS, true)) {
             return;
         }
 
