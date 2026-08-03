@@ -28,7 +28,7 @@ Visit `http://localhost:8080` (or whatever `HTTP_PORT` you set).
 ## Composer, against your own PHP + Postgres
 
 For local development without Docker. Requires PHP 8.3+ with the
-`phalcon`, `pdo_sqlite`, and `openssl` extensions, and a reachable
+`phalcon`, `pdo_pgsql`, and `openssl` extensions, and a reachable
 Postgres database.
 
 ```bash

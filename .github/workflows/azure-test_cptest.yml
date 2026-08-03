@@ -44,7 +44,7 @@ jobs:
         # Dockerfile builds a custom PHP-FPM image from source rather than
         # using a stock one (see Dockerfile's top comment). Same flag,
         # same reason, as that Dockerfile's own composer install step.
-        run: composer validate --no-check-publish && composer install --prefer-dist --no-progress --no-scripts --ignore-platform-req=ext-phalcon
+        run: composer validate --no-check-publish && composer install --prefer-dist --no-progress --no-scripts --ignore-platform-req=ext-phalcon --ignore-platform-req=ext-pdo_pgsql
 
 
       - name: Upload artifact for deployment job

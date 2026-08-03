@@ -27,7 +27,8 @@ RUN composer install \
         --no-scripts \
         --no-interaction \
         --optimize-autoloader \
-        --ignore-platform-req=ext-phalcon
+        --ignore-platform-req=ext-phalcon \
+        --ignore-platform-req=ext-pdo_pgsql
 
 # ---- Stage 2: runtime --------------------------------------------------
 # Deliberately NOT based on the official php:8.3-fpm image — that build
@@ -68,6 +69,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         php8.3-sqlite3 \
         php8.3-curl \
         php8.3-mbstring \
+        php8.3-intl \
         msmtp \
         msmtp-mta \
     # Sury's default pool listens on a Unix socket (/run/php/php8.3-fpm.sock)

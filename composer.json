@@ -8,7 +8,7 @@
     "require": {
         "php": "^8.3",
         "ext-phalcon": "^5.8",
-        "ext-pdo_sqlite": "*",
+        "ext-pdo_pgsql": "*",
         "ext-openssl": "*"
     },
     "require-dev": {
