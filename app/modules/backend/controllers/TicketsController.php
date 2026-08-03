@@ -365,12 +365,24 @@ class TicketsController extends ControllerBase
 
         $dir = BASE_PATH . '/storage/ticket-attachments/' . $ticket->id;
 
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        // !is_dir() re-checked after a failed mkdir() to tolerate two
+        // concurrent uploads to the same new ticket racing to create it —
+        // not just the permission failure this was actually caught by
+        // (storage/ticket-attachments arriving root-owned on a fresh
+        // deploy, see entrypoint.sh).
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            $this->flash->error('Could not save the attachment — storage directory is not writable');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
         }
 
         $filename = bin2hex(random_bytes(16)) . '.' . self::ALLOWED_ATTACHMENT_TYPES[$mime];
-        $file->moveTo($dir . '/' . $filename);
+
+        if (!$file->moveTo($dir . '/' . $filename)) {
+            $this->flash->error('Could not save the attachment — file upload failed');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
+        }
 
         $attachment                      = new \TicketAttachments();
         $attachment->ticket_id           = $ticket->id;

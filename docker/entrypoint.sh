@@ -1,17 +1,22 @@
 #!/bin/sh
 set -eu
 
-# The bind-mounted host directories (logs/, public/files/, sessions/) can
-# arrive owned by whoever created them on the host — root, if a deploy
-# script does `mkdir -p data` over SSH as root, which is exactly what
-# happened on the first prod deploy (2026-07-30) and silently broke error
-# logging: www-data (php-fpm's run user, uid 33) had no write access, so
-# error_log() failed with no visible symptom beyond a generic crash page.
-# This container runs as root (no USER directive in the Dockerfile — PHP-FPM
-# itself drops to www-data per the pool config), so fixing ownership here
-# on every start means it can never again depend on whoever ran `mkdir`
-# on the host getting it right.
-chown -R www-data:www-data /app/logs /app/public/files /app/sessions
+# The bind-mounted host directories (logs/, public/files/, sessions/,
+# storage/ticket-attachments/) can arrive owned by whoever created them on
+# the host — root, if a deploy script does `mkdir -p data` over SSH as
+# root, which is exactly what happened on the first prod deploy
+# (2026-07-30) and silently broke error logging: www-data (php-fpm's run
+# user, uid 33) had no write access, so error_log() failed with no visible
+# symptom beyond a generic crash page. This container runs as root (no
+# USER directive in the Dockerfile — PHP-FPM itself drops to www-data per
+# the pool config), so fixing ownership here on every start means it can
+# never again depend on whoever ran `mkdir` on the host getting it right.
+# storage/ticket-attachments was added after this line was first written
+# (REQ-025) and missed the same treatment — confirmed on prod as the
+# silent cause of ticket-attachment uploads failing (mkdir(): Permission
+# denied, moveTo() failing, both non-fatal warnings the app didn't check).
+mkdir -p /app/storage/ticket-attachments
+chown -R www-data:www-data /app/logs /app/public/files /app/sessions /app/storage
 
 # Renders app/config/config.local.php from env vars on every container
 # start — same gitignored-override mechanism config.php already uses for
