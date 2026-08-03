@@ -21,11 +21,21 @@
           <div class="form-row">
             <div class="form-group col-6">
               <label for="timezone">Timezone</label>
-              <input type="text" class="form-control" id="timezone" name="timezone" value="<?= $this->escaper->escapeHtml($profile->timezone ?: 'UTC') ?>">
+              <select class="form-control" id="timezone" name="timezone">
+<?php $currentTimezone = $profile->timezone ?: 'UTC'; ?>
+<?php foreach ($timezones as $timezone): ?>
+                <option value="<?= $this->escaper->escapeHtml($timezone) ?>" <?= $timezone === $currentTimezone ? 'selected' : '' ?>><?= $this->escaper->escapeHtml($timezone) ?></option>
+<?php endforeach; ?>
+              </select>
             </div>
             <div class="form-group col-6">
               <label for="locale">Locale</label>
-              <input type="text" class="form-control" id="locale" name="locale" value="<?= $this->escaper->escapeHtml($profile->locale ?: 'en-AU') ?>">
+              <select class="form-control" id="locale" name="locale">
+<?php $currentLocale = $profile->locale ?: 'en-AU'; ?>
+<?php foreach ($locales as $code => $name): ?>
+                <option value="<?= $this->escaper->escapeHtml($code) ?>" <?= $code === $currentLocale ? 'selected' : '' ?>><?= $this->escaper->escapeHtml($name) ?> (<?= $this->escaper->escapeHtml($code) ?>)</option>
+<?php endforeach; ?>
+              </select>
             </div>
           </div>
           <div class="form-group form-check">

@@ -134,10 +134,19 @@ class UsersController extends ControllerBase
                 $profile->user_id = $user->id;
             }
 
+            $timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
+            $locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
+
+            if (!\App_skeleton\LocaleOptions::isValidTimezone($timezone) || !\App_skeleton\LocaleOptions::isValidLocale($locale)) {
+                $this->flash->error('Invalid timezone or locale selection');
+
+                return $this->response->redirect($this->url->get('backend/users/profile/' . $user->id));
+            }
+
             $profile->phone    = (string) $this->request->getPost('phone', 'string');
             $profile->bio      = (string) $this->request->getPost('bio', 'string');
-            $profile->timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
-            $profile->locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
+            $profile->timezone = $timezone;
+            $profile->locale   = $locale;
 
             $ageVerified = (bool) $this->request->getPost('age_verified');
 
@@ -163,6 +172,8 @@ class UsersController extends ControllerBase
 
         $this->view->targetUser = $user;
         $this->view->profile    = $profile ?: new \UserProfiles();
+        $this->view->timezones  = \App_skeleton\LocaleOptions::timezones();
+        $this->view->locales    = \App_skeleton\LocaleOptions::locales();
     }
 
     public function settingsAction($userId)

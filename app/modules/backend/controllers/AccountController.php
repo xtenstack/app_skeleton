@@ -32,6 +32,8 @@ class AccountController extends ControllerBase
         $this->view->profile        = $this->currentProfile($userId);
         $this->view->themePalette   = $userSettings['theme_palette'] ?? $this->settings->get('default_theme_palette', 'blue');
         $this->view->themeMode      = $userSettings['theme_mode'] ?? $this->settings->get('default_theme_mode', 'auto');
+        $this->view->timezones      = \App_skeleton\LocaleOptions::timezones();
+        $this->view->locales        = \App_skeleton\LocaleOptions::locales();
         $this->view->apiKeys        = \ApiKeys::find([
             'conditions' => 'user_id = :id: AND revoked_at IS NULL',
             'bind'       => ['id' => $userId],
@@ -59,11 +61,20 @@ class AccountController extends ControllerBase
             return $this->response->redirect($this->url->get('backend/account'));
         }
 
+        $timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
+        $locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
+
+        if (!\App_skeleton\LocaleOptions::isValidTimezone($timezone) || !\App_skeleton\LocaleOptions::isValidLocale($locale)) {
+            $this->flash->error('Invalid timezone or locale selection');
+
+            return $this->response->redirect($this->url->get('backend/account'));
+        }
+
         $profile = $this->currentProfile($userId);
         $profile->phone    = (string) $this->request->getPost('phone', 'string');
         $profile->bio      = (string) $this->request->getPost('bio', 'string');
-        $profile->timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
-        $profile->locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
+        $profile->timezone = $timezone;
+        $profile->locale   = $locale;
 
         if (!$profile->save()) {
             foreach ($profile->getMessages() as $message) {
