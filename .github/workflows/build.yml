@@ -1,0 +1,68 @@
+name: Build
+
+# What "build passing" actually means here: the same Docker image that
+# Internal Prod and every client instance run builds successfully, boots
+# the full stack (Caddy + app + Postgres) against a stock .env.example
+# config, and actually serves real HTTP responses. This is a build/smoke
+# check, not a test suite — there's no PHPUnit yet (see CONTRIBUTING.md);
+# don't read this badge as "tests pass."
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .env and required bind-mount targets
+        run: |
+          cp .env.example .env
+          echo "DB_PASSWORD=ci-only-not-a-real-secret" >> .env
+          mkdir -p data
+          touch data/encryption_key
+
+      - name: Build and start the real stack
+        run: docker compose up -d --build
+
+      - name: Wait for the app to become reachable
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:8080/; then
+              echo "app reachable after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "app never became reachable" >&2
+          exit 1
+
+      - name: Smoke-test real endpoints
+        run: |
+          set -e
+          # Guest landing page (backend/index) — served, not an error page.
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/)
+          [ "$status" = "200" ] || { echo "landing page: expected 200, got $status" >&2; exit 1; }
+
+          # Login page — same check, confirms the backend module and Volt
+          # rendering both actually work, not just the router.
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/backend/session)
+          [ "$status" = "200" ] || { echo "login page: expected 200, got $status" >&2; exit 1; }
+
+          # A mistyped/unmatched URL should hit the themed 404, not a
+          # leaked JSON error or a raw crash (REQ-024/REQ-026).
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/this-route-does-not-exist)
+          [ "$status" = "404" ] || { echo "unmatched route: expected 404, got $status" >&2; exit 1; }
+
+      - name: Show app container logs on failure
+        if: failure()
+        run: docker compose logs app
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

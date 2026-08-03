@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/PHP-%5E8.3-777bb4.svg)](composer.json)
 [![Phalcon](https://img.shields.io/badge/Phalcon-%5E5.8-2196f3.svg)](composer.json)
+[![Build](https://github.com/xtenstack/app_skeleton/actions/workflows/build.yml/badge.svg)](https://github.com/xtenstack/app_skeleton/actions/workflows/build.yml)
 
 A Phalcon 5.8 multi-module PHP application skeleton: a server-rendered
 AdminLTE backend plus a JSON API module, sharing one codebase. Comes with
@@ -10,12 +11,16 @@ authentication, RBAC, audit logging (with reversal), soft deletes, a cron
 system, signup/verification/password-reset flows, and a Composer-package
 based module system for adding features without forking the base app.
 
-There's no bundled CI/test-suite badge yet — that's a known gap, see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+The Build badge covers a real build + boot + smoke-test of the actual
+Docker image every push/PR — it is **not** a test-suite badge; there's
+still no PHPUnit suite, see [CONTRIBUTING.md](CONTRIBUTING.md) for that
+gap.
 
 ## What's included
 
 - **Backend module** — server-rendered AdminLTE admin/user interface.
+- **Frontend module** — the public-facing guest landing page and a
+  non-admin member dashboard, separate from the admin backend.
 - **API module** — JSON-only, session or API-key authenticated.
 - **CLI module** — `./run <task> <action>` for migrations, seeding,
   module management, route listing, cron, and more (`./run` with no
@@ -50,6 +55,10 @@ Full install options (Docker, Composer-only, plain download) are in
 - [INSTALL.md](INSTALL.md) — setup instructions.
 - [CODING-STANDARDS.md](CODING-STANDARDS.md) — conventions used
   throughout the codebase.
+- [CLAUDE.md](CLAUDE.md) — module boundaries and forbidden patterns, for
+  Claude Code (or any AI-assisted) sessions working in this repo.
+- [docs/guide-to-xten-stack-modules.md](docs/guide-to-xten-stack-modules.md)
+  — what ships built-in vs. optional, and how to build your own module.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose a change.
 - [SECURITY.md](SECURITY.md) — how to report a vulnerability.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community expectations.
