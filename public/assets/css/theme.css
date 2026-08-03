@@ -57,6 +57,16 @@ html[data-mode="dark"] .form-control {
   border-color: #444;
 }
 
+/* Bootstrap's reboot sets pre/code's color explicitly (not just inherited
+   from body), so it isn't covered by the .card-body rule above — an
+   explicitly-matched rule always wins over an inherited value, no matter
+   how low its specificity. Without this, dark near-black log text sits on
+   a dark card background (e.g. the System Log page). */
+html[data-mode="dark"] pre,
+html[data-mode="dark"] code {
+  color: #e9ecef;
+}
+
 html[data-mode="dark"] .main-header.navbar {
   background-color: #1e2124 !important;
   border-bottom: 1px solid #33373a;
@@ -105,6 +115,11 @@ html[data-mode="dark"] .main-footer {
     background-color: #2c2f31;
     color: #e9ecef;
     border-color: #444;
+  }
+
+  html[data-mode="auto"] pre,
+  html[data-mode="auto"] code {
+    color: #e9ecef;
   }
 
   html[data-mode="auto"] .main-header.navbar {

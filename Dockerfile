@@ -79,6 +79,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
+# sury's default upload_max_filesize (2M)/post_max_size (8M) are both below
+# TicketsController::MAX_ATTACHMENT_BYTES (10MB) — a multipart POST over
+# post_max_size gets silently emptied by PHP itself (no $_POST, no $_FILES,
+# no warning the app can see), which the app's own CSRF check then
+# misreports as "session expired" since it just sees a POST with no token.
+# Some headroom above the app's own limit for multipart overhead and any
+# other form fields on the same request.
+RUN { \
+        echo "upload_max_filesize = 12M"; \
+        echo "post_max_size = 15M"; \
+    } > /etc/php/8.3/fpm/conf.d/zz-uploads.ini
+
 WORKDIR /app
 
 COPY --from=vendor /app/vendor ./vendor
