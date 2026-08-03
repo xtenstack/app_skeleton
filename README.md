@@ -50,6 +50,21 @@ docker compose up -d --build
 Full install options (Docker, Composer-only, plain download) are in
 [INSTALL.md](INSTALL.md).
 
+## Known limitations
+
+- **File uploads picked directly from Photos in Safari on macOS can
+  fail.** Selecting a file via a `<input type="file">` picker's "Photos"
+  source (rather than choosing an already-saved file) requires Safari to
+  export the asset from the Photos library first — which can involve
+  downloading the full-resolution original from iCloud if "Optimize Mac
+  Storage" is enabled — before it can build the upload request. That
+  export isn't always complete by the time the form submits, which can
+  result in a malformed multipart request reaching the server and a
+  misleading "session expired" error, independent of file size or type
+  (confirmed with both JPEG and PNG). This isn't fixable server-side.
+  **Workaround**: export/save the photo to disk first (Finder or the
+  Photos "Export" menu), then upload the saved file.
+
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) — setup instructions.
