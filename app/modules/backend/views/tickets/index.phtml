@@ -30,56 +30,129 @@
   </div>
 </div>
 
-<div class="row">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body p-0">
-        <table class="table table-striped mb-0">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Title</th>
-              <th>Type</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Reporter</th>
-              <th>Assignee</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+<form method="post" action="<?= $this->url->get('backend/tickets/bulk') ?>" id="tickets-bulk-form">
+  <div class="row mb-2">
+    <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="bulk-dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+          With selected
+        </button>
+        <div class="dropdown-menu p-3 shadow" style="min-width: 320px;" aria-labelledby="bulk-dropdown-toggle">
+          <div class="form-group mb-2">
+            <label class="small mb-1">Set type</label>
+            <select class="form-control form-control-sm" name="ticket_type">
+              <option value="">— No change —</option>
+<?php foreach (['bug' => 'Bug', 'issue' => 'Issue', 'feature' => 'Feature', 'support' => 'Support'] as $value => $label): ?>
+              <option value="<?= $value ?>"><?= $label ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group mb-2">
+            <label class="small mb-1">Set severity</label>
+            <select class="form-control form-control-sm" name="severity">
+              <option value="">— No change —</option>
+<?php foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'] as $value => $label): ?>
+              <option value="<?= $value ?>"><?= $label ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group mb-3">
+            <label class="small mb-1">Set status</label>
+            <select class="form-control form-control-sm" name="status">
+              <option value="">— No change —</option>
+              <option value="closed">Closed</option>
+              <option value="open">Reopened</option>
+            </select>
+          </div>
+          <button type="submit" name="bulk_action" value="update" class="btn btn-sm btn-primary btn-block">Apply to selected</button>
+          <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger btn-block" onclick="return confirm('Delete the selected ticket(s)? This cannot be undone from here.')">Delete selected</button>
+        </div>
+      </div>
+      <span class="text-muted small" id="bulk-selected-count">0 selected</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body p-0">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th style="width: 2.5rem;"><input type="checkbox" id="bulk-select-all" aria-label="Select all tickets"></th>
+                <th>#</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Reporter</th>
+                <th>Assignee</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
 <?php foreach ($tickets as $ticket): ?>
-            <tr>
-              <td><?= $ticket->id ?></td>
-              <td><?= $this->escaper->escapeHtml($ticket->title) ?></td>
-              <td><span class="badge badge-light"><?= $this->escaper->escapeHtml(ucfirst($ticket->ticket_type ?: 'bug')) ?></span></td>
-              <td><span class="badge badge-<?= $ticket->severity === 'critical' ? 'danger' : ($ticket->severity === 'high' ? 'warning' : 'secondary') ?>"><?= $this->escaper->escapeHtml($ticket->severity) ?></span></td>
-              <td><span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
+              <tr>
+                <td><input type="checkbox" class="bulk-row-checkbox" name="ticket_ids[]" value="<?= $ticket->id ?>" aria-label="Select ticket #<?= $ticket->id ?>"></td>
+                <td><?= $ticket->id ?></td>
+                <td><?= $this->escaper->escapeHtml($ticket->title) ?></td>
+                <td><span class="badge badge-light"><?= $this->escaper->escapeHtml(ucfirst($ticket->ticket_type ?: 'bug')) ?></span></td>
+                <td><span class="badge badge-<?= $ticket->severity === 'critical' ? 'danger' : ($ticket->severity === 'high' ? 'warning' : 'secondary') ?>"><?= $this->escaper->escapeHtml($ticket->severity) ?></span></td>
+                <td><span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
 <?php if ($ticket->auto_closed_at && !$ticket->qa_reviewed_at): ?>
-                <span class="badge badge-warning">needs QA</span>
+                  <span class="badge badge-warning">needs QA</span>
 <?php endif; ?>
-              </td>
-              <td><?= $this->escaper->escapeHtml($ticket->Reporter ? $ticket->Reporter->email : '—') ?></td>
-              <td><?= $this->escaper->escapeHtml($ticket->Assignee ? $ticket->Assignee->email : '—') ?></td>
-              <td><?= $this->escaper->escapeHtml($ticket->created_at) ?></td>
-              <td class="text-right">
-                <a href="<?= $this->url->get('backend/tickets/view/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
-                <a href="<?= $this->url->get('backend/tickets/edit/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                <form method="post" action="<?= $this->url->get('backend/tickets/delete/' . $ticket->id) ?>" class="d-inline" onsubmit="return confirm('Delete ticket #<?= $ticket->id ?>?')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
-              </td>
-            </tr>
+                </td>
+                <td><?= $this->escaper->escapeHtml($ticket->Reporter ? $ticket->Reporter->email : '—') ?></td>
+                <td><?= $this->escaper->escapeHtml($ticket->Assignee ? $ticket->Assignee->email : '—') ?></td>
+                <td><?= $this->escaper->escapeHtml($ticket->created_at) ?></td>
+                <td class="text-right">
+                  <a href="<?= $this->url->get('backend/tickets/view/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
+                  <a href="<?= $this->url->get('backend/tickets/edit/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <button type="submit" formaction="<?= $this->url->get('backend/tickets/delete/' . $ticket->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete ticket #<?= $ticket->id ?>?')">Delete</button>
+                </td>
+              </tr>
 <?php endforeach; ?>
 <?php if (!count($tickets)): ?>
-            <tr>
-              <td colspan="9" class="text-center text-muted">No tickets yet.</td>
-            </tr>
+              <tr>
+                <td colspan="10" class="text-center text-muted">No tickets yet.</td>
+              </tr>
 <?php endif; ?>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</form>
+
+<script>
+(function () {
+  var selectAll = document.getElementById('bulk-select-all');
+  var count = document.getElementById('bulk-selected-count');
+
+  function rowCheckboxes() {
+    return Array.prototype.slice.call(document.querySelectorAll('.bulk-row-checkbox'));
+  }
+
+  function updateCount() {
+    var checked = rowCheckboxes().filter(function (cb) { return cb.checked; }).length;
+    count.textContent = checked + ' selected';
+  }
+
+  selectAll.addEventListener('change', function () {
+    rowCheckboxes().forEach(function (cb) { cb.checked = selectAll.checked; });
+    updateCount();
+  });
+
+  rowCheckboxes().forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      if (!cb.checked) {
+        selectAll.checked = false;
+      }
+      updateCount();
+    });
+  });
+})();
+</script>

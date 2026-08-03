@@ -247,6 +247,91 @@ class TicketsController extends ControllerBase
         return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
     }
 
+    /**
+     * "With selected" bulk actions from the list view (delete, or update
+     * severity/type/status across every checked ticket). Bulk status is
+     * deliberately limited to close/reopen — the same two side-effecting
+     * transitions closeAction/reopenAction already define — rather than a
+     * raw status dropdown, since 'consolidated' needs a single merge
+     * target and doesn't make sense applied to a batch.
+     */
+    public function bulkAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
+        }
+
+        $ids = array_filter(array_map('intval', (array) $this->request->getPost('ticket_ids', null, [])));
+
+        if (!$ids) {
+            $this->flash->error('No tickets were selected');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
+        }
+
+        $tickets = \Tickets::find([
+            'conditions' => 'id IN ({ids:array})',
+            'bind'       => ['ids' => $ids],
+        ]);
+
+        $bulkAction = (string) $this->request->getPost('bulk_action', 'string');
+
+        if ($bulkAction === 'delete') {
+            $count = 0;
+
+            foreach ($tickets as $ticket) {
+                if ($ticket->softDelete()) {
+                    $count++;
+                }
+            }
+
+            $this->flash->success($count . ' ticket(s) deleted');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
+        }
+
+        $ticketType = (string) $this->request->getPost('ticket_type', 'string');
+        $severity   = (string) $this->request->getPost('severity', 'string');
+        $status     = (string) $this->request->getPost('status', 'string');
+
+        if ($ticketType === '' && $severity === '' && $status === '') {
+            $this->flash->error('Choose at least one field to bulk-update');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
+        }
+
+        $count = 0;
+
+        foreach ($tickets as $ticket) {
+            if ($ticketType !== '' && isset(self::TICKET_TYPES[$ticketType])) {
+                $ticket->ticket_type = $ticketType;
+            }
+
+            if ($severity !== '' && in_array($severity, ['low', 'normal', 'high', 'critical'], true)) {
+                $ticket->severity = $severity;
+            }
+
+            if ($status === 'closed') {
+                $ticket->status       = 'closed';
+                $ticket->closed_at    = date('Y-m-d H:i:s');
+                $ticket->close_reason = 'manual';
+            } elseif ($status === 'open') {
+                $ticket->status         = 'open';
+                $ticket->closed_at      = null;
+                $ticket->auto_closed_at = null;
+                $ticket->close_reason   = null;
+            }
+
+            if ($ticket->save()) {
+                $count++;
+            }
+        }
+
+        $this->flash->success($count . ' ticket(s) updated');
+
+        return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
+    }
+
     public function uploadAttachmentAction($id)
     {
         $ticket = \Tickets::findFirstById($id);
