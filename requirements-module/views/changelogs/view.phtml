@@ -1,0 +1,74 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1><?= $this->escaper->escapeHtml($changelog->version) ?></h1>
+    <div>
+      <a href="<?= $this->url->get('requirements/changelogs/export/' . $changelog->id) ?>" class="btn btn-outline-secondary">Export Markdown</a>
+      <a href="<?= $this->url->get('requirements/changelogs') ?>" class="btn btn-link">Back to list</a>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">Linked requirements</div>
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($linked as $requirement): ?>
+            <tr>
+              <td><a href="<?= $this->url->get('requirements/requirements/view/' . $requirement->id) ?>"><?= $this->escaper->escapeHtml($requirement->display_id) ?></a></td>
+              <td><?= $this->escaper->escapeHtml($requirement->changelog_note ?: $requirement->title) ?></td>
+              <td class="text-right">
+                <form method="post" action="<?= $this->url->get('requirements/changelogs/remove-requirement/' . $changelog->id . '/' . $requirement->id) ?>" onsubmit="return confirm('Remove <?= $this->escaper->escapeHtmlAttr($requirement->display_id) ?> from this changelog?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($linked)): ?>
+            <tr>
+              <td colspan="3" class="text-center text-muted">No requirements linked yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mt-2">
+      <div class="card-header">Add requirements</div>
+      <div class="card-body">
+<?php if (!count($pickable)): ?>
+        <p class="text-muted mb-0">No requirements are currently "Done — pending changelog decision".</p>
+<?php else: ?>
+        <form method="post" action="<?= $this->url->get('requirements/changelogs/add-requirements/' . $changelog->id) ?>">
+<?php foreach ($pickable as $requirement): ?>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="requirement_ids[]" value="<?= $requirement->id ?>" id="pick_<?= $requirement->id ?>">
+            <label class="form-check-label" for="pick_<?= $requirement->id ?>"><?= $this->escaper->escapeHtml($requirement->display_id) ?> — <?= $this->escaper->escapeHtml($requirement->title) ?></label>
+          </div>
+<?php endforeach; ?>
+          <button type="submit" class="btn btn-primary mt-2">Add selected</button>
+        </form>
+<?php endif; ?>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">Markdown preview</div>
+      <div class="card-body">
+        <pre class="mb-0"><?= $this->escaper->escapeHtml($markdownPreview) ?></pre>
+      </div>
+    </div>
+  </div>
+</div>

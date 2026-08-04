@@ -1,0 +1,125 @@
+<?php $baseUrl = $this->url->get('requirements/requirements'); ?>
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Requirements</h1>
+    <div>
+      <a href="<?= $this->url->get('requirements/changelogs') ?>" class="btn btn-outline-secondary">Changelogs</a>
+      <a href="<?= $baseUrl ?>/new" class="btn btn-primary">New Requirement</a>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
+    <div class="btn-group" role="group">
+      <a href="<?= $baseUrl ?>" class="btn btn-sm btn-outline-secondary <?= $currentStatus === '' ? 'active' : '' ?>">All</a>
+<?php foreach ($statuses as $value => $label): ?>
+      <a href="<?= $baseUrl ?>?status=<?= $value ?>" class="btn btn-sm btn-outline-secondary <?= $currentStatus === $value ? 'active' : '' ?>"><?= $label ?></a>
+<?php endforeach; ?>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="<?= $this->url->get('requirements/requirements/bulk') ?>" id="requirements-bulk-form">
+  <div class="row mb-2">
+    <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="bulk-dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+          With selected
+        </button>
+        <div class="dropdown-menu p-3 shadow" style="min-width: 320px;" aria-labelledby="bulk-dropdown-toggle">
+          <div class="form-group mb-3">
+            <label class="small mb-1">Set status</label>
+            <select class="form-control form-control-sm" name="status">
+              <option value="">— No change —</option>
+<?php foreach ($statuses as $value => $label): ?>
+<?php if ($value === 'complete') continue; ?>
+              <option value="<?= $value ?>"><?= $label ?></option>
+<?php endforeach; ?>
+            </select>
+            <small class="form-text text-muted">"Complete" needs a changelog decision — set it from the requirement's own edit page.</small>
+          </div>
+          <button type="submit" name="bulk_action" value="update" class="btn btn-sm btn-primary btn-block">Apply to selected</button>
+          <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger btn-block" onclick="return confirm('Delete the selected requirement(s)? This cannot be undone from here.')">Delete selected</button>
+        </div>
+      </div>
+      <span class="text-muted small" id="bulk-selected-count">0 selected</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body p-0">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th style="width: 2.5rem;"><input type="checkbox" id="bulk-select-all" aria-label="Select all requirements"></th>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Changelog decision</th>
+                <th>Origin</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+<?php foreach ($requirements as $requirement): ?>
+              <tr>
+                <td><input type="checkbox" class="bulk-row-checkbox" name="requirement_ids[]" value="<?= $requirement->id ?>" aria-label="Select <?= $this->escaper->escapeHtmlAttr($requirement->display_id) ?>"></td>
+                <td><?= $this->escaper->escapeHtml($requirement->display_id) ?></td>
+                <td><?= $this->escaper->escapeHtml($requirement->title) ?></td>
+                <td><span class="badge badge-<?= $requirement->status === 'complete' ? 'success' : ($requirement->status === 'done_pending_changelog_decision' ? 'info' : ($requirement->status === 'in_progress' ? 'warning' : 'secondary')) ?>"><?= $this->escaper->escapeHtml($statuses[$requirement->status] ?? $requirement->status) ?></span></td>
+                <td><?= $this->escaper->escapeHtml($requirement->changelog_decision ?: '—') ?></td>
+                <td><?= $this->escaper->escapeHtml($requirement->origin_session ?: '—') ?></td>
+                <td><?= $this->escaper->escapeHtml($requirement->created_at) ?></td>
+                <td class="text-right">
+                  <a href="<?= $baseUrl ?>/view/<?= $requirement->id ?>" class="btn btn-sm btn-outline-secondary">View</a>
+                  <a href="<?= $baseUrl ?>/edit/<?= $requirement->id ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <button type="submit" formaction="<?= $baseUrl ?>/delete/<?= $requirement->id ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete <?= $this->escaper->escapeHtmlAttr($requirement->display_id) ?>?')">Delete</button>
+                </td>
+              </tr>
+<?php endforeach; ?>
+<?php if (!count($requirements)): ?>
+              <tr>
+                <td colspan="8" class="text-center text-muted">No requirements yet.</td>
+              </tr>
+<?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+(function () {
+  var selectAll = document.getElementById('bulk-select-all');
+  var count = document.getElementById('bulk-selected-count');
+
+  function rowCheckboxes() {
+    return Array.prototype.slice.call(document.querySelectorAll('.bulk-row-checkbox'));
+  }
+
+  function updateCount() {
+    var checked = rowCheckboxes().filter(function (cb) { return cb.checked; }).length;
+    count.textContent = checked + ' selected';
+  }
+
+  selectAll.addEventListener('change', function () {
+    rowCheckboxes().forEach(function (cb) { cb.checked = selectAll.checked; });
+    updateCount();
+  });
+
+  rowCheckboxes().forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      if (!cb.checked) {
+        selectAll.checked = false;
+      }
+      updateCount();
+    });
+  });
+})();
+</script>

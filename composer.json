@@ -5,11 +5,18 @@
     "license": "MIT",
     "minimum-stability": "dev",
     "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "requirements-module"
+        }
+    ],
     "require": {
         "php": "^8.3",
         "ext-phalcon": "^5.8",
         "ext-pdo_pgsql": "*",
-        "ext-openssl": "*"
+        "ext-openssl": "*",
+        "xtenstack/requirements-module": "*"
     },
     "require-dev": {
         "phalcon/devtools": "^5.0"

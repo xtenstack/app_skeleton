@@ -1,0 +1,27 @@
+<?php
+/** @var \Phalcon\Mvc\View\Engine\Php $this */
+/** @var string $controllerName */
+
+$menu   = $this->moduleManager->mergedMenu('backend');
+$roleId = $this->session->get('auth')['role_id'] ?? null;
+?>
+<aside class="main-sidebar sidebar-dark-primary elevation-4">
+  <a href="<?= $this->url->get('backend') ?>" class="brand-link">
+    <span class="brand-text font-weight-light"><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?></span>
+  </a>
+  <div class="sidebar">
+    <nav class="mt-2">
+      <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+<?php foreach ($menu as $item): ?>
+<?php if ($item['roles'] !== null && !in_array($roleId, $item['roles'], true)) continue; ?>
+        <li class="nav-item">
+          <a href="<?= $this->url->get($item['url']) ?>" class="nav-link <?= $controllerName === $item['controller'] ? 'active' : '' ?>">
+            <i class="nav-icon <?= $item['icon'] ?>"></i>
+            <p><?= $this->escaper->escapeHtml($item['label']) ?></p>
+          </a>
+        </li>
+<?php endforeach; ?>
+      </ul>
+    </nav>
+  </div>
+</aside>
