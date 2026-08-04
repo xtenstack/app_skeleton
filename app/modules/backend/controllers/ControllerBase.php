@@ -112,6 +112,23 @@ class ControllerBase extends Controller
             return;
         }
 
+        // Diagnostic for production ticket #5 (intermittent "session expired"
+        // on login, no confirmed root cause as of Session 13) — the working
+        // theory is a session-write race on very fast autofill+Enter submits,
+        // not the token-reuse bug destroyIfValid:false already rules out.
+        // No sensitive values logged (no token, no credentials), just enough
+        // to correlate a future occurrence: whether a token existed at all
+        // (a completely empty session points at the write-race theory; a
+        // present-but-mismatched token points elsewhere).
+        error_log(sprintf(
+            'CSRF check failed: controller=%s action=%s session_id=%s had_token=%s referer=%s',
+            $this->dispatcher->getControllerName(),
+            $this->dispatcher->getActionName(),
+            $this->session->getId(),
+            $this->security->getSessionToken() ? 'yes' : 'no',
+            $this->request->getHTTPReferer() ?: '(none)'
+        ));
+
         $this->flash->error('Your session expired or the form was resubmitted — please try again.');
 
         $referer = $this->request->getHTTPReferer();
