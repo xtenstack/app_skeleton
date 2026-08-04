@@ -65,7 +65,11 @@ services:
       - "${HTTP_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
     environment:
-      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      # http:// prefix by default (see docker/Caddyfile) — bare "localhost"
+      # still triggers Caddy's automatic HTTPS + redirect, which breaks
+      # plain-HTTP curl checks (CI, local dev). Real deployments override
+      # this with an actual domain and no scheme prefix.
+      SITE_DOMAIN: ${SITE_DOMAIN:-http://localhost}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       # Static assets (css/js/img) come straight from the host repo's

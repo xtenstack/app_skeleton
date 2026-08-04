@@ -2,10 +2,15 @@
 # app/bootstrap_web.php) rather than a rewritten _url query param, so
 # php_fastcgi's default try_files-then-index.php behaviour is already
 # exactly right — no custom rewrite rules needed. Automatic HTTPS is on by
-# default for any real domain in {$SITE_DOMAIN}; for local/IP-only testing
-# it falls back to self-signed.
+# default for any real domain in {$SITE_DOMAIN}. Caddy also enables it
+# (self-signed, with an HTTP->HTTPS redirect) for the bare hostname
+# "localhost" specifically — not what local dev/CI curl over plain HTTP
+# wants, so their SITE_DOMAIN default is the explicit "http://localhost"
+# scheme, which disables automatic HTTPS for that block entirely. Real
+# deployments set SITE_DOMAIN to an actual domain (no scheme), which still
+# gets full automatic HTTPS as intended.
 
-{$SITE_DOMAIN:localhost} {
+{$SITE_DOMAIN:http://localhost} {
     root * /app/public
     encode gzip
 
