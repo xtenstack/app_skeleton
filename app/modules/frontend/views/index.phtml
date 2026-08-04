@@ -2,13 +2,35 @@
 /** @var \Phalcon\Mvc\View\Engine\Php $this */
 
 /**
- * Standalone shell, not shared with backend's AdminLTE layout on purpose
- * — cross-module reach-ins are forbidden (see CLAUDE.md), and this
- * module's audience (guests, and logged-in members on their own
- * dashboard) doesn't need the admin sidebar/topnav anyway. Reuses the
- * same public asset paths (theme.css) for visual consistency without
- * coupling to backend's view code.
+ * Own layout, not a reach-in to backend's (cross-module reach-ins are
+ * forbidden — see CLAUDE.md) — but same AdminLTE topnav/sidenav chrome
+ * for the member dashboard as backend uses (REQ pending, Session 13),
+ * built from this module's own partials/menu.php rather than backend's.
+ * The guest landing page ('index' controller) stays the plain standalone
+ * card it always was — a logged-out visitor has no account menu, no
+ * sidebar links, nothing the chrome would actually be for.
  */
+$controllerName = $this->dispatcher->getControllerName();
+$isGuestLanding = $controllerName === 'index';
+
+// Same theme-resolution as backend/views/index.phtml (REQ-016) — a
+// member's own preference, falling back through the admin-set default to
+// a hardcoded one. Guests get the site default outright (no user_settings
+// to read yet).
+$allowedPalettes = ['blue', 'purple', 'green', 'orange'];
+$allowedModes    = ['light', 'dark', 'auto'];
+$userSettings    = $this->session->get('user_settings') ?? [];
+$themePalette    = $userSettings['theme_palette'] ?? $this->settings->get('default_theme_palette', 'blue');
+$themeMode       = $userSettings['theme_mode'] ?? $this->settings->get('default_theme_mode', 'auto');
+
+if (!in_array($themePalette, $allowedPalettes, true)) {
+    $themePalette = 'blue';
+}
+
+if (!in_array($themeMode, $allowedModes, true)) {
+    $themeMode = 'auto';
+}
+
 $flashTypeClasses = [
     'success' => 'alert-success',
     'error'   => 'alert-danger',
@@ -27,7 +49,7 @@ foreach ($this->flash->getMessages() as $flashType => $flashMessages) {
 $this->flash->clear();
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-palette="<?= $this->escaper->escapeHtmlAttr($themePalette) ?>" data-mode="<?= $this->escaper->escapeHtmlAttr($themeMode) ?>">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -38,10 +60,36 @@ $this->flash->clear();
     <link rel="stylesheet" href="/assets/adminlte/css/adminlte.min.css">
     <link rel="stylesheet" href="/assets/css/theme.css">
   </head>
-  <body class="hold-transition">
+  <body class="<?= $isGuestLanding ? 'hold-transition' : 'sidebar-mini layout-fixed' ?>">
+<?php if ($isGuestLanding): ?>
     <?= $flashHtml ?>
     <?= $this->getContent() ?>
+<?php else: ?>
+    <div class="wrapper">
+      <?= $this->partial('partials/topnav') ?>
+
+      <?= $this->partial('partials/sidenav', ['controllerName' => $controllerName]) ?>
+
+      <div class="content-wrapper">
+        <div class="content">
+          <div class="container-fluid">
+            <?= $flashHtml ?>
+            <?= $this->getContent() ?>
+          </div>
+        </div>
+      </div>
+    </div>
+<?php endif; ?>
+    <script src="/assets/adminlte/plugins/jquery/jquery.min.js"></script>
+    <script src="/assets/adminlte/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/adminlte/js/adminlte.min.js"></script>
     <script>
+      // Cache-Control: no-store (see ControllerBase::onConstruct) stops
+      // most browsers from bfcache-restoring this page at all, but Safari
+      // has historically been inconsistent about honoring that for every
+      // back/forward navigation path — belt and suspenders: force a real
+      // reload if this page ever does come back from bfcache, so a stale
+      // embedded CSRF token can never be resubmitted.
       window.addEventListener('pageshow', function (event) {
         if (event.persisted) {
           window.location.reload();

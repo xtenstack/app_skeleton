@@ -1,13 +1,8 @@
-<div class="container" style="max-width: 720px; margin-top: 6vh;">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0">Welcome, <?= $this->escaper->escapeHtml($user->first_name ?: $user->email) ?></h1>
-    <a href="<?= $this->url->get('backend/session/logout') ?>" class="btn btn-outline-secondary btn-sm">Log out</a>
-  </div>
+<h1 class="mb-4">Welcome, <?= $this->escaper->escapeHtml($user->first_name ?: $user->email) ?></h1>
 
-  <div class="card">
-    <div class="card-body">
-      <p class="text-muted mb-3">This is your account home.</p>
-      <a href="<?= $this->url->get('backend/account') ?>" class="btn btn-primary">My Profile</a>
-    </div>
+<div class="card">
+  <div class="card-body">
+    <p class="text-muted mb-3">This is your account home.</p>
+    <a href="<?= $this->url->get('backend/account') ?>" class="btn btn-primary">My Profile</a>
   </div>
 </div>
