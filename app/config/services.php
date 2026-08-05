@@ -55,12 +55,20 @@ $di->setShared('db', function () {
     $class  = 'Phalcon\Db\Adapter\Pdo\\' . $config->database->adapter;
     $params = ['dbname' => $config->database->dbname];
 
-    if ($config->database->adapter === 'Postgresql') {
+    // Sqlite's PDO DSN is just a file path (dbname above) — no
+    // host/port/credentials to add. Every other adapter needs them.
+    // This used to be `if adapter === 'Postgresql'`, which silently
+    // dropped host/username/password for Mysql too — Mysql would build
+    // a DSN with no host or credentials at all and fail to connect.
+    // See docs/user-guide.md's install notes for the MySQL/SQLite path.
+    if ($config->database->adapter !== 'Sqlite') {
         $params['host']     = $config->database->host;
         $params['port']     = $config->database->port;
         $params['username'] = $config->database->username;
         $params['password'] = $config->database->password;
+    }
 
+    if ($config->database->adapter === 'Postgresql') {
         // libpq's default gssencmode=prefer probes system Kerberos config on
         // every new connection, which crashes (SIGSEGV in CFPreferences, a
         // known macOS bug) the first time it runs inside a freshly-forked
