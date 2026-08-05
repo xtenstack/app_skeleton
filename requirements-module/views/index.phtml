@@ -74,27 +74,6 @@ $this->flash->clear();
     <script src="/assets/adminlte/plugins/jquery/jquery.min.js"></script>
     <script src="/assets/adminlte/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="/assets/adminlte/js/adminlte.min.js"></script>
-    <script>
-    window.addEventListener('pageshow', function (event) {
-      if (event.persisted) {
-        window.location.reload();
-      }
-    });
-
-    (function () {
-      var keyMeta = document.querySelector('meta[name="csrf-key"]');
-      var tokenMeta = document.querySelector('meta[name="csrf-token"]');
-      if (!keyMeta || !tokenMeta) return;
-      document.querySelectorAll('form').forEach(function (form) {
-        if ((form.getAttribute('method') || '').toLowerCase() !== 'post') return;
-        if (form.querySelector('input[name="' + keyMeta.content + '"]')) return;
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = keyMeta.content;
-        input.value = tokenMeta.content;
-        form.appendChild(input);
-      });
-    })();
-    </script>
+    <script src="/assets/js/app.js"></script>
   </body>
 </html>

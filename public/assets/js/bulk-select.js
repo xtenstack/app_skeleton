@@ -1,7 +1,9 @@
 // Extracted from an inline <script> block in
 // backend/views/tickets/index.phtml (Session 13) so script-src can drop
 // 'unsafe-inline' from the CSP. See RB-03 (list-view convention) for the
-// bulk-select-all / "N selected" pattern this implements.
+// bulk-select-all / "N selected" pattern this implements. Shared verbatim
+// by requirements-module/views/requirements/index.phtml (REQ-046) — same
+// bulk-select-all/bulk-selected-count/bulk-row-checkbox ids/classes.
 (function () {
   var selectAll = document.getElementById('bulk-select-all');
   var count = document.getElementById('bulk-selected-count');

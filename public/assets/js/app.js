@@ -1,6 +1,7 @@
-// Shared by backend/views/index.phtml and frontend/views/index.phtml —
-// extracted from an inline <script> block (Session 13) so script-src can
-// drop 'unsafe-inline' from the CSP without breaking either layout.
+// Shared by backend/views/index.phtml, frontend/views/index.phtml, and
+// requirements-module/views/index.phtml (REQ-046) — extracted from an
+// inline <script> block (Session 13) so script-src can drop
+// 'unsafe-inline' from the CSP without breaking any of them.
 //
 // Cache-Control: no-store (see each module's ControllerBase) stops most
 // browsers from bfcache-restoring a page at all, but Safari has
