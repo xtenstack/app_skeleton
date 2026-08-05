@@ -1,9 +1,15 @@
-# Guide to XTen.Stack Modules
+# User Guide
 
-This is the map for anyone who's just installed App Skeleton and wants
-to understand what's already there before extending it: what a
-"module" means in this codebase, which ones ship with the base product,
-and how to build your own.
+The reference for anyone who's just installed App Skeleton and wants to
+understand what's already there before extending it. See also
+[README.md](../README.md) for what this project is and how to run it,
+and [INSTALL.md](../INSTALL.md) for getting a fresh instance up.
+
+- [Modules](#modules) — what a "module" means in this codebase, which
+  ones ship with the base product, and how to build your own.
+- [Cron](#cron) — how scheduled/background jobs work and how to add one.
+
+## Modules
 
 ## Two kinds of module
 
@@ -101,3 +107,80 @@ unsure which kind your feature is, ask: "would every single instance of
 this product need this to function at all?" If yes, it's core (and
 probably belongs in a conversation with the base engine's maintainers,
 not a plug-in). If no, it's a module.
+
+## Cron
+
+One thing every deployment needs at most one OS-level scheduled task
+for, no matter how many background jobs the app itself has — see
+[Adding a new cron job](#adding-a-new-cron-job) below for the workflow,
+or the backend's Cron screen (admin-only) to see what's currently
+registered.
+
+### How it works
+
+`cron_jobs` (Postgres) is the registry: one row per job — `name`,
+`task`/`task_action` (which CLI task class + method to call), a
+`frequency` (a `strtotime()`-relative expression like `+1 day`, applied
+to the job's own `last_run_at` to decide if it's due — not a full
+cron-expression parser, deliberately, to keep this simple), and
+`enabled`.
+
+`App_skeleton\CronRunner::runDueJobs()` (`app/common/library/CronRunner.php`)
+is the shared logic: loop every enabled row, run the ones that are due,
+record the result. Two callers use it:
+
+- **CLI** (`./run cron run`, `app/modules/cli/tasks/CronTask.php`) —
+  the one that matters for real deployments. Point a single OS crontab
+  entry at it and every registered job gets evaluated on that same
+  schedule:
+
+  ```
+  * * * * * cd /opt/app_skeleton && ./run cron run >> logs/cron.log 2>&1
+  ```
+
+  Only relevant when the `cron_mode` setting (Settings screen) is
+  `auto`. Claude Code won't add this crontab entry itself — see
+  `CONTRIBUTING.md`/`CODING-STANDARDS.md`'s Git Safety Protocol — that's
+  a one-time step for whoever provisions the box.
+- **Backend "Run now" button** (Cron screen) — the same
+  `runDueJobs()` call, triggered manually. Only enabled when
+  `cron_mode` is `manual`; in `auto` mode the button is disabled with a
+  tooltip pointing at the crontab entry above, so there's never two
+  things racing to run the same job.
+
+Every execution — CLI or manual — writes one row to `cron_run_log`
+(job name, status, output, a real timestamp) in addition to updating
+the job's own `last_run_at`/`last_status`/`last_output` (kept for an
+at-a-glance index view). The Cron screen's **Log** button (top-level:
+every job's history; per-row: just that job) is how you read it back —
+`cron_jobs`' own last-run columns only ever hold the *most recent* run,
+so the log is the only place to see history at all.
+
+The daily Postgres backup (`docker/backup-db.sh`) is a deliberate
+exception to "everything goes through `runDueJobs()`": it needs the
+*host's* `pg_dump`, not the app container's (which has no Postgres
+client tools and no reason to grow them just for this), so it's driven
+by its own host-crontab line, not this system. It still reports into
+`cron_run_log` directly (with no `cron_jobs` row behind it) purely so
+it's visible on the same Log screen — it isn't one of the jobs the
+"add a new cron job" workflow below produces, and disabling/editing it
+happens by editing the host crontab, not the Cron screen.
+
+### Adding a new cron job
+
+1. **Write the task.** A CLI task class under
+   `app/modules/cli/tasks/`, same shape as any other
+   (`AuditTask::archiveAction()` is the reference implementation) — the
+   action just needs to do the work and `echo` anything worth recording
+   as this run's output.
+2. **Register it.** Cron screen → *New cron job* → `task` is the class
+   name minus `Task` (e.g. `audit` for `AuditTask`), `task_action` is
+   the method minus `Action` (e.g. `archive` for `archiveAction()`),
+   `frequency` is a `strtotime()`-relative expression (`+1 day`,
+   `+30 minutes`, `+1 week`). Leave `enabled` checked.
+3. **Nothing else, if `cron_mode` is already `auto` and the crontab
+   entry above already exists** — the next minute's `./run cron run`
+   picks up the new row automatically, since it evaluates every enabled
+   job, not a fixed list. If this is the *first* job on a fresh
+   install, see the crontab line above and the `cron_mode` setting.
+4. Watch it land in the Log view on its first due run.

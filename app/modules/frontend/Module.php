@@ -15,7 +15,7 @@ use Phalcon\Config\Config;
  * non-admin member dashboard (REQ-020/031) — separate from `backend`'s
  * AdminLTE admin UI on purpose, same "application-defining core module"
  * status as `backend`/`api`/`cli` (always on, never listed on the
- * Configuration page). See docs/guide-to-xten-stack-modules.md.
+ * Configuration page). See docs/user-guide.md.
  */
 class Module implements ModuleDefinitionInterface
 {

@@ -8,6 +8,7 @@
       </p>
     </div>
     <div>
+      <a href="<?= $this->url->get('backend/cron/new') ?>" class="btn btn-outline-primary mr-2">New cron job</a>
       <a href="<?= $this->url->get('backend/cron/log') ?>" class="btn btn-outline-secondary mr-2">Log</a>
 <?php if ($cronMode === 'manual'): ?>
       <form method="post" action="<?= $this->url->get('backend/cron/run-now') ?>" class="d-inline">
@@ -60,6 +61,7 @@
 <?php endif; ?>
               </td>
               <td class="text-right">
+                <a href="<?= $this->url->get('backend/cron/edit/' . $job->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
                 <a href="<?= $this->url->get('backend/cron/log/' . $job->id) ?>" class="btn btn-sm btn-outline-secondary">Log</a>
               </td>
             </tr>

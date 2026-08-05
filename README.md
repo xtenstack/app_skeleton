@@ -72,8 +72,9 @@ Full install options (Docker, Composer-only, plain download) are in
   throughout the codebase.
 - [CLAUDE.md](CLAUDE.md) — module boundaries and forbidden patterns, for
   Claude Code (or any AI-assisted) sessions working in this repo.
-- [docs/guide-to-xten-stack-modules.md](docs/guide-to-xten-stack-modules.md)
-  — what ships built-in vs. optional, and how to build your own module.
+- [docs/user-guide.md](docs/user-guide.md) — modules (what ships
+  built-in vs. optional, how to build your own) and cron (how scheduled
+  jobs work, how to add one).
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose a change.
 - [SECURITY.md](SECURITY.md) — how to report a vulnerability.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community expectations.

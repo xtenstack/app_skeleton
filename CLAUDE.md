@@ -10,8 +10,8 @@ server-rendered AdminLTE `backend` + JSON `api`, sharing one codebase,
 plus a `cli` module (`./run <task> <action>`, `./run` with no args lists
 everything). Postgres via the ORM. `frontend` (guest landing + member
 dashboard) ships alongside `backend`/`api`/`cli` as base modules — see
-`docs/guide-to-xten-stack-modules.md` for the full module-type
-breakdown once you need it.
+`docs/user-guide.md` for the full module-type breakdown once you need
+it.
 
 ## Module boundaries
 
@@ -53,9 +53,9 @@ breakdown once you need it.
   list-view conventions) and one-off design/plan docs for bigger
   features (e.g. the ticketing and Requirements-module plans) live
   privately in `stack.xten.au/docs/`, not in this repo — not published
-  with the OSS release. `docs/guide-to-xten-stack-modules.md` is the one
-  exception: it's user-facing product documentation, meant to ship with
-  the product, so it stays in-repo.
+  with the OSS release. `docs/user-guide.md` is the one exception: it's
+  user-facing product documentation, meant to ship with the product, so
+  it stays in-repo.
 
 ## Sessions
 

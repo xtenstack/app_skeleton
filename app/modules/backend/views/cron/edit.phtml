@@ -1,0 +1,42 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>Edit cron job</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/cron/update/' . $job->id) ?>">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" class="form-control" id="name" name="name" value="<?= $this->escaper->escapeHtmlAttr($job->name) ?>" required>
+          </div>
+          <div class="form-group">
+            <label for="task">Task</label>
+            <input type="text" class="form-control" id="task" name="task" value="<?= $this->escaper->escapeHtmlAttr($job->task) ?>" required>
+            <small class="form-text text-muted">Resolves to <code>\App_skeleton\Modules\Cli\Tasks\{Studly(task)}Task</code>.</small>
+          </div>
+          <div class="form-group">
+            <label for="task_action">Task action</label>
+            <input type="text" class="form-control" id="task_action" name="task_action" value="<?= $this->escaper->escapeHtmlAttr($job->task_action) ?>" required>
+            <small class="form-text text-muted">Resolves to <code>{task_action}Action()</code> on that task class.</small>
+          </div>
+          <div class="form-group">
+            <label for="frequency">Frequency</label>
+            <input type="text" class="form-control" id="frequency" name="frequency" value="<?= $this->escaper->escapeHtmlAttr($job->frequency) ?>" required>
+            <small class="form-text text-muted">A <code>strtotime()</code>-relative expression applied to the last run.</small>
+          </div>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="enabled" name="enabled" value="1" <?= $job->enabled ? 'checked' : '' ?>>
+            <label class="form-check-label" for="enabled">Enabled</label>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/cron/log/' . $job->id) ?>" class="btn btn-outline-secondary">View log</a>
+          <a href="<?= $this->url->get('backend/cron') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
