@@ -1,0 +1,123 @@
+name: PHPUnit CI for azure-test
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      app_test_base_url:
+        description: 'Base URL used by Feature tests'
+        required: false
+        default: 'http://caddy'
+      app_test_host:
+        description: 'Host header used by Feature tests'
+        required: false
+        default: 'localhost'
+      db_host:
+        description: 'PostgreSQL host for the app'
+        required: false
+        default: 'db'
+      db_port:
+        description: 'PostgreSQL port'
+        required: false
+        default: '5432'
+      db_name:
+        description: 'PostgreSQL database name'
+        required: false
+        default: 'app_skeleton'
+      db_user:
+        description: 'PostgreSQL user'
+        required: false
+        default: 'app_skeleton'
+      db_password:
+        description: 'PostgreSQL password'
+        required: false
+        default: 'ci-only-not-a-real-secret'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      APP_TEST_BASE_URL: ${{ github.event.inputs.app_test_base_url || 'http://caddy' }}
+      APP_TEST_HOST: ${{ github.event.inputs.app_test_host || 'localhost' }}
+      DB_HOST: ${{ github.event.inputs.db_host || secrets.DB_HOST || 'db' }}
+      DB_PORT: ${{ github.event.inputs.db_port || secrets.DB_PORT || '5432' }}
+      DB_NAME: ${{ github.event.inputs.db_name || secrets.DB_NAME || 'app_skeleton' }}
+      DB_USER: ${{ github.event.inputs.db_user || secrets.DB_USER || secrets.DB_USERNAME || 'app_skeleton' }}
+      DB_PASSWORD: ${{ github.event.inputs.db_password || secrets.DB_PASSWORD || secrets.DB_PASS || 'ci-only-not-a-real-secret' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create PHPUnit result folder
+        run: mkdir -p test-results
+
+      - name: Prepare .env for Docker Compose
+        run: |
+          cat > .env <<'EOF'
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_NAME=${DB_NAME}
+          DB_USER=${DB_USER}
+          DB_PASSWORD=${DB_PASSWORD}
+          APP_ENV=development
+          SITE_DOMAIN=http://localhost
+          HTTP_PORT=8080
+          HTTPS_PORT=8443
+          EOF
+
+      - name: Build and start the real stack
+        run: |
+          docker compose up -d --build
+
+      - name: Wait for the app to become reachable
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:8080/; then
+              echo "app reachable after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "app never became reachable" >&2
+          exit 1
+
+      - name: Install PHPUnit dependencies inside the running app container
+        run: |
+          docker compose exec -T -u root app sh -c "apt-get update -qq && apt-get install -y -qq curl unzip php8.3-xml"
+          docker compose exec -T app sh -c "curl -sS https://getcomposer.org/installer | php -- --install-dir=/tmp --filename=composer.phar"
+          docker compose exec -T app php /tmp/composer.phar install --ignore-platform-req=ext-pdo_pgsql
+
+      - name: Run PHPUnit and save JUnit XML
+        id: run_phpunit
+        run: |
+          exit_code=0
+          docker compose exec -T app sh -c "
+            mkdir -p /app/test-results &&
+            APP_TEST_BASE_URL=${APP_TEST_BASE_URL} \
+            APP_TEST_HOST=${APP_TEST_HOST} \
+            vendor/bin/phpunit --log-junit /app/test-results/phpunit.xml
+          " || exit_code=$?
+          docker cp "$(docker compose ps -q app)":/app/test-results/phpunit.xml test-results/phpunit.xml || true
+          if [ ! -f test-results/phpunit.xml ]; then
+            echo "JUnit report not found"
+          fi
+          exit $exit_code
+
+      - name: Save PHPUnit report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpunit-report
+          path: test-results/phpunit.xml
+          if-no-files-found: warn
+
+      - name: Show app container logs on failure
+        if: failure()
+        run: docker compose logs app
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

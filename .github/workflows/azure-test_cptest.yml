@@ -58,6 +58,8 @@ jobs:
     needs: build
     permissions:
       contents: read #This is required for actions/checkout
+    env:
+      AZURE_WEBAPP_URL: https://cptest-bxbqh5b6dtfwb7cc.australiaeast-01.azurewebsites.net
 
     steps:
       - name: Download artifact from build job
@@ -78,3 +80,32 @@ jobs:
           slot-name: 'Production'
           package: .
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+
+      - name: Verify deployed site is reachable
+        run: |
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "$AZURE_WEBAPP_URL/")
+            if [ "$status" = "200" ]; then
+              echo "root page reachable after ${i}s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Expected 200 on /, got $status" >&2
+          exit 1
+
+      - name: Verify backend login route
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "$AZURE_WEBAPP_URL/backend/session")
+          if [ "$status" != "200" ]; then
+            echo "Expected 200 on /backend/session, got $status" >&2
+            exit 1
+          fi
+
+      - name: Verify missing page returns 404
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "$AZURE_WEBAPP_URL/this-route-does-not-exist")
+          if [ "$status" != "404" ]; then
+            echo "Expected 404 on unknown route, got $status" >&2
+            exit 1
+          fi
