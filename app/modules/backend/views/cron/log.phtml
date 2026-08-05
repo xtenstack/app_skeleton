@@ -1,0 +1,54 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="mb-0">Cron Log<?= $job ? ' — ' . $this->escaper->escapeHtml($job->name) : '' ?></h1>
+      <p class="text-muted mb-0">
+        Most recent 200 runs, newest first.
+<?php if ($job): ?>
+        <a href="<?= $this->url->get('backend/cron/log') ?>">Show all jobs</a>
+<?php endif; ?>
+      </p>
+    </div>
+    <a href="<?= $this->url->get('backend/cron') ?>" class="btn btn-secondary">Back to Cron</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Ran at</th>
+              <th>Job</th>
+              <th>Status</th>
+              <th>Output</th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($entries as $entry): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($entry->ran_at) ?></td>
+              <td><?= $this->escaper->escapeHtml($entry->job_name) ?></td>
+              <td>
+<?php if ($entry->status === 'success'): ?>
+                <span class="badge badge-success">success</span>
+<?php else: ?>
+                <span class="badge badge-danger">error</span>
+<?php endif; ?>
+              </td>
+              <td><?= $entry->output ? $this->escaper->escapeHtml($entry->output) : '<span class="text-muted">—</span>' ?></td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($entries)): ?>
+            <tr>
+              <td colspan="4" class="text-center text-muted">No runs recorded yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

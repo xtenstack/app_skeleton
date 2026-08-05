@@ -51,11 +51,20 @@ class CronRunner extends Injectable
         }
 
         $output = trim(ob_get_clean());
+        $ranAt  = date('Y-m-d H:i:s');
 
-        $job->last_run_at = date('Y-m-d H:i:s');
+        $job->last_run_at = $ranAt;
         $job->last_status = $status;
         $job->last_output = $output;
         $job->save();
+
+        $log              = new \CronRunLog();
+        $log->cron_job_id = $job->id;
+        $log->job_name    = $job->name;
+        $log->status      = $status;
+        $log->output      = $output;
+        $log->ran_at      = $ranAt;
+        $log->save();
 
         return ['job' => $job->name, 'status' => $status, 'output' => $output];
     }

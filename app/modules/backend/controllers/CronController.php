@@ -15,6 +15,38 @@ class CronController extends ControllerBase
         $this->view->cronMode = $this->settings->get('cron_mode', 'manual');
     }
 
+    /**
+     * Full run history, most recent first — unlike cron_jobs' own
+     * last_run_at/last_status (which only ever hold the latest run),
+     * every past execution here has its own timestamp. $jobId optionally
+     * scopes to one job (linked from that row's own "Log" action); with
+     * no id, shows every job's history interleaved, including entries
+     * with no cron_job_id at all (e.g. the daily backup script, which
+     * writes here directly — see cron_run_log's migration comment).
+     */
+    public function logAction($jobId = null)
+    {
+        $conditions = [];
+        $bind       = [];
+
+        if ($jobId !== null) {
+            $conditions[]    = 'cron_job_id = :jobId:';
+            $bind['jobId']   = (int) $jobId;
+            $this->view->job = \CronJobs::findFirst($jobId);
+        } else {
+            $this->view->job = null;
+        }
+
+        $params = ['order' => 'ran_at DESC', 'limit' => 200];
+
+        if ($conditions) {
+            $params['conditions'] = implode(' AND ', $conditions);
+            $params['bind']       = $bind;
+        }
+
+        $this->view->entries = \CronRunLog::find($params);
+    }
+
     public function runNowAction()
     {
         $cronMode = $this->settings->get('cron_mode', 'manual');
