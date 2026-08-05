@@ -69,10 +69,13 @@ jobs:
         # job (see "Tear down" below), never pushed or deployed anywhere.
         # php8.3-xml is PHPUnit's own requirement (dom/xmlwriter), not
         # this app's — sury's php8.3-phalcon meta-package doesn't pull it
-        # in. Sequence verified directly against this same image before
-        # writing it here, not assumed to work from reading docs.
+        # in. unzip is for Composer itself: no zip extension either, and
+        # without unzip present it can't fetch nette/utils' dist archive
+        # (a transitive phpunit dep) — confirmed as the actual failure on
+        # the first real Actions run of this step (build 30966499003),
+        # not assumed from the local dry run alone.
         run: |
-          docker compose exec -T -u root app sh -c "apt-get update -qq && apt-get install -y -qq curl php8.3-xml"
+          docker compose exec -T -u root app sh -c "apt-get update -qq && apt-get install -y -qq curl unzip php8.3-xml"
           docker compose exec -T app sh -c "curl -sS https://getcomposer.org/installer | php -- --install-dir=/tmp --filename=composer.phar"
           docker compose exec -T app php /tmp/composer.phar install --ignore-platform-req=ext-pdo_pgsql
 
