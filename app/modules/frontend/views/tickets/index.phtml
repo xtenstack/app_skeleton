@@ -1,0 +1,48 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1 class="mb-0">Support Requests</h1>
+    <a href="<?= $this->url->get('frontend/tickets/new') ?>" class="btn btn-primary">New request</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Type</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($tickets as $ticket): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($ticket->title) ?></td>
+              <td><?= $this->escaper->escapeHtml($ticket->ticket_type) ?></td>
+              <td><?= $this->escaper->escapeHtml($ticket->severity) ?></td>
+              <td>
+                <span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
+              </td>
+              <td><?= $this->escaper->escapeHtml($ticket->created_at) ?></td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('frontend/tickets/view/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($tickets)): ?>
+            <tr>
+              <td colspan="6" class="text-center text-muted">No support requests yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

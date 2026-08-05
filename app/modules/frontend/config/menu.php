@@ -18,6 +18,13 @@ return [
         'roles'      => null,
     ],
     [
+        'label'      => 'Support Requests',
+        'icon'       => 'fas fa-ticket-alt',
+        'controller' => 'tickets',
+        'url'        => 'frontend/tickets',
+        'roles'      => null,
+    ],
+    [
         'label'      => 'My Profile',
         'icon'       => 'fas fa-id-badge',
         'controller' => 'account',
