@@ -131,11 +131,13 @@ reading the diff. For anything that can't be driven through the UI
 (background jobs, file downloads, API-only endpoints), exercise it with
 a real request (`curl`, `./run`) against a running instance.
 
-There's no PHPUnit suite yet (see [CONTRIBUTING.md](CONTRIBUTING.md) for
-the honest state of this gap and what closes it); until it exists, the
-above manual-verification standard is what "tested" means for a PR in
-this repo. A `.github/workflows/` build/smoke check does run on every
-push/PR — see the README badge.
+`vendor/bin/phpunit` (`tests/Unit/`, `tests/Feature/`) covers CSRF
+rejection, RBAC denial, and soft-delete exclusion — see
+[CONTRIBUTING.md](CONTRIBUTING.md#testing) for how to run it and what
+it does and doesn't cover. It's a baseline, not comprehensive coverage
+— the manual-verification standard above still applies for anything
+outside those three patterns. A `.github/workflows/` build/smoke check
+plus this suite both run on every push/PR — see the README badge.
 
 ## Deviations from the XTen Coding Standard
 

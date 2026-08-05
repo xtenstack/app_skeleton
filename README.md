@@ -12,9 +12,10 @@ system, signup/verification/password-reset flows, and a Composer-package
 based module system for adding features without forking the base app.
 
 The Build badge covers a real build + boot + smoke-test of the actual
-Docker image every push/PR — it is **not** a test-suite badge; there's
-still no PHPUnit suite, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
-for that gap.
+Docker image, plus the PHPUnit suite (CSRF, RBAC, soft-delete coverage
+— a baseline, not comprehensive), on every push/PR. See
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md#testing) for how to run the
+tests locally and what they do and don't cover.
 
 ## What's included
 

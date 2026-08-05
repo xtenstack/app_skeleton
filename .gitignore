@@ -19,6 +19,10 @@
 # any regular PHP deps declared in composer.json, e.g. require-dev tooling)
 /vendor/
 
+# PHPUnit's own cache/result files (machine-specific, not project config)
+/.phpunit.cache/
+/.phpunit.result.cache
+
 # Local Claude Code overrides (auto-accumulated permission grants, machine-specific)
 /.claude/settings.local.json
 

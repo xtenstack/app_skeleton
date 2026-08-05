@@ -12,7 +12,8 @@
         "ext-openssl": "*"
     },
     "require-dev": {
-        "phalcon/devtools": "^5.0"
+        "phalcon/devtools": "^5.0",
+        "phpunit/phpunit": "^10.5"
     },
     "autoload": {
         "psr-4": {
@@ -32,6 +33,7 @@
         ],
         "post-update-cmd": [
             "@php bin/install.php"
-        ]
+        ],
+        "test": "phpunit"
     }
 }

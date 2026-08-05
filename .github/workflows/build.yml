@@ -3,9 +3,10 @@ name: Build
 # What "build passing" actually means here: the same Docker image that
 # Internal Prod and every client instance run builds successfully, boots
 # the full stack (Caddy + app + Postgres) against a stock .env.example
-# config, and actually serves real HTTP responses. This is a build/smoke
-# check, not a test suite — there's no PHPUnit yet (see docs/CONTRIBUTING.md);
-# don't read this badge as "tests pass."
+# config, actually serves real HTTP responses, AND passes the PHPUnit
+# suite (see docs/CONTRIBUTING.md's Testing section) — Unit tests
+# against a real Postgres connection, Feature tests as real HTTP
+# requests against this exact running stack, not mocks either way.
 
 on:
   push:
@@ -58,6 +59,25 @@ jobs:
           # leaked JSON error or a raw crash (REQ-024/REQ-026).
           status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/this-route-does-not-exist)
           [ "$status" = "404" ] || { echo "unmatched route: expected 404, got $status" >&2; exit 1; }
+
+      - name: Install PHPUnit + its dependencies inside the running app container
+        # The runtime image deliberately excludes dev deps (Dockerfile's
+        # vendor stage: `composer install --no-dev`) and deliberately
+        # purges curl/composer after its own apt-time use — smaller attack
+        # surface for what's actually deployed. Reinstalling both here is
+        # CI-only: this exact container is torn down at the end of this
+        # job (see "Tear down" below), never pushed or deployed anywhere.
+        # php8.3-xml is PHPUnit's own requirement (dom/xmlwriter), not
+        # this app's — sury's php8.3-phalcon meta-package doesn't pull it
+        # in. Sequence verified directly against this same image before
+        # writing it here, not assumed to work from reading docs.
+        run: |
+          docker compose exec -T -u root app sh -c "apt-get update -qq && apt-get install -y -qq curl php8.3-xml"
+          docker compose exec -T app sh -c "curl -sS https://getcomposer.org/installer | php -- --install-dir=/tmp --filename=composer.phar"
+          docker compose exec -T app php /tmp/composer.phar install --ignore-platform-req=ext-pdo_pgsql
+
+      - name: Run PHPUnit
+        run: docker compose exec -T app vendor/bin/phpunit
 
       - name: Show app container logs on failure
         if: failure()

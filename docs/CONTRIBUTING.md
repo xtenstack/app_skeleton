@@ -34,21 +34,46 @@ for bugfixes. Name your branch `feature/<REQ-id>-short-name` or
 
 ## Testing
 
-There's no PHPUnit suite yet — that's a known, tracked gap (backlog),
-not something quietly skipped. Two things do exist today:
+`vendor/bin/phpunit` (`tests/Unit/`, `tests/Feature/`) covers the three
+patterns this codebase leans on most: CSRF rejection, RBAC denial, and
+soft-delete exclusion — see `tests/*/README` intent in each test file's
+own docblock for what each one actually protects and why. Both suites
+test the real thing, not mocks:
 
-- `.github/workflows/build.yml` ("Build" badge on the README) builds the
-  real Docker image, boots the full stack, and smoke-tests a few real
-  endpoints on every push/PR to `main`. It proves the app builds and
-  serves traffic, not that any particular feature's logic is correct.
-- The manual-verification standard in
-  [CODING-STANDARDS.md](CODING-STANDARDS.md#testing-changes-before-calling-them-done)
-  — actually drive the change (browser or `curl`/`./run`) — is what
-  "tested" means for a PR until a real test suite exists.
+- `tests/Unit/` connects to a real Postgres database (via the ORM/models,
+  same as the app itself) — no mocked query results.
+- `tests/Feature/` makes real HTTP requests (via `tests/Feature/HttpClient.php`)
+  against the actually-running Docker stack — no in-process dispatch,
+  deliberately (`HttpClient`'s own docblock explains why: several
+  controllers call `exit;` after an early-return response, which would
+  kill the PHPUnit process itself if dispatched in-process instead of
+  over real HTTP).
 
-If you're adding PHPStan/PHP_CodeSniffer or a PHPUnit suite, open an
-issue first (see Before you start) — this is exactly the kind of
-cross-cutting addition worth aligning on before writing code.
+Run them the same way `.github/workflows/build.yml` does in CI — against
+a running stack, not standalone:
+
+```bash
+docker compose up -d --build
+# one-time per container: dev deps aren't in the runtime image (see
+# build.yml's "Install PHPUnit..." step for the exact commands)
+docker compose exec app vendor/bin/phpunit
+```
+
+Coverage beyond those three patterns is thin — this is a baseline, not
+comprehensive coverage, and growing it is a legitimate contribution.
+`.github/workflows/build.yml` ("Build" badge on the README) runs this
+same suite on every push/PR to `main`, alongside its existing build +
+boot + smoke-test check.
+
+The manual-verification standard in
+[CODING-STANDARDS.md](CODING-STANDARDS.md#testing-changes-before-calling-them-done)
+— actually drive the change (browser or `curl`/`./run`) — still applies
+for anything a test doesn't cover; passing PHPUnit isn't a substitute
+for that on a PR touching untested territory.
+
+If you're adding PHPStan or PHP_CodeSniffer, open an issue first (see
+Before you start) — this is exactly the kind of cross-cutting addition
+worth aligning on before writing code.
 
 ## Commit messages
 
