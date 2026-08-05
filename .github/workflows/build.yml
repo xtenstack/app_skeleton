@@ -4,7 +4,7 @@ name: Build
 # Internal Prod and every client instance run builds successfully, boots
 # the full stack (Caddy + app + Postgres) against a stock .env.example
 # config, and actually serves real HTTP responses. This is a build/smoke
-# check, not a test suite — there's no PHPUnit yet (see CONTRIBUTING.md);
+# check, not a test suite — there's no PHPUnit yet (see docs/CONTRIBUTING.md);
 # don't read this badge as "tests pass."
 
 on:

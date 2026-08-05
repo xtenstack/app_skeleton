@@ -16,6 +16,6 @@ Describe what you actually did to verify it:
 
 ## Checklist
 
-- [ ] Follows [CODING-STANDARDS.md](../CODING-STANDARDS.md)
+- [ ] Follows [CODING-STANDARDS.md](../docs/CODING-STANDARDS.md)
 - [ ] No unrelated changes bundled in
 - [ ] Migrations (if any) are additive/reversible and documented

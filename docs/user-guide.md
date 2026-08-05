@@ -3,7 +3,7 @@
 The reference for anyone who's just installed App Skeleton and wants to
 understand what's already there before extending it. See also
 [README.md](../README.md) for what this project is and how to run it,
-and [INSTALL.md](../INSTALL.md) for getting a fresh instance up.
+and [INSTALL.md](INSTALL.md) for getting a fresh instance up.
 
 - [Modules](#modules) — what a "module" means in this codebase, which
   ones ship with the base product, and how to build your own.
