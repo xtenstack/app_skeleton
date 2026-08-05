@@ -14,6 +14,23 @@
     root * /app/public
     encode gzip
 
+    # Baseline security headers (project audit, 2026-08-04, Tier 1).
+    # script-src has no 'unsafe-inline' — every inline <script> block the
+    # AdminLTE views used has been extracted to a static file under
+    # public/assets/js/ specifically so this could be dropped rather than
+    # left permissive (Session 13). style-src keeps 'unsafe-inline':
+    # this app uses inline style="..." attributes throughout the views,
+    # and CSP has no equivalent low-effort tightening for those the way
+    # it does for <script> blocks (would need per-element nonces/hashes,
+    # real effort disproportionate to a "baseline" header pass) — a much
+    # lower-risk allowance than unsafe-inline on script-src, since it
+    # can't execute arbitrary JS.
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+    }
+
     php_fastcgi app:9000
 
     file_server

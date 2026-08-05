@@ -52,16 +52,4 @@
   </div>
 </div>
 
-<script>
-document.getElementById('revealBtn').addEventListener('click', function () {
-  var btn = this;
-  fetch(btn.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      document.getElementById('credential').type = 'text';
-      document.getElementById('credential').value = data.credential || '';
-      document.getElementById('credential').placeholder = data.credential ? '' : 'No credential stored';
-      btn.disabled = true;
-    });
-});
-</script>
+<script src="/assets/js/external-connections-edit.js"></script>
