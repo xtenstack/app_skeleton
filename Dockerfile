@@ -12,15 +12,17 @@
 # chase a newer PHP would defeat the entire point of using prebuilt binaries.
 
 # ---- Stage 1: vendor/ ------------------------------------------------
-# Composer only, no Phalcon extension needed here — this project has zero
-# real Composer packages today (composer.lock's "packages" is empty; only
-# require-dev tooling), so --ignore-platform-req=ext-phalcon is safe: it's
-# skipping a metadata check, not actually resolving anything against it.
+# Composer only, no Phalcon extension needed here — --ignore-platform-req
+# =ext-phalcon is safe: it's skipping a metadata check, not actually
+# resolving anything against it. requirements-module/ is a path
+# repository (REQ-046) — its source has to be present before `composer
+# install` runs, unlike a real registry package it can't be fetched.
 FROM composer:2 AS vendor
 
 WORKDIR /app
 
 COPY composer.json composer.lock ./
+COPY requirements-module ./requirements-module
 
 RUN composer install \
         --no-dev \

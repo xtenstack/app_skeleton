@@ -4,8 +4,34 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7886ae035fad1d92f54fce377a8a2690",
-    "packages": [],
+    "content-hash": "304fc38498f882859b4317bbfde59739",
+    "packages": [
+        {
+            "name": "xtenstack/requirements-module",
+            "version": "dev-integrate/req-046-into-main",
+            "dist": {
+                "type": "path",
+                "url": "requirements-module",
+                "reference": "5ddd7b2466161502f92d98bfaa12e34a78ca2424"
+            },
+            "require": {
+                "php": "^8.3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "XtenRequirements\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Optional XTen.Stack module: tracks REQ-NNN requirement entries through to a generated release changelog.",
+            "transport-options": {
+                "relative": true
+            }
+        }
+    ],
     "packages-dev": [
         {
             "name": "graham-campbell/result-type",

@@ -1,0 +1,54 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1><?= $this->escaper->escapeHtml($requirement->display_id) ?> — <?= $this->escaper->escapeHtml($requirement->title) ?></h1>
+    <div>
+      <a href="<?= $this->url->get('requirements/requirements/edit/' . $requirement->id) ?>" class="btn btn-outline-secondary">Edit</a>
+      <a href="<?= $this->url->get('requirements/requirements') ?>" class="btn btn-link">Back to list</a>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-8">
+    <div class="card">
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Status</dt>
+          <dd class="col-sm-9"><?= $this->escaper->escapeHtml($requirement->status) ?></dd>
+
+          <dt class="col-sm-3">Description</dt>
+          <dd class="col-sm-9"><?= $requirement->description ? nl2br($this->escaper->escapeHtml($requirement->description)) : '<span class="text-muted">—</span>' ?></dd>
+
+          <dt class="col-sm-3">Originated</dt>
+          <dd class="col-sm-9"><?= $this->escaper->escapeHtml($requirement->origin_session ?: '—') ?></dd>
+
+          <dt class="col-sm-3">Changelog decision</dt>
+          <dd class="col-sm-9">
+<?php if ($requirement->changelog_id): ?>
+            Included in <a href="<?= $this->url->get('requirements/changelogs/view/' . $requirement->changelog_id) ?>"><?= $this->escaper->escapeHtml($requirement->Changelog->version) ?></a>
+<?php elseif ($requirement->changelog_decision): ?>
+            <?= $this->escaper->escapeHtml($requirement->changelog_decision) ?>
+<?php else: ?>
+            <span class="text-muted">—</span>
+<?php endif; ?>
+          </dd>
+
+<?php if ($requirement->changelog_note): ?>
+          <dt class="col-sm-3">Changelog note</dt>
+          <dd class="col-sm-9"><?= nl2br($this->escaper->escapeHtml($requirement->changelog_note)) ?></dd>
+<?php endif; ?>
+
+          <dt class="col-sm-3">Created</dt>
+          <dd class="col-sm-9"><?= $this->escaper->escapeHtml($requirement->created_at) ?></dd>
+
+          <dt class="col-sm-3">Updated</dt>
+          <dd class="col-sm-9"><?= $this->escaper->escapeHtml($requirement->updated_at) ?></dd>
+        </dl>
+      </div>
+    </div>
+
+    <form method="post" action="<?= $this->url->get('requirements/requirements/delete/' . $requirement->id) ?>" onsubmit="return confirm('Delete <?= $this->escaper->escapeHtmlAttr($requirement->display_id) ?>?')">
+      <button type="submit" class="btn btn-outline-danger mt-2">Delete</button>
+    </form>
+  </div>
+</div>

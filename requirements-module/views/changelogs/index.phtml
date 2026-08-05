@@ -1,0 +1,45 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Changelogs</h1>
+    <div>
+      <a href="<?= $this->url->get('requirements/requirements') ?>" class="btn btn-outline-secondary">Requirements</a>
+      <a href="<?= $this->url->get('requirements/changelogs/new') ?>" class="btn btn-primary">New Changelog</a>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Released</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($changelogs as $changelog): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($changelog->version) ?></td>
+              <td><?= $this->escaper->escapeHtml($changelog->released_at ?: 'Unreleased') ?></td>
+              <td><?= $this->escaper->escapeHtml($changelog->created_at) ?></td>
+              <td class="text-right">
+                <a href="<?= $this->url->get('requirements/changelogs/view/' . $changelog->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($changelogs)): ?>
+            <tr>
+              <td colspan="4" class="text-center text-muted">No changelogs yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
