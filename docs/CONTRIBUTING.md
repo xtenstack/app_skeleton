@@ -28,8 +28,8 @@ for bugfixes. Name your branch `feature/<REQ-id>-short-name` or
    `fix/<issue>`.
 2. Make your change, following [CODING-STANDARDS.md](CODING-STANDARDS.md).
 3. If you touched anything the browser can exercise, actually run it
-   locally and check it (see INSTALL.md) — don't rely on reading the
-   diff.
+   locally and check it (see [INSTALL.md](INSTALL.md)) — don't rely on
+   reading the diff.
 4. Open a pull request against `main` using the PR template.
 
 ## Testing

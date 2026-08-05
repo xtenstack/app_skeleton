@@ -1,7 +1,8 @@
 # CLAUDE.md
 
-Read [CODING-STANDARDS.md](CODING-STANDARDS.md) first — this file is the
-short version plus things specific to working here as Claude/Claude Code.
+Read [docs/CODING-STANDARDS.md](docs/CODING-STANDARDS.md) first — this
+file is the short version plus things specific to working here as
+Claude/Claude Code.
 
 ## What this is
 
@@ -41,7 +42,7 @@ it.
 - Committing a secret, or writing one into `app/config/config.php`
   (secrets go in gitignored `config.local.php` / env vars only).
 - Skipping real verification (browser click-through or `curl`/`./run`)
-  before calling a change done — see CODING-STANDARDS.md's Testing
+  before calling a change done — see docs/CODING-STANDARDS.md's Testing
   section.
 
 ## Where things live

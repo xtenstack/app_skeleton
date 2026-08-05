@@ -13,8 +13,8 @@ based module system for adding features without forking the base app.
 
 The Build badge covers a real build + boot + smoke-test of the actual
 Docker image every push/PR — it is **not** a test-suite badge; there's
-still no PHPUnit suite, see [CONTRIBUTING.md](CONTRIBUTING.md) for that
-gap.
+still no PHPUnit suite, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
+for that gap.
 
 ## What's included
 
@@ -34,8 +34,8 @@ gap.
   manifest are discovered and toggleable from the admin Configuration
   page, without touching core code.
 
-See [CODING-STANDARDS.md](CODING-STANDARDS.md) for the conventions the
-existing code follows.
+See [docs/CODING-STANDARDS.md](docs/CODING-STANDARDS.md) for the
+conventions the existing code follows.
 
 ## Quickstart
 
@@ -48,7 +48,7 @@ docker compose up -d --build
 ```
 
 Full install options (Docker, Composer-only, plain download) are in
-[INSTALL.md](INSTALL.md).
+[docs/INSTALL.md](docs/INSTALL.md).
 
 ## Known limitations
 
@@ -67,17 +67,21 @@ Full install options (Docker, Composer-only, plain download) are in
 
 ## Documentation
 
-- [INSTALL.md](INSTALL.md) — setup instructions.
-- [CODING-STANDARDS.md](CODING-STANDARDS.md) — conventions used
-  throughout the codebase.
+- [docs/INSTALL.md](docs/INSTALL.md) — setup instructions.
+- [docs/CODING-STANDARDS.md](docs/CODING-STANDARDS.md) — conventions
+  used throughout the codebase.
 - [CLAUDE.md](CLAUDE.md) — module boundaries and forbidden patterns, for
-  Claude Code (or any AI-assisted) sessions working in this repo.
+  Claude Code (or any AI-assisted) sessions working in this repo. Stays
+  at the repo root (unlike the rest of this list) — that's where Claude
+  Code auto-discovers it.
 - [docs/user-guide.md](docs/user-guide.md) — modules (what ships
   built-in vs. optional, how to build your own) and cron (how scheduled
   jobs work, how to add one).
-- [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose a change.
-- [SECURITY.md](SECURITY.md) — how to report a vulnerability.
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community expectations.
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — how to propose a
+  change.
+- [docs/SECURITY.md](docs/SECURITY.md) — how to report a vulnerability.
+- [docs/CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md) — community
+  expectations.
 
 ## License
 
