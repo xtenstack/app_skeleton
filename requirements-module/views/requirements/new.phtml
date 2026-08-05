@@ -1,0 +1,31 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>New requirement</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('requirements/requirements/create') ?>">
+          <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="<?= $this->escaper->escapeHtml((string) $requirement->title) ?>" required>
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="5"><?= $this->escaper->escapeHtml((string) $requirement->description) ?></textarea>
+          </div>
+          <div class="form-group">
+            <label for="origin_session">Originated <span class="text-muted">(e.g. "Session 12")</span></label>
+            <input type="text" class="form-control" id="origin_session" name="origin_session" value="<?= $this->escaper->escapeHtml((string) $requirement->origin_session) ?>">
+          </div>
+          <p class="text-muted small">New requirements start as <strong>Open</strong> — the display id (REQ-NNN) is assigned on save.</p>
+          <button type="submit" class="btn btn-primary">Create requirement</button>
+          <a href="<?= $this->url->get('requirements/requirements') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
