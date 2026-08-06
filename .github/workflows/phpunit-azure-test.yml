@@ -114,6 +114,58 @@ jobs:
           path: test-results/phpunit.xml
           if-no-files-found: warn
 
+      - name: Create production ticket on test failure
+        if: failure()
+        env:
+          STACK_API_KEY: ${{ secrets.AZT_STACK_INTERNAL_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          report_file="test-results/phpunit.xml"
+          if [ -f "$report_file" ]; then
+            tests=$(python3 - <<'PY'
+import xml.etree.ElementTree as ET
+root = ET.parse('test-results/phpunit.xml').getroot()
+suite = root.find('testsuite')
+print(suite.get('tests', '0'))
+PY
+)
+            failures=$(python3 - <<'PY'
+import xml.etree.ElementTree as ET
+root = ET.parse('test-results/phpunit.xml').getroot()
+suite = root.find('testsuite')
+print(suite.get('failures', '0'))
+PY
+)
+            errors=$(python3 - <<'PY'
+import xml.etree.ElementTree as ET
+root = ET.parse('test-results/phpunit.xml').getroot()
+suite = root.find('testsuite')
+print(suite.get('errors', '0'))
+PY
+)
+            passed=$((tests - failures - errors))
+            summary="PHPUnit failed: ${failures} failures, ${errors} errors"
+          else
+            tests=0
+            failures=0
+            errors=1
+            passed=0
+            summary="PHPUnit failed before JUnit report was produced"
+          fi
+
+          run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          payload=$(cat <<EOF
+{"title":"Failed CI PHPUnit run: ${{ github.workflow }}","ticket_type":"issue","severity":"normal","description":"Branch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun URL: ${run_url}\nSuite: PHPUnit\nPass count: ${passed}\nFail count: ${failures}\nError count: ${errors}\nSummary: ${summary}","source_ref":"${run_url}"}
+EOF
+)
+
+          curl -sS -X POST 'https://stack-internal.xten.au/api/tickets/create' \
+            -H "Authorization: Bearer ${STACK_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$payload"
+
       - name: Show app container logs on failure
         if: failure()
         run: docker compose logs app

@@ -123,3 +123,23 @@ jobs:
             echo "Expected 404 on unknown route, got $status" >&2
             exit 1
           fi
+
+      - name: Create production ticket on smoke-test failure
+        if: failure()
+        env:
+          STACK_API_KEY: ${{ secrets.AZT_STACK_INTERNAL_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          summary="Azure smoke tests failed. Check run logs for exact failing route and status code."
+
+          payload=$(cat <<EOF
+{"title":"Failed Azure smoke test run: ${{ github.workflow }}","ticket_type":"issue","severity":"normal","description":"Branch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun URL: ${run_url}\nSuite: Azure smoke tests\nPass count: unknown\nFail count: 1+\nSummary: ${summary}","source_ref":"${run_url}"}
+EOF
+)
+
+          curl -sS -X POST 'https://stack-internal.xten.au/api/tickets/create' \
+            -H "Authorization: Bearer ${STACK_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$payload"
