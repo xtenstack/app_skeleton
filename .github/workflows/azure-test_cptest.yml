@@ -67,6 +67,20 @@ jobs:
         with:
           name: php-app
 
+      - name: Inspect downloaded artifact
+        run: |
+          echo "Downloaded root:"
+          ls -la
+          echo "Artifact contents:"
+          ls -la php-app
+          find php-app -maxdepth 2 -type f | sort | sed -n '1,50p'
+
+      - name: Verify artifact contains the app entrypoint
+        run: |
+          test -f php-app/index.php
+          test ! -f php-app/index.html
+          test ! -f php-app/hostingstart.html
+
       # Publish-profile auth (static credential, no Azure AD app
       # registration or branch-subject matching) instead of azure/login's
       # OIDC federation — that kept failing with AADSTS700213 even after a
@@ -78,7 +92,7 @@ jobs:
         with:
           app-name: 'cptest'
           slot-name: 'Production'
-          package: .
+          package: php-app
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
 
       - name: Verify deployed site is reachable
