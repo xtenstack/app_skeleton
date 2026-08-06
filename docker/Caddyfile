@@ -31,7 +31,7 @@
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
     }
 
-    php_fastcgi app:9000
+    php_fastcgi {$PHP_FPM_UPSTREAM:app:9000}
 
     file_server
 }
