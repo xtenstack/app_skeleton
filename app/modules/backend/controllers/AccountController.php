@@ -45,7 +45,7 @@ class AccountController extends ControllerBase
     public function updateAction()
     {
         if (!$this->request->isPost()) {
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $userId = $this->currentUserId();
@@ -58,7 +58,7 @@ class AccountController extends ControllerBase
                 $this->flash->error((string) $message);
             }
 
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
@@ -67,7 +67,7 @@ class AccountController extends ControllerBase
         if (!\App_skeleton\LocaleOptions::isValidTimezone($timezone) || !\App_skeleton\LocaleOptions::isValidLocale($locale)) {
             $this->flash->error('Invalid timezone or locale selection');
 
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $profile = $this->currentProfile($userId);
@@ -84,13 +84,13 @@ class AccountController extends ControllerBase
             $this->flash->success('Profile updated');
         }
 
-        return $this->response->redirect($this->url->get('backend/account'));
+        return $this->response->redirect($this->homeUrl());
     }
 
     public function saveThemeAction()
     {
         if (!$this->request->isPost()) {
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $palette = (string) $this->request->getPost('theme_palette', 'string');
@@ -99,7 +99,7 @@ class AccountController extends ControllerBase
         if (!in_array($palette, self::ALLOWED_PALETTES, true) || !in_array($mode, self::ALLOWED_MODES, true)) {
             $this->flash->error('Invalid theme selection');
 
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $userId = $this->currentUserId();
@@ -116,7 +116,7 @@ class AccountController extends ControllerBase
 
         $this->flash->success('Theme updated');
 
-        return $this->response->redirect($this->url->get('backend/account'));
+        return $this->response->redirect($this->homeUrl());
     }
 
     private function upsertSetting(int $userId, string $key, string $value): void
@@ -137,7 +137,7 @@ class AccountController extends ControllerBase
         if (!$this->request->isPost() || !$this->request->hasFiles()) {
             $this->flash->error('No file was uploaded');
 
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $file = $this->request->getUploadedFiles()[0];
@@ -146,13 +146,13 @@ class AccountController extends ControllerBase
         if (!isset(self::ALLOWED_AVATAR_TYPES[$mime])) {
             $this->flash->error('Avatar must be a JPEG, PNG, or WebP image');
 
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         if ($file->getSize() > self::MAX_AVATAR_BYTES) {
             $this->flash->error('Avatar must be under 5MB');
 
-            return $this->response->redirect($this->url->get('backend/account'));
+            return $this->response->redirect($this->homeUrl());
         }
 
         $userId = $this->currentUserId();
@@ -180,7 +180,25 @@ class AccountController extends ControllerBase
 
         $this->flash->success('Avatar updated');
 
-        return $this->response->redirect($this->url->get('backend/account'));
+        return $this->response->redirect($this->homeUrl());
+    }
+
+    // A 'member' who reaches this controller got here via the frontend
+    // module's own topnav ("My Profile" links here since there's no
+    // separate frontend-local profile page) -- redirecting back to
+    // 'backend/account' unconditionally after save stranded them in
+    // backend's own chrome, with no Support Tickets nav item to get
+    // back with (production ticket #13). Everyone else's destination
+    // is unchanged.
+    private function homeUrl(): string
+    {
+        $roleId = (int) ($this->session->get('auth')['role_id'] ?? 0);
+
+        if (in_array($roleId, \Roles::idsByNames(['member']), true)) {
+            return $this->url->get('frontend/dashboard');
+        }
+
+        return $this->url->get('backend/account');
     }
 
     private function currentUserId(): int
