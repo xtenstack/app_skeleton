@@ -15,6 +15,15 @@ Don't batch this to the end. Whenever the user agrees to something requirement-s
 
 An "on hold" requirement (a named idea with no scope yet — this project has several: modules logged by name only) still gets a real row: `On hold — user asked for this to be logged for a future session, no further detail given yet.` Don't fabricate scope that wasn't given.
 
+## The production requirements module is now the system of record too (REQ-083)
+
+Since Session 14 (REQ-081's import), the live `/requirements` module on prod holds all 90 historical `REQ-NNN` entries and is a real, working tool — not just an aspiration. `Requirements-List.md` stays the narrative source (it carries far more prose/context per entry than the DB's `notes` field is meant to hold, and it's readable without prod access), but **every new or status-changing requirement from Session 15 onward also needs to land in prod**, not just the markdown file. Two ways to do that, pick based on volume:
+
+- **One or two, mid-session**: use the backend UI directly (`/requirements/requirements/new` or `/edit/<id>`), or drive it with a curl + CSRF-token flow like any other authenticated POST (see `docs/CODING-STANDARDS.md`'s Testing section for the general pattern — extract `csrf-key`/`csrf-token` from the page's `<meta>` tags per `public/assets/js/app.js`, since forms inject CSRF via JS, not a static hidden field).
+- **A batch, at session end**: same shape as the REQ-081 import — a short script generating `INSERT`/`UPDATE` statements against prod's `requirements` table via `docker compose exec -T db psql`, reviewed before running. Faster than N round-trips through the UI when several requirements changed in one session.
+
+Either way, keep `display_id` matching `Requirements-List.md`'s own `REQ-NNN` exactly — the two are meant to cross-reference, not drift into two different numbering schemes. `type` (functional/user/internal/note) and `status` need an actual choice, not a copy-paste of the markdown's free-text Status cell — that free text is what `notes` is for.
+
 ## At the end: three files
 
 1. **`Requirements-List.md`** — already current if you logged as you went (above). Do a final pass: anything agreed late in the session that hasn't been logged yet.
