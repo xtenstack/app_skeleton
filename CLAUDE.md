@@ -28,6 +28,10 @@ it.
   Configuration page (`./run modules sync|list|enable|disable`).
   `backend`/`api`/`cli`/`frontend` are core — always on, never listed
   there, disabling them would break the admin UI itself.
+- Private/internal-only modules (not part of the public release) live
+  in a separate private repo, never in this tree — see
+  [docs/INTERNAL-MODULES.md](docs/INTERNAL-MODULES.md) for the
+  mechanism.
 
 ## Forbidden patterns
 
@@ -64,3 +68,9 @@ Each working session against this repo produces a Session Summary and
 Handover in the private `stack.xten.au/claude/sessions/` folder, and
 logs anything requirement-shaped to `Requirements-List.md` as it comes
 up rather than only at the end.
+
+A separate thread, `stack.xten.au/claude/modules/`, scopes and plans new
+modules before handing them to AutoClaudeDev to build — see that
+folder's own `README.md` for how it stays part of the same project
+(same `REQ-NNN` id space, same `Requirements-List.md`, own session
+numbering).
