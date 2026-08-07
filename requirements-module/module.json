@@ -1,9 +1,0 @@
-{
-    "key": "requirements",
-    "code": "reqs",
-    "tier": "application",
-    "className": "XtenRequirements\\Module",
-    "surface": "backend",
-    "menu": "menu.php",
-    "migrations": "migrations"
-}

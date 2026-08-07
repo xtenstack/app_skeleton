@@ -40,6 +40,13 @@
 # app/config/config.php for how it's merged in.
 /app/config/config.local.php
 
+# Per-instance private/internal Composer packages (see docs/INTERNAL-MODULES.md).
+# Merged in by wikimedia/composer-merge-plugin if present — copy
+# composer.local.json.example to get started. Never committed: this is
+# how requirements-module (and any future internal-only module) gets
+# pulled in without the public repo hard-requiring it.
+/composer.local.json
+
 # Docker Compose local stack — DB creds and stateful volumes (uploads,
 # logs, the encryption key), see docker-compose.yml/.env.example.
 /.env
