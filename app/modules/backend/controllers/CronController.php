@@ -127,10 +127,10 @@ class CronController extends ControllerBase
      */
     private function fillFromRequest(\CronJobs $job): void
     {
-        $job->name        = (string) $this->request->getPost('name', 'string');
-        $job->task        = (string) $this->request->getPost('task', 'string');
-        $job->task_action = (string) $this->request->getPost('task_action', 'string');
-        $job->frequency   = (string) $this->request->getPost('frequency', 'string');
+        $job->name        = (string) $this->request->getPost('name');
+        $job->task        = (string) $this->request->getPost('task');
+        $job->task_action = (string) $this->request->getPost('task_action');
+        $job->frequency   = (string) $this->request->getPost('frequency');
         $job->enabled     = $this->request->getPost('enabled') ? 1 : 0;
     }
 

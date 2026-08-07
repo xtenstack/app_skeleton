@@ -37,8 +37,8 @@ class SettingsController extends ControllerBase
         }
 
         $setting                = new \Settings();
-        $setting->setting_key   = (string) $this->request->getPost('setting_key', 'string');
-        $setting->setting_value = (string) $this->request->getPost('setting_value', 'string');
+        $setting->setting_key   = (string) $this->request->getPost('setting_key');
+        $setting->setting_value = (string) $this->request->getPost('setting_value');
 
         if (!$setting->save()) {
             foreach ($setting->getMessages() as $message) {
@@ -68,7 +68,7 @@ class SettingsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'settings', 'action' => 'index']);
         }
 
-        $setting->setting_value = (string) $this->request->getPost('setting_value', 'string');
+        $setting->setting_value = (string) $this->request->getPost('setting_value');
 
         if (!$setting->save()) {
             foreach ($setting->getMessages() as $message) {

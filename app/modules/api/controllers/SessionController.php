@@ -16,7 +16,7 @@ class SessionController extends ControllerBase
         $body = $this->getJsonBody();
 
         $email    = (string) ($body['email'] ?? $this->request->getPost('email', 'email'));
-        $password = (string) ($body['password'] ?? $this->request->getPost('password', 'string'));
+        $password = (string) ($body['password'] ?? $this->request->getPost('password'));
 
         if (!$this->auth->check($email, $password)) {
             $this->response->setStatusCode(401, 'Unauthorized');

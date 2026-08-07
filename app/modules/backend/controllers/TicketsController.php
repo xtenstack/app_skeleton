@@ -94,7 +94,7 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
         }
 
-        $title = trim((string) $this->request->getPost('title', 'string'));
+        $title = trim((string) $this->request->getPost('title'));
 
         if ($title === '') {
             $this->flash->error('Title is required');
@@ -102,12 +102,12 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'new']);
         }
 
-        $ticketType = (string) $this->request->getPost('ticket_type', 'string');
+        $ticketType = (string) $this->request->getPost('ticket_type');
 
         $ticket              = new \Tickets();
         $ticket->title       = $title;
-        $ticket->description = (string) $this->request->getPost('description', 'string') ?: null;
-        $ticket->severity    = (string) $this->request->getPost('severity', 'string') ?: 'normal';
+        $ticket->description = (string) $this->request->getPost('description') ?: null;
+        $ticket->severity    = (string) $this->request->getPost('severity') ?: 'normal';
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : 'bug';
 
         // Staff filing via the backend UI — reporter is always whoever's
@@ -177,7 +177,7 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
         }
 
-        $title = trim((string) $this->request->getPost('title', 'string'));
+        $title = trim((string) $this->request->getPost('title'));
 
         if ($title === '') {
             $this->flash->error('Title is required');
@@ -186,13 +186,13 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'edit', 'params' => [$id]]);
         }
 
-        $ticketType = (string) $this->request->getPost('ticket_type', 'string');
+        $ticketType = (string) $this->request->getPost('ticket_type');
 
         $ticket->title       = $title;
-        $ticket->description = (string) $this->request->getPost('description', 'string') ?: null;
-        $ticket->severity    = (string) $this->request->getPost('severity', 'string') ?: 'normal';
+        $ticket->description = (string) $this->request->getPost('description') ?: null;
+        $ticket->severity    = (string) $this->request->getPost('severity') ?: 'normal';
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
-        $ticket->notes       = (string) $this->request->getPost('notes', 'string') ?: null;
+        $ticket->notes       = (string) $this->request->getPost('notes') ?: null;
 
         if (!$ticket->save()) {
             foreach ($ticket->getMessages() as $message) {
@@ -263,7 +263,7 @@ class TicketsController extends ControllerBase
             'bind'       => ['ids' => $ids],
         ]);
 
-        $bulkAction = (string) $this->request->getPost('bulk_action', 'string');
+        $bulkAction = (string) $this->request->getPost('bulk_action');
 
         if ($bulkAction === 'delete') {
             $count = 0;
@@ -279,9 +279,9 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
         }
 
-        $ticketType = (string) $this->request->getPost('ticket_type', 'string');
-        $severity   = (string) $this->request->getPost('severity', 'string');
-        $status     = (string) $this->request->getPost('status', 'string');
+        $ticketType = (string) $this->request->getPost('ticket_type');
+        $severity   = (string) $this->request->getPost('severity');
+        $status     = (string) $this->request->getPost('status');
 
         if ($ticketType === '' && $severity === '' && $status === '') {
             $this->flash->error('Choose at least one field to bulk-update');
@@ -472,7 +472,7 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
         }
 
-        $outcome = (string) $this->request->getPost('outcome', 'string');
+        $outcome = (string) $this->request->getPost('outcome');
 
         if (!in_array($outcome, ['confirmed', 'reopened'], true)) {
             $this->flash->error('Choose a valid QA outcome');

@@ -16,7 +16,7 @@ class SessionController extends ControllerBase
         }
 
         $email    = (string) $this->request->getPost('email', 'email');
-        $password = (string) $this->request->getPost('password', 'string');
+        $password = (string) $this->request->getPost('password');
 
         if ($this->auth->check($email, $password)) {
             // Admin/operator/agent land in the backend admin UI; 'member'

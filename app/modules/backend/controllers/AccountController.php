@@ -50,8 +50,8 @@ class AccountController extends ControllerBase
 
         $userId = $this->currentUserId();
         $user   = \Users::findFirstById($userId);
-        $user->first_name = (string) $this->request->getPost('first_name', 'string');
-        $user->last_name  = (string) $this->request->getPost('last_name', 'string');
+        $user->first_name = (string) $this->request->getPost('first_name');
+        $user->last_name  = (string) $this->request->getPost('last_name');
 
         if (!$user->save()) {
             foreach ($user->getMessages() as $message) {
@@ -61,8 +61,8 @@ class AccountController extends ControllerBase
             return $this->response->redirect($this->homeUrl());
         }
 
-        $timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
-        $locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
+        $timezone = (string) $this->request->getPost('timezone') ?: 'UTC';
+        $locale   = (string) $this->request->getPost('locale') ?: 'en-AU';
 
         if (!\App_skeleton\LocaleOptions::isValidTimezone($timezone) || !\App_skeleton\LocaleOptions::isValidLocale($locale)) {
             $this->flash->error('Invalid timezone or locale selection');
@@ -71,8 +71,8 @@ class AccountController extends ControllerBase
         }
 
         $profile = $this->currentProfile($userId);
-        $profile->phone    = (string) $this->request->getPost('phone', 'string');
-        $profile->bio      = (string) $this->request->getPost('bio', 'string');
+        $profile->phone    = (string) $this->request->getPost('phone');
+        $profile->bio      = (string) $this->request->getPost('bio');
         $profile->timezone = $timezone;
         $profile->locale   = $locale;
 
@@ -93,8 +93,8 @@ class AccountController extends ControllerBase
             return $this->response->redirect($this->homeUrl());
         }
 
-        $palette = (string) $this->request->getPost('theme_palette', 'string');
-        $mode    = (string) $this->request->getPost('theme_mode', 'string');
+        $palette = (string) $this->request->getPost('theme_palette');
+        $mode    = (string) $this->request->getPost('theme_mode');
 
         if (!in_array($palette, self::ALLOWED_PALETTES, true) || !in_array($mode, self::ALLOWED_MODES, true)) {
             $this->flash->error('Invalid theme selection');

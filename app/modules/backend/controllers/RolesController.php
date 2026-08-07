@@ -37,7 +37,7 @@ class RolesController extends ControllerBase
         }
 
         $role       = new \Roles();
-        $role->name = (string) $this->request->getPost('name', 'string');
+        $role->name = (string) $this->request->getPost('name');
 
         if (!$role->save()) {
             foreach ($role->getMessages() as $message) {
@@ -67,7 +67,7 @@ class RolesController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'roles', 'action' => 'index']);
         }
 
-        $role->name = (string) $this->request->getPost('name', 'string');
+        $role->name = (string) $this->request->getPost('name');
 
         if (!$role->save()) {
             foreach ($role->getMessages() as $message) {

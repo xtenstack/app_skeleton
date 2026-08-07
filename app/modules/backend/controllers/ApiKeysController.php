@@ -22,7 +22,7 @@ class ApiKeysController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'api-keys', 'action' => 'index']);
         }
 
-        $name = (string) $this->request->getPost('name', 'string');
+        $name = (string) $this->request->getPost('name');
 
         if ($name === '') {
             $this->flash->error('Name is required');

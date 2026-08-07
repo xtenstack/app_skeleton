@@ -22,9 +22,9 @@ class SignupController extends ControllerBase
         }
 
         $email     = (string) $this->request->getPost('email', 'email');
-        $password  = (string) $this->request->getPost('password', 'string');
-        $firstName = (string) $this->request->getPost('first_name', 'string');
-        $lastName  = (string) $this->request->getPost('last_name', 'string');
+        $password  = (string) $this->request->getPost('password');
+        $firstName = (string) $this->request->getPost('first_name');
+        $lastName  = (string) $this->request->getPost('last_name');
 
         if (strlen($password) < 8) {
             $this->view->error = 'Password must be at least 8 characters';

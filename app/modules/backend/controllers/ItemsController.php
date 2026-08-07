@@ -44,9 +44,9 @@ class ItemsController extends ControllerBase
 
         $item = new \Items();
         $item->user_id     = (int) $this->request->getPost('user_id', 'int');
-        $item->title       = (string) $this->request->getPost('title', 'string');
-        $item->description = (string) $this->request->getPost('description', 'string');
-        $item->status      = (string) $this->request->getPost('status', 'string');
+        $item->title       = (string) $this->request->getPost('title');
+        $item->description = (string) $this->request->getPost('description');
+        $item->status      = (string) $this->request->getPost('status');
 
         if (!$item->save()) {
             foreach ($item->getMessages() as $message) {
@@ -89,9 +89,9 @@ class ItemsController extends ControllerBase
         }
 
         $item->user_id     = (int) $this->request->getPost('user_id', 'int');
-        $item->title       = (string) $this->request->getPost('title', 'string');
-        $item->description = (string) $this->request->getPost('description', 'string');
-        $item->status      = (string) $this->request->getPost('status', 'string');
+        $item->title       = (string) $this->request->getPost('title');
+        $item->description = (string) $this->request->getPost('description');
+        $item->status      = (string) $this->request->getPost('status');
 
         if (!$item->save()) {
             foreach ($item->getMessages() as $message) {

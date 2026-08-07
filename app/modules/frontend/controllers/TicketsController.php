@@ -65,7 +65,7 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
         }
 
-        $title = trim((string) $this->request->getPost('title', 'string'));
+        $title = trim((string) $this->request->getPost('title'));
 
         if ($title === '') {
             $this->flash->error('Title is required');
@@ -73,12 +73,12 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'new']);
         }
 
-        $ticketType = (string) $this->request->getPost('ticket_type', 'string');
+        $ticketType = (string) $this->request->getPost('ticket_type');
 
         $ticket                   = new \Tickets();
         $ticket->title            = $title;
-        $ticket->description      = (string) $this->request->getPost('description', 'string') ?: null;
-        $ticket->severity         = (string) $this->request->getPost('severity', 'string') ?: 'normal';
+        $ticket->description      = (string) $this->request->getPost('description') ?: null;
+        $ticket->severity         = (string) $this->request->getPost('severity') ?: 'normal';
         $ticket->ticket_type      = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : 'support';
         $ticket->reporter_user_id = $this->currentUserId();
 
@@ -135,7 +135,7 @@ class TicketsController extends ControllerBase
             return $this->response->redirect($this->url->get('frontend/tickets/view/' . $id));
         }
 
-        $title = trim((string) $this->request->getPost('title', 'string'));
+        $title = trim((string) $this->request->getPost('title'));
 
         if ($title === '') {
             $this->flash->error('Title is required');
@@ -144,14 +144,14 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'edit', 'params' => [$id]]);
         }
 
-        $ticketType = (string) $this->request->getPost('ticket_type', 'string');
+        $ticketType = (string) $this->request->getPost('ticket_type');
 
         // Only the fields a customer actually owns — status, assignment,
         // consolidation, QA, and internal notes stay staff-only (see class
         // docblock) and are never read from the request here.
         $ticket->title       = $title;
-        $ticket->description = (string) $this->request->getPost('description', 'string') ?: null;
-        $ticket->severity    = (string) $this->request->getPost('severity', 'string') ?: $ticket->severity;
+        $ticket->description = (string) $this->request->getPost('description') ?: null;
+        $ticket->severity    = (string) $this->request->getPost('severity') ?: $ticket->severity;
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
 
         if (!$ticket->save()) {

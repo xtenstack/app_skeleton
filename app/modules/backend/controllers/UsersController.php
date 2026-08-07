@@ -38,7 +38,7 @@ class UsersController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
         }
 
-        $password = (string) $this->request->getPost('password', 'string');
+        $password = (string) $this->request->getPost('password');
 
         if (strlen($password) < 8) {
             $this->flash->error('Password must be at least 8 characters');
@@ -48,8 +48,8 @@ class UsersController extends ControllerBase
 
         $user                = new \Users();
         $user->email         = (string) $this->request->getPost('email', 'email');
-        $user->first_name    = (string) $this->request->getPost('first_name', 'string');
-        $user->last_name     = (string) $this->request->getPost('last_name', 'string');
+        $user->first_name    = (string) $this->request->getPost('first_name');
+        $user->last_name     = (string) $this->request->getPost('last_name');
         $user->role_id       = (int) $this->request->getPost('role_id', 'int');
         $user->is_active     = $this->request->getPost('is_active') ? 1 : 0;
         $user->password_hash = password_hash($password, PASSWORD_DEFAULT);
@@ -83,12 +83,12 @@ class UsersController extends ControllerBase
         }
 
         $user->email      = (string) $this->request->getPost('email', 'email');
-        $user->first_name = (string) $this->request->getPost('first_name', 'string');
-        $user->last_name  = (string) $this->request->getPost('last_name', 'string');
+        $user->first_name = (string) $this->request->getPost('first_name');
+        $user->last_name  = (string) $this->request->getPost('last_name');
         $user->role_id    = (int) $this->request->getPost('role_id', 'int');
         $user->is_active  = $this->request->getPost('is_active') ? 1 : 0;
 
-        $password = (string) $this->request->getPost('password', 'string');
+        $password = (string) $this->request->getPost('password');
 
         if ($password !== '') {
             if (strlen($password) < 8) {
@@ -134,8 +134,8 @@ class UsersController extends ControllerBase
                 $profile->user_id = $user->id;
             }
 
-            $timezone = (string) $this->request->getPost('timezone', 'string') ?: 'UTC';
-            $locale   = (string) $this->request->getPost('locale', 'string') ?: 'en-AU';
+            $timezone = (string) $this->request->getPost('timezone') ?: 'UTC';
+            $locale   = (string) $this->request->getPost('locale') ?: 'en-AU';
 
             if (!\App_skeleton\LocaleOptions::isValidTimezone($timezone) || !\App_skeleton\LocaleOptions::isValidLocale($locale)) {
                 $this->flash->error('Invalid timezone or locale selection');
@@ -143,8 +143,8 @@ class UsersController extends ControllerBase
                 return $this->response->redirect($this->url->get('backend/users/profile/' . $user->id));
             }
 
-            $profile->phone    = (string) $this->request->getPost('phone', 'string');
-            $profile->bio      = (string) $this->request->getPost('bio', 'string');
+            $profile->phone    = (string) $this->request->getPost('phone');
+            $profile->bio      = (string) $this->request->getPost('bio');
             $profile->timezone = $timezone;
             $profile->locale   = $locale;
 
@@ -200,7 +200,7 @@ class UsersController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'settings', 'params' => [$userId]]);
         }
 
-        $key = (string) $this->request->getPost('setting_key', 'string');
+        $key = (string) $this->request->getPost('setting_key');
 
         if ($key === '') {
             $this->flash->error('Key is required');
@@ -215,7 +215,7 @@ class UsersController extends ControllerBase
 
         $setting->user_id       = (int) $userId;
         $setting->setting_key   = $key;
-        $setting->setting_value = (string) $this->request->getPost('setting_value', 'string');
+        $setting->setting_value = (string) $this->request->getPost('setting_value');
 
         if (!$setting->save()) {
             foreach ($setting->getMessages() as $message) {

@@ -127,12 +127,12 @@ class ExternalConnectionsController extends ControllerBase
 
     private function applyPost(\ExternalConnections $connection): void
     {
-        $connection->name      = (string) $this->request->getPost('name', 'string');
-        $connection->base_url  = (string) $this->request->getPost('base_url', 'string') ?: null;
-        $connection->auth_type = (string) $this->request->getPost('auth_type', 'string');
-        $connection->config    = (string) $this->request->getPost('config', 'string') ?: null;
+        $connection->name      = (string) $this->request->getPost('name');
+        $connection->base_url  = (string) $this->request->getPost('base_url') ?: null;
+        $connection->auth_type = (string) $this->request->getPost('auth_type');
+        $connection->config    = (string) $this->request->getPost('config') ?: null;
         $connection->is_active = $this->request->getPost('is_active') ? 1 : 0;
 
-        $connection->setCredential((string) $this->request->getPost('credential', 'string'));
+        $connection->setCredential((string) $this->request->getPost('credential'));
     }
 }

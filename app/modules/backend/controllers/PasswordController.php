@@ -60,8 +60,8 @@ class PasswordController extends ControllerBase
             return $this->response->redirect($this->url->get('backend/session'));
         }
 
-        $token    = (string) $this->request->getPost('token', 'string');
-        $password = (string) $this->request->getPost('password', 'string');
+        $token    = (string) $this->request->getPost('token');
+        $password = (string) $this->request->getPost('password');
 
         $user = \Users::findFirst([
             'conditions' => 'password_reset_token = :token: AND password_reset_expires_at > :now:',
