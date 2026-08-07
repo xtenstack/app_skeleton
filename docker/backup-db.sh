@@ -1,6 +1,15 @@
 #!/bin/sh
 set -eu
 
+# Superseded by BackupTask (REQ-077, app/modules/cli/tasks/BackupTask.php)
+# — that runs inside the app container itself via the same
+# cron_jobs/CronRunner system AuditTask already uses, so a fresh install
+# only needs one host crontab entry (`./run cron run`), not this
+# separate one. Kept for any instance that already has this wired into
+# its host crontab; not removed outright since swapping it out is a
+# deliberate per-instance step (see RB-05), not automatic. New instances
+# should use BackupTask, not this script.
+#
 # Daily Postgres backup — meant to run from the host crontab, e.g.:
 #
 #   0 3 * * * /opt/app_skeleton/docker/backup-db.sh >> /opt/app_skeleton/logs/backup-db.log 2>&1

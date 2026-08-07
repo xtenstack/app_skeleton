@@ -156,15 +156,12 @@ every job's history; per-row: just that job) is how you read it back —
 `cron_jobs`' own last-run columns only ever hold the *most recent* run,
 so the log is the only place to see history at all.
 
-The daily Postgres backup (`docker/backup-db.sh`) is a deliberate
-exception to "everything goes through `runDueJobs()`": it needs the
-*host's* `pg_dump`, not the app container's (which has no Postgres
-client tools and no reason to grow them just for this), so it's driven
-by its own host-crontab line, not this system. It still reports into
-`cron_run_log` directly (with no `cron_jobs` row behind it) purely so
-it's visible on the same Log screen — it isn't one of the jobs the
-"add a new cron job" workflow below produces, and disabling/editing it
-happens by editing the host crontab, not the Cron screen.
+The database backup (`BackupTask`) is a normal `cron_jobs` row like any
+other, seeded on every install — see [Backups](#backups) below. It used
+to be a deliberate exception (a separate host-crontab script, since the
+app image had no Postgres client tools) — that's no longer true, the
+app image carries its own `pg_dump` now, so backups go through the same
+single crontab entry as everything else.
 
 ### Adding a new cron job
 
@@ -184,3 +181,29 @@ happens by editing the host crontab, not the Cron screen.
    job, not a fixed list. If this is the *first* job on a fresh
    install, see the crontab line above and the `cron_mode` setting.
 4. Watch it land in the Log view on its first due run.
+
+### Backups
+
+`BackupTask` (`app/modules/cli/tasks/BackupTask.php`) runs a real
+`pg_dump` of the app's own database, gzips it, and writes it to
+`./backups` on the host (bind-mounted into the app container at
+`/app/backups` — see `docker-compose.yml`). It's seeded as a normal
+`cron_jobs` row ("Database backup") on every install, same as
+"Archive audit log" — no separate setup, it runs on whatever schedule
+that row's `frequency` says (`+1 day` by default) through the exact
+same single crontab entry described above.
+
+- **Retention**: 14 days, local to the instance — old dump files are
+  deleted automatically after each successful run. This protects
+  against a bad migration or bad data, not against losing the droplet
+  itself; there's no off-instance upload built in yet.
+- **Restoring**: `gunzip -c backups/<file>.sql.gz | psql -h <host> -U <user> -d <dbname>`
+  against an empty database. Always test a restore somewhere other than
+  production before you actually need one.
+- **Filename**: `<dbname>-<YYYYmmdd-HHMMSS>.sql.gz`.
+- Disable or reschedule it from the Cron screen like any other job —
+  there's nothing special about it there.
+
+A separate, older host-crontab script (`docker/backup-db.sh`) predates
+`BackupTask` and is kept only for instances that already have it wired
+into their host crontab; new installs should use `BackupTask` instead.

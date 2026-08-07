@@ -51,3 +51,7 @@
 # logs, the encryption key), see docker-compose.yml/.env.example.
 /.env
 /data/
+
+# Database backups (BackupTask / REQ-077) — real dump files, never
+# committed.
+/backups/

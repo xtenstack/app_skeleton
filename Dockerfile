@@ -72,11 +72,19 @@ ARG DEBIAN_FRONTEND=noninteractive
 # local dev's mhsendmail-to-MailHog, relaying instead to a real SMTP
 # server via entrypoint.sh's rendered /etc/msmtprc. Only actually wired up
 # (sendmail_path set) if SMTP_HOST/SMTP_PASSWORD are configured — see
-# entrypoint.sh.
+# entrypoint.sh. postgresql-client-18 (from PGDG's own repo, same
+# version-gap problem this project already solved on the host per
+# REQ-052 — Debian bookworm's default postgresql-client is older than
+# the postgres:18 server this talks to) + gzip give BackupTask
+# (REQ-077) a real `pg_dump` inside the app container itself, so backup
+# runs through the same CronRunner/cron_jobs system as everything else
+# instead of needing a separate host-crontab entry.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg lsb-release \
     && curl -sSL https://packages.sury.org/php/apt.gpg -o /etc/apt/trusted.gpg.d/sury-php.gpg \
     && echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/sury-php.list \
+    && curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/pgdg.asc \
+    && echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -sc)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update && apt-get install -y --no-install-recommends \
         php8.3-fpm \
         php8.3-phalcon \
@@ -87,6 +95,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         php8.3-intl \
         msmtp \
         msmtp-mta \
+        postgresql-client-18 \
+        gzip \
     # Sury's default pool listens on a Unix socket (/run/php/php8.3-fpm.sock)
     # — switched to TCP :9000 since Caddy and PHP-FPM are separate
     # containers here, not sharing a filesystem for a socket.

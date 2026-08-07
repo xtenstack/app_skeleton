@@ -56,6 +56,11 @@ services:
       # they're served through an authenticated action rather than Caddy's
       # static file_server, and this mount is app-only — no caddy mount.
       - ./data/ticket-attachments:/app/storage/ticket-attachments
+      # Same host path docker/backup-db.sh already wrote to (not under
+      # data/) — BackupTask (REQ-077) reuses it so existing backups on
+      # any already-deployed instance stay in one place, not split
+      # across two directories.
+      - ./backups:/app/backups
     depends_on:
       db:
         condition: service_healthy
