@@ -10,7 +10,14 @@
 #   cp .env.example .env   # then fill in real values
 services:
   app:
-    build: .
+    build:
+      context: .
+      # Sibling checkout of any private modules repo (see
+      # docs/INTERNAL-MODULES.md) — must exist even if empty
+      # (`mkdir -p ../InternalModules`) so a build with no private
+      # modules configured still works unmodified.
+      additional_contexts:
+        internal-modules: ../InternalModules
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-development}

@@ -14,15 +14,28 @@
 # ---- Stage 1: vendor/ ------------------------------------------------
 # Composer only, no Phalcon extension needed here — --ignore-platform-req
 # =ext-phalcon is safe: it's skipping a metadata check, not actually
-# resolving anything against it. requirements-module/ is a path
-# repository (REQ-046) — its source has to be present before `composer
-# install` runs, unlike a real registry package it can't be fetched.
+# resolving anything against it. Also faked via composer.json's own
+# "config.platform" (ext-phalcon/ext-pdo_pgsql) — needed because
+# wikimedia/composer-merge-plugin's internal "composer update to apply
+# merge settings" (triggered whenever composer.local.json adds a new,
+# not-yet-locked require) doesn't honor --ignore-platform-req or
+# COMPOSER_IGNORE_PLATFORM_REQS, only composer.json's own static config.
+# docs/INSTALL.md's non-Docker install path still documents these
+# extensions as a hard prerequisite, so this doesn't remove the real
+# safety net there. Private/internal modules (REQ-073) live in a sibling
+# repo, not in this tree — composer.local.json (gitignored, see
+# docs/INTERNAL-MODULES.md) references them as `../InternalModules/*`
+# path repositories, so that sibling checkout has to land at
+# /InternalModules (matching /app's own parent) before `composer install`
+# runs. The `internal-modules` build context is declared in
+# docker-compose.yml; it must exist on the host even if empty so a build
+# with no private modules configured still works unmodified.
 FROM composer:2 AS vendor
 
 WORKDIR /app
 
-COPY composer.json composer.lock ./
-COPY requirements-module ./requirements-module
+COPY composer.json composer.lock composer.local.jso[n] ./
+COPY --from=internal-modules . /InternalModules
 
 RUN composer install \
         --no-dev \

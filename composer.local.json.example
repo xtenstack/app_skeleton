@@ -1,0 +1,14 @@
+{
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../InternalModules/*",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
+    "require": {
+        "xtenstack/requirements-module": "*"
+    }
+}
