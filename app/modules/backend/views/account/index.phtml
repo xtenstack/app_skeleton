@@ -72,6 +72,7 @@ $initial = strtoupper(substr($targetUser->first_name ?: $targetUser->email, 0, 1
         <strong>API Keys</strong>
       </div>
       <div class="card-body p-0">
+        <div class="table-responsive">
         <table class="table table-sm mb-0">
           <tbody>
 <?php foreach ($apiKeys as $apiKey): ?>
@@ -87,6 +88,7 @@ $initial = strtoupper(substr($targetUser->first_name ?: $targetUser->email, 0, 1
 <?php endif; ?>
           </tbody>
         </table>
+        </div>
       </div>
       <div class="card-footer text-right">
         <a href="<?= $this->url->get('backend/api-keys') ?>" class="btn btn-sm btn-outline-secondary">Generate / manage keys</a>
