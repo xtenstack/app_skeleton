@@ -6,6 +6,7 @@
 [![Build](https://github.com/xtenstack/app_skeleton/actions/workflows/build.yml/badge.svg)](https://github.com/xtenstack/app_skeleton/actions/workflows/build.yml)
 [![Digital Ocean: Deployable](https://img.shields.io/badge/Digital_Ocean-Deployable-blue)](docs/INSTALL.md)
 [![Azure: Deployable](https://img.shields.io/badge/Azure-Deployable-blue)](docs/INSTALL.md)
+[![IBM Cloud: Deployable Soon](https://img.shields.io/badge/IBM_Cloud-Deployable_Soon-red)](docs/INSTALL.md#planned-deployment-targets)
 
 A Phalcon 5.8 multi-module PHP application skeleton: a server-rendered
 AdminLTE backend plus a JSON API module, sharing one codebase. Comes with

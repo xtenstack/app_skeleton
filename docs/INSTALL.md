@@ -102,6 +102,14 @@ based on an adapter choice at install time — see `docs/user-guide.md`
 and the project's requirements log. Fine to stay Postgres-only until
 then; this section exists for the shared-hosting case that can't wait.
 
+## Planned deployment targets
+
+The Docker install above works on any host with Docker + Compose —
+Digital Ocean and Azure are the two verified so far (see the README
+badges). **IBM Cloud is planned but not yet trialled** — no
+IBM-specific instructions exist yet beyond the same generic Docker
+install.
+
 ## After install
 
 - Default seeded roles: `admin`, `member`, `operator`, `agent` — no
