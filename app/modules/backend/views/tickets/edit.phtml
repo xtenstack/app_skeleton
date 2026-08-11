@@ -38,6 +38,10 @@
             <label for="notes">Internal notes <span class="text-muted">(staff only, not visible via the API)</span></label>
             <textarea class="form-control" id="notes" name="notes" rows="4"><?= $this->escaper->escapeHtml((string) $ticket->notes) ?></textarea>
           </div>
+          <div class="form-group">
+            <label for="project">Project <span class="text-muted">(Dolibarr project number/name, staff only)</span></label>
+            <input type="text" class="form-control" id="project" name="project" value="<?= $this->escaper->escapeHtml((string) $ticket->project) ?>">
+          </div>
           <button type="submit" class="btn btn-primary">Save changes</button>
           <a href="<?= $this->url->get('backend/tickets/view/' . $ticket->id) ?>" class="btn btn-link">Cancel</a>
         </form>

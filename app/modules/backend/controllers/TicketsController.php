@@ -193,6 +193,7 @@ class TicketsController extends ControllerBase
         $ticket->severity    = (string) $this->request->getPost('severity') ?: 'normal';
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
         $ticket->notes       = (string) $this->request->getPost('notes') ?: null;
+        $ticket->project     = (string) $this->request->getPost('project') ?: null;
 
         if (!$ticket->save()) {
             foreach ($ticket->getMessages() as $message) {

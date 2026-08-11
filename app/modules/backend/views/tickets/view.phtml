@@ -26,6 +26,8 @@
           <dd class="col-9"><?= $ticket->description ? nl2br($this->escaper->escapeHtml($ticket->description)) : '<span class="text-muted">—</span>' ?></dd>
           <dt class="col-3">Notes</dt>
           <dd class="col-9"><?= $ticket->notes ? nl2br($this->escaper->escapeHtml($ticket->notes)) : '<span class="text-muted">—</span>' ?></dd>
+          <dt class="col-3">Project</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->project ?: '—') ?></dd>
           <dt class="col-3">Source ref</dt>
           <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->source_ref ?: '—') ?></dd>
           <dt class="col-3">Reporter</dt>

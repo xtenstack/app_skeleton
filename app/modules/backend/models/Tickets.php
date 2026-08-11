@@ -21,6 +21,7 @@ class Tickets extends \Phalcon\Mvc\Model
     public $status;
     public $ticket_type;
     public $notes;
+    public $project;
     public $source_ref;
     public $reporter_user_id;
     public $reporter_api_key_id;
