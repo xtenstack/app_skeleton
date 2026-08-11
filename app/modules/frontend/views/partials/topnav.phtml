@@ -11,6 +11,11 @@
         <i class="fas fa-ellipsis-v"></i>
       </a>
       <div class="dropdown-menu dropdown-menu-right">
+<?php $authEmail = $this->session->get('auth')['email'] ?? null; ?>
+<?php if ($authEmail): ?>
+        <span class="dropdown-item-text text-muted small text-truncate d-block" style="max-width: 220px;"><?= $this->escaper->escapeHtml($authEmail) ?></span>
+        <div class="dropdown-divider"></div>
+<?php endif; ?>
         <a href="<?= $this->url->get('backend/account') ?>" class="dropdown-item"><i class="fas fa-id-badge mr-2"></i>My Profile</a>
         <div class="dropdown-divider"></div>
         <a href="<?= $this->url->get('backend/session/logout') ?>" class="dropdown-item"><i class="fas fa-sign-out-alt mr-2"></i>Log out</a>

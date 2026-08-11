@@ -10,7 +10,7 @@ $isAuthPage = $isGuestLanding || in_array($controllerName, ['session', 'signup',
  * default, falling back to a hardcoded default — so a missing/corrupt
  * setting never breaks the page, it just falls through to blue/auto.
  */
-$allowedPalettes = ['blue', 'purple', 'green', 'orange'];
+$allowedPalettes = ['blue', 'purple', 'green', 'orange', 'stack'];
 $allowedModes    = ['light', 'dark', 'auto'];
 $userSettings    = $this->session->get('user_settings') ?? [];
 $themePalette    = $userSettings['theme_palette'] ?? $this->settings->get('default_theme_palette', 'blue');

@@ -13,6 +13,9 @@ html[data-palette="blue"]   { --theme-primary: #007bff; --theme-primary-dark: #0
 html[data-palette="purple"] { --theme-primary: #6f42c1; --theme-primary-dark: #4e2e8a; }
 html[data-palette="green"]  { --theme-primary: #28a745; --theme-primary-dark: #1e7e34; }
 html[data-palette="orange"] { --theme-primary: #fd7e14; --theme-primary-dark: #c8620a; }
+/* Matches stack.xten.au's own brand teal (--accent/--accent-mid in the
+   website's templatemo-622-clearwave.css) — Session 15. */
+html[data-palette="stack"]  { --theme-primary: #1A7A6E; --theme-primary-dark: #135c53; }
 
 .main-sidebar,
 .brand-link {

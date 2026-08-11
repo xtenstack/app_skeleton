@@ -48,7 +48,7 @@ $initial = strtoupper(substr($targetUser->first_name ?: $targetUser->email, 0, 1
           <div class="form-group">
             <label for="theme_palette">Colour palette</label>
             <select class="form-control" id="theme_palette" name="theme_palette">
-<?php foreach (['blue' => 'Blue', 'purple' => 'Purple', 'green' => 'Green', 'orange' => 'Orange'] as $value => $label): ?>
+<?php foreach (['blue' => 'Blue', 'purple' => 'Purple', 'green' => 'Green', 'orange' => 'Orange', 'stack' => 'Stack'] as $value => $label): ?>
               <option value="<?= $value ?>" <?= $themePalette === $value ? 'selected' : '' ?>><?= $label ?></option>
 <?php endforeach; ?>
             </select>

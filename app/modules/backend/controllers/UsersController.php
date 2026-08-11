@@ -9,7 +9,21 @@ class UsersController extends ControllerBase
 
     public function indexAction()
     {
-        $this->view->users = \Users::find(['order' => 'email']);
+        // Search/sort/pagination (Session 15, list-view convention).
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \Users::class,
+            ['email', 'first_name', 'last_name'],
+            ['email' => 'email', 'first_name' => 'first_name', 'last_name' => 'last_name', 'created' => 'id'],
+            [],
+            [],
+            25,
+            'asc'
+        );
+
+        $this->view->users        = $list['results'];
+        $this->view->listState    = $list;
+        $this->view->preserveQuery = [];
     }
 
     public function newAction()

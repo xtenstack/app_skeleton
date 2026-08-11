@@ -51,16 +51,29 @@ class TicketsController extends ControllerBase
             $bind['assigned_to']  = (int) $assignedTo;
         }
 
-        $params = ['order' => 'id DESC'];
+        // Search/sort/pagination (Session 15, list-view convention) layers
+        // on top of the filter/status/assigned_to conditions built above —
+        // see App_skeleton\ListView's own docblock.
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \Tickets::class,
+            ['title', 'description'],
+            ['created' => 'id', 'title' => 'title', 'severity' => 'severity', 'status' => 'status'],
+            $conditions,
+            $bind
+        );
 
-        if ($conditions) {
-            $params['conditions'] = implode(' AND ', $conditions);
-            $params['bind']       = $bind;
-        }
-
-        $this->view->tickets       = \Tickets::find($params);
+        $this->view->tickets       = $list['results'];
         $this->view->currentFilter = $filter;
         $this->view->currentStatus = $status;
+        $this->view->listState     = $list;
+        // Preserved on every search/sort/pagination link so navigating
+        // those doesn't drop the current status/filter/assigned_to state.
+        $this->view->preserveQuery = array_filter([
+            'filter'      => $filter !== '' ? $filter : null,
+            'status'      => $status !== '' ? $status : null,
+            'assigned_to' => $assignedTo ?: null,
+        ], fn ($v) => $v !== null);
 
         // Spot-check banner: what share of this week's auto-closes haven't
         // been QA-reviewed yet — a human-driven filtered queue rather than

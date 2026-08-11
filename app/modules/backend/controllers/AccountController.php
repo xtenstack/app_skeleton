@@ -18,7 +18,7 @@ class AccountController extends ControllerBase
 
     private const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
-    private const ALLOWED_PALETTES = ['blue', 'purple', 'green', 'orange'];
+    private const ALLOWED_PALETTES = ['blue', 'purple', 'green', 'orange', 'stack'];
     private const ALLOWED_MODES    = ['light', 'dark', 'auto'];
 
     public function indexAction()

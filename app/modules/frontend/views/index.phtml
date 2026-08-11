@@ -17,7 +17,7 @@ $isGuestLanding = $controllerName === 'index';
 // member's own preference, falling back through the admin-set default to
 // a hardcoded one. Guests get the site default outright (no user_settings
 // to read yet).
-$allowedPalettes = ['blue', 'purple', 'green', 'orange'];
+$allowedPalettes = ['blue', 'purple', 'green', 'orange', 'stack'];
 $allowedModes    = ['light', 'dark', 'auto'];
 $userSettings    = $this->session->get('user_settings') ?? [];
 $themePalette    = $userSettings['theme_palette'] ?? $this->settings->get('default_theme_palette', 'blue');
