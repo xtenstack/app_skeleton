@@ -97,6 +97,27 @@ $di->setShared('dispatcher', function () {
 
         error_log(sprintf('%s: %s in %s:%d', get_class($exception), $exception->getMessage(), $exception->getFile(), $exception->getLine()) . "\n" . $exception->getTraceAsString());
 
+        // Structured copy for the browsable Error Log admin view (project
+        // audit, Tier 3 — lightweight self-hosted monitoring rather than an
+        // external service). Wrapped in its own try/catch deliberately: if
+        // the DB itself is what's unhealthy, logging the error must never
+        // become a second, worse crash — the plain error_log() call above
+        // already covers that scenario regardless of whether this succeeds.
+        try {
+            $entry                 = new \ErrorLog();
+            $entry->exception_class = get_class($exception);
+            $entry->message         = $exception->getMessage();
+            $entry->file            = $exception->getFile();
+            $entry->line            = $exception->getLine();
+            $entry->trace           = $exception->getTraceAsString();
+            $entry->request_method  = $_SERVER['REQUEST_METHOD'] ?? null;
+            $entry->request_uri     = $_SERVER['REQUEST_URI'] ?? null;
+            $entry->user_id         = $dispatcher->getDI()->getSession()->get('auth')['id'] ?? null;
+            $entry->save();
+        } catch (\Throwable $loggingFailure) {
+            error_log('ErrorLog write failed: ' . $loggingFailure->getMessage());
+        }
+
         $dispatcher->forward(['controller' => 'index', 'action' => 'serverError']);
 
         return false;

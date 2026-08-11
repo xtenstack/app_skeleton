@@ -1,0 +1,71 @@
+<?php $baseUrl = $this->url->get('backend/error-log'); ?>
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>Error Log</h1>
+    <p class="text-muted">Captured server-side exceptions (project audit, Tier 3 — lightweight self-hosted monitoring).</p>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
+    <div class="btn-group" role="group">
+      <a href="<?= $baseUrl ?>" class="btn btn-sm btn-outline-secondary <?= $currentStatus === '' ? 'active' : '' ?>">All</a>
+      <a href="<?= $baseUrl ?>?status=unresolved" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'unresolved' ? 'active' : '' ?>">Unresolved</a>
+      <a href="<?= $baseUrl ?>?status=resolved" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'resolved' ? 'active' : '' ?>">Resolved</a>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
+    <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search exception/message/file/URL…') ?>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'When', 'created', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+              <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Exception', 'exception', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+              <th>Message</th>
+              <th>Request</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($entries as $entry): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml($entry->created_at) ?></td>
+              <td><code><?= $this->escaper->escapeHtml($entry->exception_class) ?></code></td>
+              <td><?= $this->escaper->escapeHtml(mb_strimwidth((string) $entry->message, 0, 80, '…')) ?></td>
+              <td><?= $this->escaper->escapeHtml($entry->request_method ?: '—') ?> <?= $this->escaper->escapeHtml(mb_strimwidth((string) $entry->request_uri, 0, 40, '…')) ?></td>
+              <td><?= $entry->resolved_at ? '<span class="badge badge-success">Resolved</span>' : '<span class="badge badge-warning">Open</span>' ?></td>
+              <td class="text-right">
+                <a href="<?= $baseUrl ?>/view/<?= $entry->id ?>" class="btn btn-sm btn-outline-secondary">Details</a>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($entries)): ?>
+            <tr>
+              <td colspan="6" class="text-center text-muted">No errors captured<?= $currentStatus !== '' ? ' matching this filter' : '' ?>.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row mt-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <span class="text-muted small"><?= $listState['total'] ?> entr<?= $listState['total'] === 1 ? 'y' : 'ies' ?></span>
+    <?= \App_skeleton\ListView::pagination($baseUrl, $listState['page'], $listState['totalPages'], $preserveQuery) ?>
+  </div>
+</div>

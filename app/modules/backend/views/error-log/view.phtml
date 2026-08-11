@@ -1,0 +1,47 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>Error #<?= $entry->id ?></h1>
+    <div>
+      <form method="post" action="<?= $this->url->get('backend/error-log/resolve/' . $entry->id) ?>" class="d-inline">
+        <button type="submit" class="btn <?= $entry->resolved_at ? 'btn-outline-secondary' : 'btn-success' ?>">
+          <?= $entry->resolved_at ? 'Mark unresolved' : 'Mark resolved' ?>
+        </button>
+      </form>
+      <a href="<?= $this->url->get('backend/error-log') ?>" class="btn btn-outline-secondary">Back</a>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-9">
+    <div class="card mb-3">
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-3">When</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->created_at) ?></dd>
+          <dt class="col-3">Exception</dt>
+          <dd class="col-9"><code><?= $this->escaper->escapeHtml($entry->exception_class) ?></code></dd>
+          <dt class="col-3">Message</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->message ?: '—') ?></dd>
+          <dt class="col-3">Location</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->file ?: '—') ?><?= $entry->line ? ':' . $entry->line : '' ?></dd>
+          <dt class="col-3">Request</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->request_method ?: '—') ?> <?= $this->escaper->escapeHtml($entry->request_uri ?: '—') ?></dd>
+          <dt class="col-3">User</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml($entry->Users ? $entry->Users->email : 'Not authenticated / unknown') ?></dd>
+          <dt class="col-3">Status</dt>
+          <dd class="col-9"><?= $entry->resolved_at ? '<span class="badge badge-success">Resolved ' . $this->escaper->escapeHtml($entry->resolved_at) . '</span>' : '<span class="badge badge-warning">Open</span>' ?></dd>
+        </dl>
+      </div>
+    </div>
+
+<?php if ($entry->trace): ?>
+    <div class="card">
+      <div class="card-header">Stack trace</div>
+      <div class="card-body">
+        <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.8125rem;"><?= $this->escaper->escapeHtml($entry->trace) ?></pre>
+      </div>
+    </div>
+<?php endif; ?>
+  </div>
+</div>

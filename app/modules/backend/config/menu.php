@@ -101,4 +101,11 @@ return [
         'url'        => 'backend/system-log',
         'roles'      => [1],
     ],
+    [
+        'label'      => 'Error Log',
+        'icon'       => 'fas fa-exclamation-triangle',
+        'controller' => 'error-log',
+        'url'        => 'backend/error-log',
+        'roles'      => [1],
+    ],
 ];
