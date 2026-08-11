@@ -26,7 +26,7 @@
               <td><?= $this->escaper->escapeHtml($entry->created_at) ?></td>
               <td><?= $this->escaper->escapeHtml($entry->entity_type) ?><?= $entry->entity_id ? ' #' . $entry->entity_id : '' ?></td>
               <td><span class="badge badge-<?= $entry->action === 'delete' ? 'danger' : ($entry->action === 'insert' ? 'success' : 'info') ?>"><?= $this->escaper->escapeHtml($entry->action) ?></span></td>
-              <td><?= $this->escaper->escapeHtml($entry->Users ? $entry->Users->email : '—') ?></td>
+              <td><?= $this->escaper->escapeHtml($entry->Users ? $entry->Users->email : 'System / unknown') ?></td>
               <td class="text-right">
                 <a href="<?= $this->url->get('backend/audit-log/view/' . $entry->id) ?>" class="btn btn-sm btn-outline-secondary">Details</a>
               </td>
