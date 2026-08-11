@@ -2,7 +2,6 @@
 
 class Settings extends \Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -38,7 +37,7 @@ class Settings extends \Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("settings");
+        $this->setSource('settings');
         $this->keepSnapshots(true);
     }
 

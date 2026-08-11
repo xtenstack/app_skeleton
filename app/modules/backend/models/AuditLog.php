@@ -2,7 +2,6 @@
 
 class AuditLog extends \Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -65,7 +64,7 @@ class AuditLog extends \Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("audit_log");
+        $this->setSource('audit_log');
         $this->belongsTo('actor_user_id', 'Users', 'id', ['alias' => 'Users']);
     }
 

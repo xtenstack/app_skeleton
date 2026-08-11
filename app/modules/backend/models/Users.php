@@ -119,7 +119,7 @@ class Users extends Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("users");
+        $this->setSource('users');
         $this->keepSnapshots(true);
         $this->hasMany('id', 'Items', 'user_id', ['alias' => 'Items']);
         $this->belongsTo('role_id', 'Roles', 'id', ['alias' => 'Roles']);

@@ -12,6 +12,12 @@
       "runtimeExecutable": "php85",
       "runtimeArgs": ["-S", "localhost:8091", "-t", "/opt/local/www/apache2/html/website"],
       "port": 8091
+    },
+    {
+      "name": "deploy-website",
+      "runtimeExecutable": "php85",
+      "runtimeArgs": ["-S", "localhost:8092", "-t", "/opt/local/www/apache2/html/website_deploy"],
+      "port": 8092
     }
   ]
 }

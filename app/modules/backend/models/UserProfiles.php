@@ -2,7 +2,6 @@
 
 class UserProfiles extends \Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -70,7 +69,7 @@ class UserProfiles extends \Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("user_profiles");
+        $this->setSource('user_profiles');
         $this->keepSnapshots(true);
         $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }

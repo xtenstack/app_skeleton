@@ -18,7 +18,7 @@ class AuditTask extends \Phalcon\Cli\Task
 {
     public function mainAction()
     {
-        echo "Usage: ./run audit archive" . PHP_EOL;
+        echo 'Usage: ./run audit archive' . PHP_EOL;
     }
 
     public function archiveAction()

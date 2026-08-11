@@ -2,7 +2,6 @@
 
 class ModuleRegistry extends \Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -62,7 +61,7 @@ class ModuleRegistry extends \Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("module_registry");
+        $this->setSource('module_registry');
         $this->keepSnapshots(true);
     }
 

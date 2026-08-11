@@ -14,7 +14,7 @@ class SeedTask extends \Phalcon\Cli\Task
 {
     public function mainAction()
     {
-        echo "Usage: ./run seed run" . PHP_EOL;
+        echo 'Usage: ./run seed run' . PHP_EOL;
     }
 
     public function runAction()
@@ -23,7 +23,7 @@ class SeedTask extends \Phalcon\Cli\Task
         $this->seedSettings();
         $this->seedCronJobs();
 
-        echo "Seeding complete." . PHP_EOL;
+        echo 'Seeding complete.' . PHP_EOL;
     }
 
     private function seedRoles(): void

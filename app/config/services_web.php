@@ -51,7 +51,7 @@ $di->setShared('flash', function () {
         'error'   => 'alert alert-danger',
         'success' => 'alert alert-success',
         'notice'  => 'alert alert-info',
-        'warning' => 'alert alert-warning'
+        'warning' => 'alert alert-warning',
     ]);
 
     return $flash;
@@ -71,7 +71,7 @@ $di->setShared('flash', function () {
  * last-resort for anything that happens outside a dispatch cycle entirely
  * (or a forward loop here failing) — this listener is the common case.
  */
-$di->setShared('dispatcher', function() {
+$di->setShared('dispatcher', function () {
     $dispatcher = new Dispatcher();
     $dispatcher->setDefaultNamespace('App_skeleton\Modules\Backend\Controllers');
 

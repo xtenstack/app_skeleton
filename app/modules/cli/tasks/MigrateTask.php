@@ -33,7 +33,7 @@ class MigrateTask extends \Phalcon\Cli\Task
 {
     public function mainAction()
     {
-        echo "Usage: ./run migrate run | ./run migrate status" . PHP_EOL;
+        echo 'Usage: ./run migrate run | ./run migrate status' . PHP_EOL;
     }
 
     public function runAction()
@@ -44,7 +44,7 @@ class MigrateTask extends \Phalcon\Cli\Task
         $pending = $this->pendingMigrations($applied);
 
         if (!$pending) {
-            echo "No pending migrations." . PHP_EOL;
+            echo 'No pending migrations.' . PHP_EOL;
 
             return;
         }
@@ -67,13 +67,13 @@ class MigrateTask extends \Phalcon\Cli\Task
                 $this->db->rollback();
 
                 echo "  FAILED on {$qualified}: " . $e->getMessage() . PHP_EOL;
-                echo "  Stopped — migrations after this one were not applied." . PHP_EOL;
+                echo '  Stopped — migrations after this one were not applied.' . PHP_EOL;
 
                 return;
             }
         }
 
-        echo "Migrations complete (" . count($pending) . " applied)." . PHP_EOL;
+        echo 'Migrations complete (' . count($pending) . ' applied).' . PHP_EOL;
     }
 
     public function statusAction()
@@ -88,7 +88,7 @@ class MigrateTask extends \Phalcon\Cli\Task
             echo "  {$marker} {$qualified}" . PHP_EOL;
         }
 
-        echo count($pending) . " pending, " . count($applied) . " applied." . PHP_EOL;
+        echo count($pending) . ' pending, ' . count($applied) . ' applied.' . PHP_EOL;
     }
 
     private function ensureMigrationsTable(): void

@@ -2,7 +2,6 @@
 
 class AuditLogArchive extends \Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -62,7 +61,7 @@ class AuditLogArchive extends \Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("audit_log_archive");
+        $this->setSource('audit_log_archive');
     }
 
     /**

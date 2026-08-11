@@ -21,7 +21,7 @@ foreach ($application->getModules() as $key => $module) {
         'module' => $key,
         'controller' => 'index',
         'action' => 'index',
-        'params' => 1
+        'params' => 1,
     ])->setName($key);
 
     $router->add('/'.$key.'/:controller/:params', [
@@ -29,7 +29,7 @@ foreach ($application->getModules() as $key => $module) {
         'module' => $key,
         'controller' => 1,
         'action' => 'index',
-        'params' => 2
+        'params' => 2,
     ]);
 
     $router->add('/'.$key.'/:controller/:action/:params', [
@@ -37,7 +37,7 @@ foreach ($application->getModules() as $key => $module) {
         'module' => $key,
         'controller' => 1,
         'action' => 2,
-        'params' => 3
+        'params' => 3,
     ]);
 
     /**

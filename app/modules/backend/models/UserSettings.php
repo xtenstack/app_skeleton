@@ -2,7 +2,6 @@
 
 class UserSettings extends \Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -44,7 +43,7 @@ class UserSettings extends \Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("user_settings");
+        $this->setSource('user_settings');
         $this->keepSnapshots(true);
         $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }

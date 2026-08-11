@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App_skeleton\Modules\Backend\Controllers;
 
+use App_skeleton\Audit;
+
 /**
  * Ticket attachment upload/download/delete, split out of
  * TicketsController (project audit, 2026-08-04, Tier 2 — that file was
@@ -36,6 +38,18 @@ trait TicketAttachmentActions
 
     private const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+    /**
+     * Uploads allowed per user within RATE_LIMIT_WINDOW before further
+     * uploads are blocked outright — same principle as Auth::isRateLimited(),
+     * adapted for an abusable-but-not-failure-prone action (project audit,
+     * Tier 2: this endpoint had no rate limiting at all, only login did).
+     * Counts TicketAttachments rows directly rather than audit_log, since
+     * uploaded_by_user_id/created_at already give an exact count with no
+     * JSON-matching needed.
+     */
+    private const UPLOAD_RATE_LIMIT_MAX    = 20;
+    private const UPLOAD_RATE_LIMIT_WINDOW = '-15 minutes';
+
     public function uploadAttachmentAction($id)
     {
         $ticket = \Tickets::findFirstById($id);
@@ -48,6 +62,15 @@ trait TicketAttachmentActions
 
         if (!$this->request->isPost() || !$this->request->hasFiles()) {
             $this->flash->error('No file was uploaded');
+
+            return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
+        }
+
+        $userId = $this->session->get('auth')['id'];
+
+        if ($this->isUploadRateLimited($userId)) {
+            $this->flash->error('Too many uploads — please wait a few minutes and try again');
+            Audit::recordEvent('attachment_upload_blocked', $userId, ['ticket_id' => $ticket->id]);
 
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
         }
@@ -177,5 +200,17 @@ trait TicketAttachmentActions
         $this->flash->success('Attachment removed');
 
         return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);
+    }
+
+    private function isUploadRateLimited(int $userId): bool
+    {
+        $since = date('Y-m-d H:i:s', strtotime(self::UPLOAD_RATE_LIMIT_WINDOW));
+
+        $count = \TicketAttachments::count([
+            'conditions' => 'uploaded_by_user_id = :user_id: AND created_at >= :since:',
+            'bind'       => ['user_id' => $userId, 'since' => $since],
+        ]);
+
+        return $count >= self::UPLOAD_RATE_LIMIT_MAX;
     }
 }

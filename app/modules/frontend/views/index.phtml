@@ -56,6 +56,9 @@ $this->flash->clear();
     <title><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?></title>
     <meta name="csrf-key" content="<?= $this->escaper->escapeHtml($this->security->getTokenKey()) ?>">
     <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
     <link rel="stylesheet" href="/assets/adminlte/plugins/fontawesome-free/css/all.min.css">
     <link rel="stylesheet" href="/assets/adminlte/css/adminlte.min.css">
     <link rel="stylesheet" href="/assets/css/theme.css">

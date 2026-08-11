@@ -51,7 +51,7 @@ $console = new ConsoleApp($di);
  * Register console modules
  */
 $console->registerModules([
-    'cli' => ['className' => 'App_skeleton\Modules\Cli\Module']
+    'cli' => ['className' => 'App_skeleton\Modules\Cli\Module'],
 ]);
 
 /**
@@ -87,7 +87,7 @@ try {
      *
      * You can disable this behaviour if the output of your application needs to don't have a new line at end
      */
-    if (isset($config["printNewLine"]) && $config["printNewLine"]) {
+    if (isset($config['printNewLine']) && $config['printNewLine']) {
         echo PHP_EOL;
     }
 } catch (Exception $e) {

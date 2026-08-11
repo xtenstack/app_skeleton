@@ -23,6 +23,9 @@
 /.phpunit.cache/
 /.phpunit.result.cache
 
+# php-cs-fixer's own cache file (machine-specific, not project config)
+/.php-cs-fixer.cache
+
 # Local Claude Code overrides (auto-accumulated permission grants, machine-specific)
 /.claude/settings.local.json
 

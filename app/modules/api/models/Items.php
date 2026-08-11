@@ -53,7 +53,7 @@ class Items extends Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("items");
+        $this->setSource('items');
         $this->keepSnapshots(true);
         $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);
     }

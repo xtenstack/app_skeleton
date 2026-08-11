@@ -19,7 +19,7 @@ class ModulesTask extends \Phalcon\Cli\Task
 {
     public function mainAction()
     {
-        echo "Usage: ./run modules sync | list | enable <key> | disable <key>" . PHP_EOL;
+        echo 'Usage: ./run modules sync | list | enable <key> | disable <key>' . PHP_EOL;
     }
 
     public function syncAction()

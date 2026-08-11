@@ -2,7 +2,6 @@
 
 class Roles extends Phalcon\Mvc\Model
 {
-
     /**
      *
      * @var integer
@@ -26,7 +25,7 @@ class Roles extends Phalcon\Mvc\Model
      */
     public function initialize()
     {
-        $this->setSource("roles");
+        $this->setSource('roles');
         $this->keepSnapshots(true);
         $this->hasMany('id', 'Users', 'role_id', ['alias' => 'Users']);
     }

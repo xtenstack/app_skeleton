@@ -79,7 +79,7 @@ class TicketsController extends ControllerBase
         // been QA-reviewed yet — a human-driven filtered queue rather than
         // an automated sampler (see plan section 6).
         $autoClosedThisWeek = \Tickets::find([
-            'conditions' => "auto_closed_at >= :since:",
+            'conditions' => 'auto_closed_at >= :since:',
             'bind'       => ['since' => date('Y-m-d H:i:s', strtotime('-7 days'))],
         ]);
 
