@@ -27,6 +27,10 @@ jobs:
           echo "DB_PASSWORD=ci-only-not-a-real-secret" >> .env
           mkdir -p data
           touch data/encryption_key
+          # docker-compose.yml's internal-modules build context needs this
+          # sibling directory to exist even empty (see docs/INTERNAL-MODULES.md)
+          # — CI has no private module checkout, same as a public clone.
+          mkdir -p ../internal
 
       - name: Build and start the real stack
         run: docker compose up -d --build
