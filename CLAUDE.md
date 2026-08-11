@@ -51,9 +51,12 @@ it.
 
 ## Where things live
 
-- `Requirements-List.md` (in the private session-docs folder, not this
-  repo) is the single running requirement log — `REQ-NNN` ids, never
-  reused. Branch names reference them: `feature/REQ-020-short-name`.
+- The production `/requirements` module (live on prod, not a file in
+  this repo) is the single running requirement log — `REQ-NNN` ids,
+  never reused. Branch names reference them:
+  `feature/REQ-020-short-name`. (`Requirements-List.md` was the
+  original narrative source but is archived as of Session 15 — no
+  longer current, don't add to it.)
 - Process runbooks (branching/release strategy, dev-environment sync,
   list-view conventions) and one-off design/plan docs for bigger
   features (e.g. the ticketing and Requirements-module plans) live
@@ -66,11 +69,11 @@ it.
 
 Each working session against this repo produces a Session Summary and
 Handover in the private `stack.xten.au/claude/sessions/` folder, and
-logs anything requirement-shaped to `Requirements-List.md` as it comes
-up rather than only at the end.
+logs anything requirement-shaped to the production requirements module
+as it comes up rather than only at the end.
 
 A separate thread, `stack.xten.au/claude/modules/`, scopes and plans new
 modules before handing them to AutoClaudeDev to build — see that
 folder's own `README.md` for how it stays part of the same project
-(same `REQ-NNN` id space, same `Requirements-List.md`, own session
-numbering).
+(same `REQ-NNN` id space, same production requirements module, own
+session numbering).

@@ -1,43 +1,40 @@
 ---
 name: session-wrapup
-description: Log requirements as they surface during a session, and write the end-of-session Requirements-List/Session-Summary/Handover trio. Use at the end of every session against this repo, and any time something requirement-shaped is agreed on mid-session — don't wait until the end to log it.
+description: Log requirements directly to the production requirements module as they surface during a session, and write the end-of-session Session-Summary/Handover pair. Use at the end of every session against this repo, and any time something requirement-shaped is agreed on mid-session — don't wait until the end to log it.
 ---
 
-# Session wrap-up: Requirements-List, Session Summary, Handover
+# Session wrap-up: production requirements, Session Summary, Handover
 
-Per CLAUDE.md: *"Each working session against this repo produces a Session Summary and Handover in the private `stack.xten.au/claude/sessions/` folder, and logs anything requirement-shaped to `Requirements-List.md` as it comes up rather than only at the end."* This skill is the concrete how-to.
+Per CLAUDE.md: *"Each working session against this repo produces a Session Summary and Handover in the private `stack.xten.au/claude/sessions/` folder, and logs anything requirement-shaped to the requirements in production as it comes up rather than only at the end."* This skill is the concrete how-to.
 
-All three files live in `stack.xten.au/claude/sessions/` (private, not in this repo — see CLAUDE.md's "Where things live"). Never write session docs into the public `docs/` folder.
+Both files live in `stack.xten.au/claude/sessions/` (private, not in this repo — see CLAUDE.md's "Where things live"). Never write session docs into the public `docs/` folder.
+
+## `Requirements-List.md` is archived (Session 15) — production is the sole system of record
+
+The user moved `Requirements-List.md` to `stack.xten.au/claude/sessions/archive/` as of Session 15 — it's a frozen historical record (entries through roughly REQ-093), not a living document anymore. **Don't add to it, don't treat it as current.** The live `/requirements` module on prod (since Session 14's REQ-081 import) is now the *only* place new or status-changing requirements get logged — there is no longer a markdown file to keep in sync with it.
 
 ## During the session: log requirements as they surface
 
-Don't batch this to the end. Whenever the user agrees to something requirement-shaped — a feature, a fix, a scope decision, an explicit "log this for later" — add a row to `Requirements-List.md`'s table immediately, continuing the next `REQ-NNN` id (never reused, even for a dropped requirement). Match the existing table's tone: lead with what was decided/built, a **Status** cell with enough detail that a future session doesn't have to re-derive it (root cause, what was verified, what's deliberately incomplete), and the originating session(s).
+Don't batch this to the end. Whenever the user agrees to something requirement-shaped — a feature, a fix, a scope decision, an explicit "log this for later" — create/update the row directly in prod's `/requirements` module, continuing the next `REQ-NNN` id (never reused, even for a dropped requirement — check the highest existing `display_id` first, including soft-deleted rows). Two ways to do that, pick based on volume:
 
-An "on hold" requirement (a named idea with no scope yet — this project has several: modules logged by name only) still gets a real row: `On hold — user asked for this to be logged for a future session, no further detail given yet.` Don't fabricate scope that wasn't given.
-
-## The production requirements module is now the system of record too (REQ-083)
-
-Since Session 14 (REQ-081's import), the live `/requirements` module on prod holds all 90 historical `REQ-NNN` entries and is a real, working tool — not just an aspiration. `Requirements-List.md` stays the narrative source (it carries far more prose/context per entry than the DB's `notes` field is meant to hold, and it's readable without prod access), but **every new or status-changing requirement from Session 15 onward also needs to land in prod**, not just the markdown file. Two ways to do that, pick based on volume:
-
-- **One or two, mid-session**: use the backend UI directly (`/requirements/requirements/new` or `/edit/<id>`), or drive it with a curl + CSRF-token flow like any other authenticated POST (see `docs/CODING-STANDARDS.md`'s Testing section for the general pattern — extract `csrf-key`/`csrf-token` from the page's `<meta>` tags per `public/assets/js/app.js`, since forms inject CSRF via JS, not a static hidden field).
+- **One or two, mid-session**: use the backend UI directly (`/requirements/requirements/new` or `/edit/<id>`), or drive it with a curl + CSRF-token flow like any other authenticated POST (see `docs/CODING-STANDARDS.md`'s Testing section for the general pattern — extract `csrf-key`/`csrf-token` from the page's `<meta>` tags per `public/assets/js/app.js`, since forms inject CSRF via JS, not a static hidden field). Create fields: `title`, `description`, `type` (functional/user/internal/note), `origin_session` — `status` is set to `open` automatically. Update adds `status`, `notes`, `changelog_note`.
 - **A batch, at session end**: same shape as the REQ-081 import — a short script generating `INSERT`/`UPDATE` statements against prod's `requirements` table via `docker compose exec -T db psql`, reviewed before running. Faster than N round-trips through the UI when several requirements changed in one session.
 
-Either way, keep `display_id` matching `Requirements-List.md`'s own `REQ-NNN` exactly — the two are meant to cross-reference, not drift into two different numbering schemes. `type` (functional/user/internal/note) and `status` need an actual choice, not a copy-paste of the markdown's free-text Status cell — that free text is what `notes` is for.
+An "on hold" requirement (a named idea with no scope yet — this project has several: modules logged by name only) still gets a real row: `notes` = `On hold — user asked for this to be logged for a future session, no further detail given yet.` Don't fabricate scope that wasn't given. Don't let `notes`/`description` go stale-vague ("fixed the bug") — a future session (or a future *you*, months later) needs enough there to not have to re-read the whole diff to understand what actually happened. When updating an already-populated field via curl (not the UI), fetch the current value first — a plain form POST replaces the field, it doesn't merge.
 
-## At the end: three files
+## At the end: two files
 
-1. **`Requirements-List.md`** — already current if you logged as you went (above). Do a final pass: anything agreed late in the session that hasn't been logged yet.
-
-2. **`Session-NN-Summary.md`** — one per session, numbered sequentially. Structure that's worked well across sessions:
+1. **`Session-NN-Summary.md`** — one per session, numbered sequentially. Structure that's worked well across sessions:
+   - **Session start/end time** (clarified Session 15) — a line near the top, e.g. `Started HH:MM, ended HH:MM (timezone)`, so a future session/you can see roughly how long this one ran without reconstructing it from message timestamps.
    - Opening paragraph: what the agenda was, roughly how much of it landed, honest framing if something was explicitly deferred rather than padded to look done.
    - `## Built and verified` — one bullet per major piece of work, each naming its REQ id(s), what the actual root cause/decision was (not just "fixed X"), and how it was verified (against the real running stack, not "should work"). This is the part worth being thorough in — it's what a future session actually reads.
    - `## Explicitly not done this session` — anything deferred, and why, including the user's own stated reasoning if they gave one.
    - `## Reference notes` — anything a future session would otherwise have to rediscover (droplet IPs, credential locations, non-obvious infrastructure facts).
 
-3. **`Handover-YYYY-MM-DD.md`** — dated to the day it's written, not the session number. Shorter and more action-oriented than the summary — it's the "read this first" doc for next time, not the full record:
+2. **`Handover-YYYY-MM-DD.md`** — dated to the day it's written, not the session number. Shorter and more action-oriented than the summary — it's the "read this first" doc for next time, not the full record:
    - `## First thing, next session` — the actual next agenda item if the user named one, plus any guidance they already gave about *how* to approach it (don't make the next session re-derive instructions that were already stated).
    - `## Needed from the user to unblock other things` — anything genuinely stuck pending their action.
-   - `## Resolved this session, no longer open` — a compact list, pointing at Requirements-List.md for detail rather than repeating it.
+   - `## Resolved this session, no longer open` — a compact list, pointing at the prod `/requirements` module (by `REQ-NNN` id) for detail rather than repeating it.
    - `## Reference notes` — same purpose as the summary's, can duplicate the parts that matter most for picking work back up immediately (droplet access, deploy status, credential locations).
 
 If a session ends mid-stream (a usage limit, not a natural stopping point — this has happened before), say so explicitly at the top of the handover, and make sure "first thing, next session" is unambiguous. That framing matters: a handover written at a natural stopping point can be terser than one written because the session got cut off mid-task.
@@ -45,4 +42,4 @@ If a session ends mid-stream (a usage limit, not a natural stopping point — th
 ## Don't
 
 - Don't write these into the public repo's `docs/` folder — they're private, session-narrative documents (see CLAUDE.md's explicit exception for `docs/user-guide.md`, which is the *one* thing that's both user-facing product documentation and stays in-repo).
-- Don't let the Requirements-List table's entries go stale-vague ("fixed the bug") — a future session (or a future *you*, months later) needs enough in the Status cell to not have to re-read the whole diff to understand what actually happened.
+- Don't add rows to `Requirements-List.md` — it's archived, not a living document (see above).

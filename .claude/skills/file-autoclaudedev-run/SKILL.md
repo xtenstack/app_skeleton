@@ -32,9 +32,16 @@ capture what actually happened, not the prompt in isolation.
    a CI artifact), remove it from there afterward only once the copy is
    confirmed — don't leave a stray copy behind indefinitely, but don't
    delete-then-verify either.
-3. **Log the outcome in `Requirements-List.md`** if this run corresponds
-   to a real `REQ-NNN` — cross-reference the filed prompt/log path so a
-   future session doesn't have to search for them.
+3. **Log the outcome in the production `/requirements` module** (the
+   system of record since Session 15 — `Requirements-List.md` is
+   archived, don't write to it) if this run corresponds to a real
+   `REQ-NNN` — cross-reference the filed prompt/log path in `notes` so
+   a future session doesn't have to search for them.
+4. **If the run used `xtenstack/internal`'s `docs/autoclaudedev/`
+   scratch folder** (see that repo's README) **and the run succeeded**,
+   clear it now — delete everything under `docs/autoclaudedev/`,
+   commit, push. Leave it alone for a failed/rejected run; only a
+   successful, accepted run's temp docs get cleared.
 
 ## Don't
 

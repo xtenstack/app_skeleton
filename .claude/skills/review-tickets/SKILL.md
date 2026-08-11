@@ -19,7 +19,7 @@ If that file doesn't exist or the key doesn't work, ask the user rather than gue
 
 ## The workflow, per ticket
 
-This mirrors the pattern already proven across two sessions (REQ-048/049, REQ-054/056 in Requirements-List.md) — root-cause it for real, don't just patch the reported symptom:
+This mirrors the pattern already proven across two sessions (REQ-048/049, REQ-054/056 — full detail in the archived `Requirements-List.md`; new/status-changing requirements go in the production `/requirements` module instead, see `session-wrapup`) — root-cause it for real, don't just patch the reported symptom:
 
 1. **Read the ticket's title/description/severity** from the API response — don't assume the reported symptom is the actual bug.
 2. **Reproduce or root-cause it directly against the code**, not by guessing. A CSS bug gets traced to the actual conflicting rule; a backend error gets traced with a real request against a real stack (see this project's own testing philosophy — CODING-STANDARDS.md's Testing section — real HTTP/real DB, not assumed-safe reasoning).

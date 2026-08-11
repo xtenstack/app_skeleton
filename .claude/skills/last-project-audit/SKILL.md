@@ -22,11 +22,13 @@ follow-up pass, not a build step.
    is no `wrap-up-pa-YYYY-MM-DD.md`.")
 3. **If none exists, review the Fix Kit against real current state** —
    grep/read the actual codebase for each Tier 1/2/3 item, don't assume
-   from memory of what a prior session did. Cross-reference
-   `Requirements-List.md` for anything that turns out to already be
-   covered by a REQ logged since the audit ran (this has happened
-   before — an audit's Tier 3 item turned out to already be resolved by
-   unrelated same-session work).
+   from memory of what a prior session did. Cross-reference the
+   production `/requirements` module (the system of record since
+   Session 15 — `Requirements-List.md` is archived, don't consult it)
+   for anything that turns out to already be covered by a REQ logged
+   since the audit ran (this has happened before — an audit's Tier 3
+   item turned out to already be resolved by unrelated same-session
+   work).
 4. **Write `wrap-up-pa-<date>.md`** in `stack.xten.au/docs/`, same shape
    as any prior one (see `wrap-up-pa-2026-08-04.md` for the reference
    format): one section per tier, each finding marked done/not
@@ -45,7 +47,7 @@ follow-up pass, not a build step.
 
 - Don't write the wrap-up doc into this repo's public `docs/` folder —
   it's a private session-narrative document, same rule as
-  `session-wrapup`'s Requirements-List/Summary/Handover trio.
+  `session-wrapup`'s Summary/Handover pair.
 - Don't claim a Fix Kit item is done without checking the real repo
   state for it (grep, read the actual file) — several past audit
   findings turned out to be false positives/negatives from the
