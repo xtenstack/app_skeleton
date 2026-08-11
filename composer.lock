@@ -67,7 +67,7 @@
             "version": "dev-main",
             "dist": {
                 "type": "path",
-                "url": "../InternalModules/requirements-module",
+                "url": "../internal/requirements-module",
                 "reference": "20c914531f32f82d6642590c7f151c06cc6dcd01"
             },
             "require": {
