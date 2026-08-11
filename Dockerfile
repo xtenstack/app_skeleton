@@ -24,9 +24,9 @@
 # extensions as a hard prerequisite, so this doesn't remove the real
 # safety net there. Private/internal modules (REQ-073) live in a sibling
 # repo, not in this tree — composer.local.json (gitignored, see
-# docs/INTERNAL-MODULES.md) references them as `../InternalModules/*`
+# docs/INTERNAL-MODULES.md) references them as `../internal/*`
 # path repositories, so that sibling checkout has to land at
-# /InternalModules (matching /app's own parent) before `composer install`
+# /internal (matching /app's own parent) before `composer install`
 # runs. The `internal-modules` build context is declared in
 # docker-compose.yml; it must exist on the host even if empty so a build
 # with no private modules configured still works unmodified.
@@ -35,7 +35,7 @@ FROM composer:2 AS vendor
 WORKDIR /app
 
 COPY composer.json composer.lock composer.local.jso[n] ./
-COPY --from=internal-modules . /InternalModules
+COPY --from=internal-modules . /internal
 
 RUN composer install \
         --no-dev \
