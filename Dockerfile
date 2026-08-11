@@ -37,13 +37,32 @@ WORKDIR /app
 COPY composer.json composer.lock composer.local.jso[n] ./
 COPY --from=internal-modules . /internal
 
+# composer.lock (committed, public) deliberately does NOT include any
+# private/internal module — a plain `install` from it is what keeps a
+# public clone/CI build hermetic with no private-repo access at all.
+# When composer.local.json merges in a private require (see
+# docs/INTERNAL-MODULES.md), that entry is missing from the lock by
+# definition, and `composer install` refuses rather than silently
+# resolving it (confirmed 2026-08-11 — this is what broke every CI run
+# from REQ-073 onward: composer.lock had briefly been committed WITH a
+# private entry baked in, which broke the no-composer.local.json case
+# instead). `composer update` (private-module instances only) resolves
+# and re-locks fresh each build — the accepted tradeoff for those
+# instances vs. keeping the shared lock reproducible for everyone else.
 RUN composer install \
         --no-dev \
         --no-scripts \
         --no-interaction \
         --optimize-autoloader \
         --ignore-platform-req=ext-phalcon \
-        --ignore-platform-req=ext-pdo_pgsql
+        --ignore-platform-req=ext-pdo_pgsql \
+    || (test -f composer.local.json && composer update \
+        --no-dev \
+        --no-scripts \
+        --no-interaction \
+        --optimize-autoloader \
+        --ignore-platform-req=ext-phalcon \
+        --ignore-platform-req=ext-pdo_pgsql)
 
 # ---- Stage 2: runtime --------------------------------------------------
 # Deliberately NOT based on the official php:8.3-fpm image — that build
