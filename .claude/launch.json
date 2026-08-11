@@ -6,6 +6,12 @@
       "runtimeExecutable": "php85",
       "runtimeArgs": ["-S", "localhost:8080", "-t", "public", "bin/dev-router.php"],
       "port": 8080
+    },
+    {
+      "name": "stack-website",
+      "runtimeExecutable": "php85",
+      "runtimeArgs": ["-S", "localhost:8091", "-t", "/opt/local/www/apache2/html/website"],
+      "port": 8091
     }
   ]
 }

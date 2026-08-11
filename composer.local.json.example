@@ -2,7 +2,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "../InternalModules/*",
+            "url": "../internal/*",
             "options": {
                 "symlink": false
             }

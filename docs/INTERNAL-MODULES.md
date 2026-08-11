@@ -7,7 +7,7 @@ proprietary feature, an operator-only admin tool, etc.) lives in a
 without the public repo ever hard-requiring it.
 
 This is how XTen's own `requirements-module` is distributed: it lives in
-a private `InternalModules` repo, one top-level folder per module name,
+a private `internal` repo, one top-level folder per module name,
 and never appears in this repo's git history or `composer.json`.
 
 ## Mechanism
@@ -19,9 +19,19 @@ and never appears in this repo's git history or `composer.json`.
    doesn't exist, so a fresh clone with no private modules works exactly
    as before).
 2. `composer.local.json.example` in this repo shows the shape: a `path`
-   repository glob pointing at a sibling checkout of your private
-   modules repo, plus a `require` entry per module you actually want
-   installed on this instance.
+   repository glob (`../internal/*`) pointing at a sibling checkout of
+   your private modules repo, plus a `require` entry per module you
+   actually want installed on this instance. The glob matches every
+   top-level folder in the private repo, but only folders named in
+   `require` actually get installed — selection is already per-module,
+   not all-or-nothing for the whole private repo. A package's Composer
+   name (e.g. `xtenstack/requirements-module`) comes from that module's
+   own `composer.json`, not from the private repo's name or path — so
+   the container repo can be renamed or relocated without touching any
+   `require` entry anywhere.
+3. Adding a new private module is just a new top-level folder in the
+   private repo with its own `composer.json`/`module.json` — no
+   registration step in this repo.
 3. `ModuleManager` (`app/common/library/ModuleManager.php`) discovers
    any installed Composer package with a `module.json` manifest,
    regardless of where Composer physically put it — a private module
@@ -33,7 +43,7 @@ and never appears in this repo's git history or `composer.json`.
 deliberately — Composer copies the module's files into `vendor/` instead
 of symlinking them. The Docker build's runtime stage only copies
 `vendor/` forward from the vendor-build stage, not the sibling
-`InternalModules` checkout itself, so a symlink would dangle in the
+`internal` checkout itself, so a symlink would dangle in the
 final image. The tradeoff: local edits to a module in your sibling
 checkout need `composer install` re-run to show up, rather than being
 picked up live.
@@ -42,7 +52,7 @@ picked up live.
 
 ```bash
 # Sibling checkout, next to this repo (not inside it)
-git clone git@github.com:<you>/InternalModules.git ../InternalModules
+git clone git@github.com:xtenstack/internal.git ../internal
 
 cp composer.local.json.example composer.local.json
 # edit composer.local.json: list only the modules this instance actually needs
