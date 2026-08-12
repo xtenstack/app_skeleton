@@ -19,6 +19,17 @@ class ModuleManager extends Injectable
 
     private const REQUIRED_FIELDS = ['key', 'tier'];
 
+    /**
+     * Tiers that get real Phalcon module registration (own route
+     * namespace) and a menu contribution — everything except the
+     * top-nav application switcher, which stays 'application'-only (see
+     * module-system-design-brief.md "v1.2 direction"). Plugin-tier
+     * modules are reachable via the left-nav "Modules >" list alongside
+     * application-tier ones; they just never appear in the top-nav
+     * switcher.
+     */
+    private const ROUTABLE_TIERS = ['application', 'plugin'];
+
     private ?array $discovered = null;
 
     /**
@@ -74,9 +85,10 @@ class ModuleManager extends Injectable
     }
 
     /**
-     * Application-tier modules that are both discovered and enabled in
-     * module_registry, in the ['key' => ['className' => ...]] shape
-     * Phalcon\Mvc\Application::registerModules() expects.
+     * Application- and plugin-tier modules that are both discovered and
+     * enabled in module_registry, in the ['key' => ['className' => ...]]
+     * shape Phalcon\Mvc\Application::registerModules() expects. Both
+     * tiers get a real route namespace — see ROUTABLE_TIERS.
      */
     public function registeredPhalconModules(): array
     {
@@ -84,7 +96,7 @@ class ModuleManager extends Injectable
         $modules = [];
 
         foreach ($this->discover() as $key => $manifest) {
-            if ($manifest['tier'] !== 'application' || !in_array($key, $enabled, true)) {
+            if (!in_array($manifest['tier'], self::ROUTABLE_TIERS, true) || !in_array($key, $enabled, true)) {
                 continue;
             }
 
@@ -96,10 +108,10 @@ class ModuleManager extends Injectable
 
     /**
      * Backend sidebar menu: the built-in menu.php contribution followed by
-     * each enabled application module's own menu file, in the same
-     * {label, icon, controller, url, roles} shape sidenav.phtml already
-     * expects. $surface matches a manifest's declared 'surface' ('backend',
-     * 'frontend', or 'both').
+     * each enabled application- or plugin-tier module's own menu file, in
+     * the same {label, icon, controller, url, roles} shape sidenav.phtml
+     * already expects. $surface matches a manifest's declared 'surface'
+     * ('backend', 'frontend', or 'both').
      */
     public function mergedMenu(string $surface): array
     {
@@ -107,7 +119,7 @@ class ModuleManager extends Injectable
         $enabled = $this->enabledModuleKeys();
 
         foreach ($this->discover() as $key => $manifest) {
-            if ($manifest['tier'] !== 'application' || !in_array($key, $enabled, true)) {
+            if (!in_array($manifest['tier'], self::ROUTABLE_TIERS, true) || !in_array($key, $enabled, true)) {
                 continue;
             }
 
@@ -155,8 +167,8 @@ class ModuleManager extends Injectable
             }
         }
 
-        if ($raw['tier'] === 'application' && empty($raw['className'])) {
-            error_log("ModuleManager: {$packageName} is an application-tier module but declares no className, skipping");
+        if (in_array($raw['tier'], self::ROUTABLE_TIERS, true) && empty($raw['className'])) {
+            error_log("ModuleManager: {$packageName} is a {$raw['tier']}-tier module but declares no className, skipping");
 
             return null;
         }

@@ -59,11 +59,14 @@ it.
   longer current, don't add to it.)
 - Process runbooks (branching/release strategy, dev-environment sync,
   list-view conventions) and one-off design/plan docs for bigger
-  features (e.g. the ticketing and Requirements-module plans) live
-  privately in `stack.xten.au/docs/`, not in this repo — not published
-  with the OSS release. `docs/user-guide.md` is the one exception: it's
-  user-facing product documentation, meant to ship with the product, so
-  it stays in-repo.
+  features (e.g. the ticketing and Requirements-module plans, and the
+  module system's own design brief) live privately in
+  `stack.xten.au/docs/`, not in this repo — not published with the OSS
+  release. Two exceptions, both user/builder-facing product
+  documentation meant to ship with the product: `docs/user-guide.md`,
+  and [docs/MODULE-SPEC.md](docs/MODULE-SPEC.md) (the module `module.json`/
+  layout contract — companion to the private design brief, which is the
+  decision history, not the spec itself).
 
 ## Sessions
 
@@ -72,8 +75,9 @@ Handover in the private `stack.xten.au/claude/sessions/` folder, and
 logs anything requirement-shaped to the production requirements module
 as it comes up rather than only at the end.
 
-A separate thread, `stack.xten.au/claude/modules/`, scopes and plans new
-modules before handing them to AutoClaudeDev to build — see that
-folder's own `README.md` for how it stays part of the same project
-(same `REQ-NNN` id space, same production requirements module, own
-session numbering).
+A separate thread, `stack.xten.au/claude/sessions/modules/`, scopes and
+plans new modules before handing them to AutoClaudeDev to build — see
+the `modules-session-wrapup` skill for how it stays part of the same
+project (same `REQ-NNN` id space, same production requirements module,
+own session numbering, own `Modules-Session-N-Summary`/`Modules-
+Handover-*` naming).
