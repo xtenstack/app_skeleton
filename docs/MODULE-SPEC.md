@@ -163,7 +163,8 @@ Whole-controller only today — `ControllerBase::$allowedRoles` is a
 role-list-or-null gate on an entire controller, no per-action or
 per-record grain. This is a deliberate, not-yet-fixed gap: a module
 needing finer permission control is expected to compose with a future,
-separate on-hold **permissions module**, not to invent its own grain.
+separate on-hold **permissions module** (REQ-064), not to invent its
+own grain.
 Declare `$allowedRoles` per controller the same way the base engine's
 own controllers do.
 
