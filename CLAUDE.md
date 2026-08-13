@@ -68,6 +68,15 @@ it.
   layout contract — companion to the private design brief, which is the
   decision history, not the spec itself).
 
+## Model switching
+
+Sonnet is the default for this project. Switching to Haiku for a
+sub-task (e.g. a mechanical, well-scoped refactor or a background
+Agent doing repetitive file edits) is fine when it's clearly a good fit
+— use judgment. Fable and Opus are reserved for other uses (Cowork,
+planned future work) and cost more — don't switch to either here unless
+explicitly asked.
+
 ## Sessions
 
 Each working session against this repo produces a Session Summary and
