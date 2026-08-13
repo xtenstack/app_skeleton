@@ -13,9 +13,10 @@
       <form method="post" action="<?= $this->url->get('backend/password/update') ?>">
         <input type="hidden" name="token" value="<?= $this->escaper->escapeHtml($token) ?>">
         <div class="input-group mb-3">
-          <input type="password" class="form-control" name="password" placeholder="New password (min. 8 characters)" required minlength="8">
+          <label for="password" class="sr-only">New password (min. 8 characters)</label>
+          <input type="password" class="form-control" id="password" name="password" placeholder="New password (min. 8 characters)" required minlength="8">
           <div class="input-group-append">
-            <div class="input-group-text"><span class="fas fa-lock"></span></div>
+            <div class="input-group-text"><span class="fas fa-lock" aria-hidden="true"></span></div>
           </div>
         </div>
         <div class="row">

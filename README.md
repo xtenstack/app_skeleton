@@ -86,6 +86,8 @@ Full install options (Docker, Composer-only, plain download) are in
 - [docs/SECURITY.md](docs/SECURITY.md) — how to report a vulnerability.
 - [docs/CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md) — community
   expectations.
+- [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — accessibility goals,
+  what's been checked, and how to report a barrier.
 
 ## License
 
