@@ -11,8 +11,22 @@ class CronController extends ControllerBase
 
     public function indexAction()
     {
-        $this->view->jobs     = \CronJobs::find(['order' => 'name']);
-        $this->view->cronMode = $this->settings->get('cron_mode', 'manual');
+        // Search/sort/pagination (list-view convention, RB-03).
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \CronJobs::class,
+            ['name', 'task'],
+            ['name' => 'name', 'frequency' => 'frequency', 'last_run' => 'last_run_at'],
+            [],
+            [],
+            25,
+            'asc'
+        );
+
+        $this->view->jobs         = $list['results'];
+        $this->view->listState    = $list;
+        $this->view->preserveQuery = [];
+        $this->view->cronMode     = $this->settings->get('cron_mode', 'manual');
     }
 
     /**
@@ -132,6 +146,56 @@ class CronController extends ControllerBase
         $job->task_action = (string) $this->request->getPost('task_action');
         $job->frequency   = (string) $this->request->getPost('frequency');
         $job->enabled     = $this->request->getPost('enabled') ? 1 : 0;
+    }
+
+    /**
+     * "With selected" bulk enable/disable from the list view (list-view
+     * convention, RB-03). `enabled` is the only field worth batch-applying
+     * — name/task/task_action/frequency all need a per-record value, and
+     * there's no bulk delete since cron_jobs has no deleteAction at all
+     * (see fillFromRequest()'s docblock — disabling is the intended way
+     * to stop a job running).
+     */
+    public function bulkAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'cron', 'action' => 'index']);
+        }
+
+        $ids = array_filter(array_map('intval', (array) $this->request->getPost('cron_job_ids', null, [])));
+
+        if (!$ids) {
+            $this->flash->error('No cron jobs were selected');
+
+            return $this->dispatcher->forward(['controller' => 'cron', 'action' => 'index']);
+        }
+
+        $enabled = (string) $this->request->getPost('enabled');
+
+        if ($enabled === '') {
+            $this->flash->error('Choose Enabled or Disabled to bulk-update to');
+
+            return $this->dispatcher->forward(['controller' => 'cron', 'action' => 'index']);
+        }
+
+        $jobs = \CronJobs::find([
+            'conditions' => 'id IN ({ids:array})',
+            'bind'       => ['ids' => $ids],
+        ]);
+
+        $count = 0;
+
+        foreach ($jobs as $job) {
+            $job->enabled = $enabled === '1' ? 1 : 0;
+
+            if ($job->save()) {
+                $count++;
+            }
+        }
+
+        $this->flash->success($count . ' cron job(s) updated');
+
+        return $this->dispatcher->forward(['controller' => 'cron', 'action' => 'index']);
     }
 
     public function runNowAction()

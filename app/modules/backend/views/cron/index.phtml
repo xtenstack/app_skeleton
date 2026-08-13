@@ -1,3 +1,4 @@
+<?php $baseUrl = $this->url->get('backend/cron'); ?>
 <div class="row mb-2">
   <div class="col-12 d-flex justify-content-between align-items-center">
     <div>
@@ -21,61 +22,101 @@
   </div>
 </div>
 
-<div class="row">
+<div class="row mb-2">
   <div class="col-12">
-    <div class="card">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-        <table class="table table-striped mb-0">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Job</th>
-              <th>Frequency</th>
-              <th>Enabled</th>
-              <th>Last run</th>
-              <th>Last status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+    <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search name/task…') ?>
+  </div>
+</div>
+
+<form method="post" action="<?= $this->url->get('backend/cron/bulk') ?>" id="cron-bulk-form">
+  <div class="row mb-2">
+    <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="bulk-dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+          With selected
+        </button>
+        <div class="dropdown-menu p-3 shadow" style="min-width: 260px;" aria-labelledby="bulk-dropdown-toggle">
+          <div class="form-group mb-3">
+            <label class="small mb-1">Set enabled</label>
+            <select class="form-control form-control-sm" name="enabled">
+              <option value="">— No change —</option>
+              <option value="1">Enabled</option>
+              <option value="0">Disabled</option>
+            </select>
+          </div>
+          <button type="submit" name="bulk_action" value="update" class="btn btn-sm btn-primary btn-block">Apply to selected</button>
+        </div>
+      </div>
+      <span class="text-muted small" id="bulk-selected-count">0 selected</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th style="width: 2.5rem;"><input type="checkbox" id="bulk-select-all" aria-label="Select all cron jobs"></th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Name', 'name', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th>Job</th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Frequency', 'frequency', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th>Enabled</th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Last run', 'last_run', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th>Last status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
 <?php foreach ($jobs as $job): ?>
-            <tr>
-              <td><?= $this->escaper->escapeHtml($job->name) ?></td>
-              <td><code><?= $this->escaper->escapeHtml($job->task) ?> <?= $this->escaper->escapeHtml($job->task_action) ?></code></td>
-              <td><?= $this->escaper->escapeHtml($job->frequency) ?></td>
-              <td>
+              <tr>
+                <td><input type="checkbox" class="bulk-row-checkbox" name="cron_job_ids[]" value="<?= $job->id ?>" aria-label="Select <?= $this->escaper->escapeHtmlAttr($job->name) ?>"></td>
+                <td><?= $this->escaper->escapeHtml($job->name) ?></td>
+                <td><code><?= $this->escaper->escapeHtml($job->task) ?> <?= $this->escaper->escapeHtml($job->task_action) ?></code></td>
+                <td><?= $this->escaper->escapeHtml($job->frequency) ?></td>
+                <td>
 <?php if ($job->enabled): ?>
-                <span class="badge badge-success">Enabled</span>
+                  <span class="badge badge-success">Enabled</span>
 <?php else: ?>
-                <span class="badge badge-secondary">Disabled</span>
+                  <span class="badge badge-secondary">Disabled</span>
 <?php endif; ?>
-              </td>
-              <td><?= $this->escaper->escapeHtml($job->last_run_at ?: 'Never') ?></td>
-              <td>
+                </td>
+                <td><?= $this->escaper->escapeHtml($job->last_run_at ?: 'Never') ?></td>
+                <td>
 <?php if ($job->last_status === 'success'): ?>
-                <span class="badge badge-success">success</span>
+                  <span class="badge badge-success">success</span>
 <?php elseif ($job->last_status === 'error'): ?>
-                <span class="badge badge-danger" title="<?= $this->escaper->escapeHtml((string) $job->last_output) ?>">error</span>
+                  <span class="badge badge-danger" title="<?= $this->escaper->escapeHtml((string) $job->last_output) ?>">error</span>
 <?php else: ?>
-                <span class="text-muted">—</span>
+                  <span class="text-muted">—</span>
 <?php endif; ?>
-              </td>
-              <td class="text-right">
-                <a href="<?= $this->url->get('backend/cron/edit/' . $job->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                <a href="<?= $this->url->get('backend/cron/log/' . $job->id) ?>" class="btn btn-sm btn-outline-secondary">Log</a>
-              </td>
-            </tr>
+                </td>
+                <td class="text-right">
+                  <a href="<?= $this->url->get('backend/cron/edit/' . $job->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <a href="<?= $this->url->get('backend/cron/log/' . $job->id) ?>" class="btn btn-sm btn-outline-secondary">Log</a>
+                </td>
+              </tr>
 <?php endforeach; ?>
 <?php if (!count($jobs)): ?>
-            <tr>
-              <td colspan="7" class="text-center text-muted">No cron jobs configured.</td>
-            </tr>
+              <tr>
+                <td colspan="8" class="text-center text-muted">No cron jobs configured.</td>
+              </tr>
 <?php endif; ?>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
+  <div class="row mt-2">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <span class="text-muted small"><?= $listState['total'] ?> cron job<?= $listState['total'] === 1 ? '' : 's' ?></span>
+      <?= \App_skeleton\ListView::pagination($baseUrl, $listState['page'], $listState['totalPages'], $preserveQuery) ?>
+    </div>
+  </div>
+</form>
+
+<script src="/assets/js/bulk-select.js"></script>

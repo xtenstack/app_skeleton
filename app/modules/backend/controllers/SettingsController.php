@@ -9,7 +9,26 @@ class SettingsController extends ControllerBase
 
     public function indexAction()
     {
-        $this->view->settings = \Settings::find(['order' => 'setting_key']);
+        // Search/sort/pagination (list-view convention, RB-03). No bulk
+        // operations here, deliberately — each row is a distinct
+        // key/value pair with no field that makes sense applied
+        // identically across a batch (unlike Tickets' severity/status),
+        // and a bulk-delete across arbitrary app-wide config keys is
+        // more likely to be a footgun than a convenience.
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \Settings::class,
+            ['setting_key', 'setting_value'],
+            ['key' => 'setting_key', 'created' => 'id'],
+            [],
+            [],
+            25,
+            'asc'
+        );
+
+        $this->view->settings     = $list['results'];
+        $this->view->listState    = $list;
+        $this->view->preserveQuery = [];
     }
 
     public function newAction()

@@ -9,11 +9,20 @@ class ApiKeysController extends ControllerBase
     {
         $userId = $this->session->get('auth')['id'];
 
-        $this->view->apiKeys = \ApiKeys::find([
-            'conditions' => 'user_id = :user_id:',
-            'bind'       => ['user_id' => $userId],
-            'order'      => 'id DESC',
-        ]);
+        // Search/sort/pagination (list-view convention, RB-03) — still
+        // scoped to the logged-in user's own keys, same as before.
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \ApiKeys::class,
+            ['name'],
+            ['created' => 'id', 'name' => 'name', 'last_used' => 'last_used_at'],
+            ['user_id = :user_id:'],
+            ['user_id' => $userId]
+        );
+
+        $this->view->apiKeys      = $list['results'];
+        $this->view->listState    = $list;
+        $this->view->preserveQuery = [];
     }
 
     public function createAction()
@@ -48,13 +57,22 @@ class ApiKeysController extends ControllerBase
         }
 
         // Shown once — only the hash is ever stored, so this is the only
-        // chance to see the raw key.
-        $this->view->newToken = $raw;
-        $this->view->apiKeys  = \ApiKeys::find([
-            'conditions' => 'user_id = :user_id:',
-            'bind'       => ['user_id' => $userId],
-            'order'      => 'id DESC',
-        ]);
+        // chance to see the raw key. Re-run the same paginate() the index
+        // view expects (listState/preserveQuery), since this forwards
+        // straight to the index template rather than redirecting.
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \ApiKeys::class,
+            ['name'],
+            ['created' => 'id', 'name' => 'name', 'last_used' => 'last_used_at'],
+            ['user_id = :user_id:'],
+            ['user_id' => $userId]
+        );
+
+        $this->view->newToken     = $raw;
+        $this->view->apiKeys      = $list['results'];
+        $this->view->listState    = $list;
+        $this->view->preserveQuery = [];
         $this->view->pick('api-keys/index');
     }
 
@@ -78,6 +96,54 @@ class ApiKeysController extends ControllerBase
         } else {
             $this->flash->success('API key revoked');
         }
+
+        return $this->dispatcher->forward(['controller' => 'api-keys', 'action' => 'index']);
+    }
+
+    /**
+     * "With selected" bulk revoke from the list view (list-view
+     * convention, RB-03). Revoke-only — there's no per-record delete for
+     * API keys (revoked_at is the terminal state, keys are never removed
+     * outright) and no other field worth batch-applying, so there's no
+     * "Apply to selected" dropdown, just a single bulk action. Still
+     * scoped to the logged-in user's own keys, same guard as
+     * revokeAction.
+     */
+    public function bulkAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'api-keys', 'action' => 'index']);
+        }
+
+        $userId = $this->session->get('auth')['id'];
+        $ids    = array_filter(array_map('intval', (array) $this->request->getPost('api_key_ids', null, [])));
+
+        if (!$ids) {
+            $this->flash->error('No API keys were selected');
+
+            return $this->dispatcher->forward(['controller' => 'api-keys', 'action' => 'index']);
+        }
+
+        $apiKeys = \ApiKeys::find([
+            'conditions' => 'id IN ({ids:array}) AND user_id = :user_id:',
+            'bind'       => ['ids' => $ids, 'user_id' => $userId],
+        ]);
+
+        $count = 0;
+
+        foreach ($apiKeys as $apiKey) {
+            if ($apiKey->revoked_at) {
+                continue;
+            }
+
+            $apiKey->revoked_at = date('Y-m-d H:i:s');
+
+            if ($apiKey->save()) {
+                $count++;
+            }
+        }
+
+        $this->flash->success($count . ' API key(s) revoked');
 
         return $this->dispatcher->forward(['controller' => 'api-keys', 'action' => 'index']);
     }

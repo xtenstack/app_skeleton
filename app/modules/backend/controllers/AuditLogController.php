@@ -9,10 +9,23 @@ class AuditLogController extends ControllerBase
 
     public function indexAction()
     {
-        $this->view->entries = \AuditLog::find([
-            'order' => 'id DESC',
-            'limit' => 200,
-        ]);
+        // Search/sort/pagination (list-view convention, RB-03). No bulk
+        // operations on this list — the audit trail is immutable by
+        // design (no Edit, no Delete, even for an admin), so there's
+        // nothing to batch-apply. Search columns are restricted to the
+        // audit_log table's own columns (entity_type/action) — the actor
+        // email lives on a joined table, which ListView::paginate's ILIKE
+        // search doesn't reach.
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \AuditLog::class,
+            ['entity_type', 'action'],
+            ['created' => 'id', 'entity_type' => 'entity_type', 'action' => 'action']
+        );
+
+        $this->view->entries      = $list['results'];
+        $this->view->listState    = $list;
+        $this->view->preserveQuery = [];
     }
 
     public function viewAction($id)

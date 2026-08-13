@@ -1,3 +1,4 @@
+<?php $baseUrl = $this->url->get('backend/api-keys'); ?>
 <div class="row mb-2">
   <div class="col-12">
     <h1>API Keys (Internal)</h1>
@@ -16,54 +17,79 @@
 </div>
 <?php endif; ?>
 
-<div class="row">
+<div class="row mb-2">
   <div class="col-12">
-    <div class="card mb-3">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-        <table class="table table-striped mb-0">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Key</th>
-              <th>Last used</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+    <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search name…') ?>
+  </div>
+</div>
+
+<form method="post" action="<?= $this->url->get('backend/api-keys/bulk') ?>" id="api-keys-bulk-form">
+  <div class="row mb-2">
+    <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+      <button type="submit" name="bulk_action" value="revoke" class="btn btn-sm btn-outline-danger" onclick="return confirm('Revoke the selected key(s)?')">Revoke selected</button>
+      <span class="text-muted small" id="bulk-selected-count">0 selected</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-3">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th style="width: 2.5rem;"><input type="checkbox" id="bulk-select-all" aria-label="Select all API keys"></th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Name', 'name', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th>Key</th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Last used', 'last_used', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
 <?php foreach ($apiKeys as $apiKey): ?>
-            <tr>
-              <td><?= $this->escaper->escapeHtml($apiKey->name) ?></td>
-              <td><code><?= $this->escaper->escapeHtml($apiKey->token_prefix) ?>…</code></td>
-              <td><?= $this->escaper->escapeHtml($apiKey->last_used_at ?: 'Never') ?></td>
-              <td>
+              <tr>
+                <td><input type="checkbox" class="bulk-row-checkbox" name="api_key_ids[]" value="<?= $apiKey->id ?>" aria-label="Select <?= $this->escaper->escapeHtmlAttr($apiKey->name) ?>"></td>
+                <td><?= $this->escaper->escapeHtml($apiKey->name) ?></td>
+                <td><code><?= $this->escaper->escapeHtml($apiKey->token_prefix) ?>…</code></td>
+                <td><?= $this->escaper->escapeHtml($apiKey->last_used_at ?: 'Never') ?></td>
+                <td>
 <?php if ($apiKey->revoked_at): ?>
-                <span class="badge badge-secondary">Revoked</span>
+                  <span class="badge badge-secondary">Revoked</span>
 <?php else: ?>
-                <span class="badge badge-success">Active</span>
+                  <span class="badge badge-success">Active</span>
 <?php endif; ?>
-              </td>
-              <td class="text-right">
+                </td>
+                <td class="text-right">
 <?php if (!$apiKey->revoked_at): ?>
-                <form method="post" action="<?= $this->url->get('backend/api-keys/revoke/' . $apiKey->id) ?>" class="d-inline" onsubmit="return confirm('Revoke this key?')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
-                </form>
+                  <button type="submit" formaction="<?= $this->url->get('backend/api-keys/revoke/' . $apiKey->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Revoke this key?')">Revoke</button>
 <?php endif; ?>
-              </td>
-            </tr>
+                </td>
+              </tr>
 <?php endforeach; ?>
 <?php if (!count($apiKeys)): ?>
-            <tr>
-              <td colspan="5" class="text-center text-muted">No API keys yet.</td>
-            </tr>
+              <tr>
+                <td colspan="6" class="text-center text-muted">No API keys yet.</td>
+              </tr>
 <?php endif; ?>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+          <span class="text-muted small"><?= $listState['total'] ?> API key<?= $listState['total'] === 1 ? '' : 's' ?></span>
+          <?= \App_skeleton\ListView::pagination($baseUrl, $listState['page'], $listState['totalPages'], $preserveQuery) ?>
         </div>
       </div>
     </div>
+  </div>
+</form>
 
+<div class="row">
+  <div class="col-12">
     <div class="card">
       <div class="card-body">
         <h5>Create a new key</h5>
@@ -75,3 +101,5 @@
     </div>
   </div>
 </div>
+
+<script src="/assets/js/bulk-select.js"></script>

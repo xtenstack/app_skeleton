@@ -9,7 +9,21 @@ class RolesController extends ControllerBase
 
     public function indexAction()
     {
-        $this->view->roles = \Roles::find(['order' => 'name']);
+        // Search/sort/pagination (list-view convention, RB-03).
+        $list = \App_skeleton\ListView::paginate(
+            $this->request,
+            \Roles::class,
+            ['name'],
+            ['name' => 'name', 'created' => 'id'],
+            [],
+            [],
+            25,
+            'asc'
+        );
+
+        $this->view->roles       = $list['results'];
+        $this->view->listState   = $list;
+        $this->view->preserveQuery = [];
     }
 
     public function newAction()
@@ -106,6 +120,63 @@ class RolesController extends ControllerBase
             }
         } else {
             $this->flash->success('Role was deleted successfully');
+        }
+
+        return $this->dispatcher->forward(['controller' => 'roles', 'action' => 'index']);
+    }
+
+    /**
+     * "With selected" bulk delete from the list view (list-view convention,
+     * RB-03). Delete-only — a role's only other field is `name`, which
+     * isn't something that makes sense applied identically across a
+     * batch, so there's no "Apply to selected" half here. Roles has no
+     * `deleted_at` column (004_soft_deletes.sql only retrofitted
+     * users/items, and roles was never a "user-managed entity" in that
+     * sense) so this goes through the same hard `delete()` + assigned-user
+     * guard as the single-record deleteAction, not SoftDeletes.
+     */
+    public function bulkAction()
+    {
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'roles', 'action' => 'index']);
+        }
+
+        $ids = array_filter(array_map('intval', (array) $this->request->getPost('role_ids', null, [])));
+
+        if (!$ids) {
+            $this->flash->error('No roles were selected');
+
+            return $this->dispatcher->forward(['controller' => 'roles', 'action' => 'index']);
+        }
+
+        $roles = \Roles::find([
+            'conditions' => 'id IN ({ids:array})',
+            'bind'       => ['ids' => $ids],
+        ]);
+
+        $deleted = 0;
+        $skipped = 0;
+
+        foreach ($roles as $role) {
+            $usersWithRole = \Users::count(['role_id = :role_id:', 'bind' => ['role_id' => $role->id]]);
+
+            if ($usersWithRole > 0) {
+                $skipped++;
+
+                continue;
+            }
+
+            if ($role->delete()) {
+                $deleted++;
+            }
+        }
+
+        if ($deleted > 0) {
+            $this->flash->success($deleted . ' role(s) deleted');
+        }
+
+        if ($skipped > 0) {
+            $this->flash->error($skipped . ' role(s) skipped — still assigned to at least one user');
         }
 
         return $this->dispatcher->forward(['controller' => 'roles', 'action' => 'index']);

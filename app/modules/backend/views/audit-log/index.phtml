@@ -1,7 +1,14 @@
+<?php $baseUrl = $this->url->get('backend/audit-log'); ?>
 <div class="row mb-2">
   <div class="col-12">
     <h1>Audit Log</h1>
-    <p class="text-muted">Most recent 200 entries.</p>
+    <p class="text-muted mb-0">Read-only — entries are immutable by design, no edit or delete.</p>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
+    <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search entity/action…') ?>
   </div>
 </div>
 
@@ -13,9 +20,9 @@
         <table class="table table-striped mb-0">
           <thead>
             <tr>
-              <th>When</th>
-              <th>Entity</th>
-              <th>Action</th>
+              <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'When', 'created', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+              <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Entity', 'entity_type', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+              <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Action', 'action', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
               <th>Actor</th>
               <th></th>
             </tr>
@@ -42,5 +49,11 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+<div class="row mt-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <span class="text-muted small"><?= $listState['total'] ?> entr<?= $listState['total'] === 1 ? 'y' : 'ies' ?></span>
+    <?= \App_skeleton\ListView::pagination($baseUrl, $listState['page'], $listState['totalPages'], $preserveQuery) ?>
   </div>
 </div>
