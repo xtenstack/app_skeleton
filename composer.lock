@@ -61,6 +61,32 @@
                 "source": "https://github.com/wikimedia/composer-merge-plugin/tree/v2.1.0"
             },
             "time": "2023-04-15T19:07:00+00:00"
+        },
+        {
+            "name": "xtenstack/requirements-module",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../internal/requirements-module",
+                "reference": "20c914531f32f82d6642590c7f151c06cc6dcd01"
+            },
+            "require": {
+                "php": "^8.3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "XtenRequirements\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Optional XTen.Stack module: tracks REQ-NNN requirement entries through to a generated release changelog.",
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         }
     ],
     "packages-dev": [
