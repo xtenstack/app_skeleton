@@ -6,20 +6,28 @@ description: Review the most recent Project Audit Report against current repo st
 # Reviewing the last Project Audit Report
 
 Project Audit Reports (`project-audit` skill's output) live at
-`stack.xten.au/docs/Project-Audit-Report-YYYY-MM-DD.md` — private, not
-in this repo. Each one's Fix Kit is a punch list, not something that
-gets auto-applied; this skill is the "did we actually do any of that"
-follow-up pass, not a build step.
+`stack.xten.au/docs/Project-Audit-Report-YYYY-MM-DD-HHMM.md` — private,
+not in this repo. The `HHMM` suffix (added after this project got
+audited twice in one day) means there can be more than one report on
+the same calendar date — always match a wrap-up to a report by its
+*full* stamp, not just the date. Each report's Fix Kit is a punch list,
+not something that gets auto-applied; this skill is the "did we
+actually do any of that" follow-up pass, not a build step.
 
 ## Steps
 
 1. **Find the latest report.** List
-   `stack.xten.au/docs/Project-Audit-Report-*.md`, take the newest date.
+   `stack.xten.au/docs/Project-Audit-Report-*.md`, take the one that
+   sorts last (the `YYYY-MM-DD-HHMM` stamp sorts chronologically as a
+   plain string, so the last filename alphabetically is the most
+   recent report — no date parsing needed).
 2. **Check for an existing wrap-up.** If
-   `stack.xten.au/docs/wrap-up-pa-<that-date>.md` already exists, this
-   audit has already been reviewed — say so and stop, don't redo it.
-   (This is the condition the user's own trigger names: "provided there
-   is no `wrap-up-pa-YYYY-MM-DD.md`.")
+   `stack.xten.au/docs/wrap-up-pa-<that report's full stamp>.md`
+   already exists, this exact report has already been reviewed — say so
+   and stop, don't redo it. (This is the condition the user's own
+   trigger names: "provided there is no `wrap-up-pa-<stamp>.md`" — a
+   same-day *earlier* report having a wrap-up doesn't count, since it's
+   a different report than the latest one found in step 1.)
 3. **If none exists, review the Fix Kit against real current state** —
    grep/read the actual codebase for each Tier 1/2/3 item, don't assume
    from memory of what a prior session did. Cross-reference the
@@ -29,9 +37,11 @@ follow-up pass, not a build step.
    since the audit ran (this has happened before — an audit's Tier 3
    item turned out to already be resolved by unrelated same-session
    work).
-4. **Write `wrap-up-pa-<date>.md`** in `stack.xten.au/docs/`, same shape
-   as any prior one (see `wrap-up-pa-2026-08-04.md` for the reference
-   format): one section per tier, each finding marked done/not
+4. **Write `wrap-up-pa-<report's full stamp>.md`** in
+   `stack.xten.au/docs/`, same shape as any prior one (see
+   `wrap-up-pa-2026-08-04.md` for the reference format — pre-dates the
+   `HHMM` convention, still a valid shape reference): one section per
+   tier, each finding marked done/not
    done/deferred with enough detail to not require re-reading the
    original report, a "Found along the way" section for anything
    discovered outside the original report's own findings, honest about
