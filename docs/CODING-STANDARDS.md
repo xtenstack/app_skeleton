@@ -90,6 +90,19 @@ docblocks only where the types themselves don't tell the story.
 - Every destructive action goes through the audit/soft-delete pathway
   (see Models above).
 
+## Database portability
+
+New DB code must be PDO-portable / database-agnostic — no
+Postgres-specific SQL constructs (e.g. `ILIKE`, `RETURNING`-style
+idioms tied to one adapter) where a portable equivalent exists, and
+prefer the ORM/query builder over raw SQL in the first place. This is
+forward-looking: pgsql/mysql/sqlite demo installs are planned, so code
+written against Postgres-only syntax today becomes a migration problem
+later. Applies to new/changed code only — existing Postgres-specific
+code (e.g. the search implementation) is a known, deliberately
+deferred backlog item, not something to refactor incidentally while
+touching nearby code.
+
 ## Migrations
 
 Plain SQL, one file per change, under `db/migrations/<adapter>/`, applied
