@@ -58,3 +58,9 @@
 # Database backups (BackupTask / REQ-077) — real dump files, never
 # committed.
 /backups/
+
+# Scratch task-prompt file staged by the dev droplet's AutoClaudeDev
+# runner (xtenstack/internal's bin/autoclaudedev-runner.sh) so the
+# sandbox container can read it — always cleaned up after the run, this
+# is a belt-and-braces guard in case a run is interrupted mid-flight.
+/.autoclaudedev-task-prompt.md
