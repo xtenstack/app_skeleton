@@ -23,6 +23,10 @@
 <?php endforeach; ?>
           </div>
           <div class="form-group">
+            <label for="project">Project ID <span class="text-muted">(from your welcome email — required to qualify for SLA response timing)</span></label>
+            <input type="text" class="form-control" id="project" name="project" value="<?= $this->escaper->escapeHtml((string) $ticket->project) ?>">
+          </div>
+          <div class="form-group">
             <label for="severity">Severity</label>
             <select class="form-control" id="severity" name="severity">
 <?php foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'] as $value => $label): ?>

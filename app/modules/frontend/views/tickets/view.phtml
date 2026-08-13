@@ -17,6 +17,8 @@
           <dd class="col-9">
             <span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
           </dd>
+          <dt class="col-3">Project ID</dt>
+          <dd class="col-9"><?= $ticket->project ? $this->escaper->escapeHtml($ticket->project) : '<span class="text-muted">Not set — required to qualify for SLA response timing</span>' ?></dd>
           <dt class="col-3">Type</dt>
           <dd class="col-9"><?= $this->escaper->escapeHtml($ticket->ticket_type) ?></dd>
           <dt class="col-3">Severity</dt>

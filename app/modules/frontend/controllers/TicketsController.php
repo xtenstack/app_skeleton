@@ -80,6 +80,7 @@ class TicketsController extends ControllerBase
         $ticket->description      = (string) $this->request->getPost('description') ?: null;
         $ticket->severity         = (string) $this->request->getPost('severity') ?: 'normal';
         $ticket->ticket_type      = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : 'support';
+        $ticket->project          = (string) $this->request->getPost('project') ?: null;
         $ticket->reporter_user_id = $this->currentUserId();
 
         if (!$ticket->save()) {
@@ -148,11 +149,15 @@ class TicketsController extends ControllerBase
 
         // Only the fields a customer actually owns — status, assignment,
         // consolidation, QA, and internal notes stay staff-only (see class
-        // docblock) and are never read from the request here.
+        // docblock) and are never read from the request here. project is
+        // customer-owned (unlike backend's staff-only edit path) — a
+        // ticket needs a valid Project ID from the customer themselves to
+        // qualify for SLA timing (Support-Operations-Pack RB-18).
         $ticket->title       = $title;
         $ticket->description = (string) $this->request->getPost('description') ?: null;
         $ticket->severity    = (string) $this->request->getPost('severity') ?: $ticket->severity;
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
+        $ticket->project     = (string) $this->request->getPost('project') ?: null;
 
         if (!$ticket->save()) {
             foreach ($ticket->getMessages() as $message) {
