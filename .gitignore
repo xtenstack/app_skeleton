@@ -64,3 +64,10 @@
 # sandbox container can read it — always cleaned up after the run, this
 # is a belt-and-braces guard in case a run is interrupted mid-flight.
 /.autoclaudedev-task-prompt.md
+
+# Playwright E2E (project audit Fix Kit, 2026-08-11, Tier 3) — the only
+# Node/npm footprint in this otherwise 100% PHP project. package-lock.json
+# IS committed (reproducible installs); these are all local/CI-generated.
+/node_modules/
+/playwright-report/
+/test-results/
