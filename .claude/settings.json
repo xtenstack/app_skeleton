@@ -23,6 +23,16 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "MSG=$(jq -r '.message // \"Claude Code needs your attention\"' 2>/dev/null); osascript -e \"display notification \\\"$MSG\\\" with title \\\"Claude Code\\\" sound name \\\"Glass\\\"\" 2>/dev/null || true"
+          }
+        ]
+      }
     ]
   }
 }

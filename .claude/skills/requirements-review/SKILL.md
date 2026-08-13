@@ -7,9 +7,9 @@ description: Step through open requirements in the production requirements modul
 
 The production `/requirements` module (see `CLAUDE.md`) is the sole system of record for REQ-NNN entries. This skill is a periodic triage pass — not a bug hunt like `review-tickets`, and not the same thing as `session-wrapup`'s per-session logging. It exists so requirements that have gone stale, drifted, or quietly become irrelevant get caught, and so `hold`/priority/target_version stay meaningful instead of write-once fields nobody revisits.
 
-## No API for this module — a real gap, not a design choice
+## Use the API, not the backend UI, for edits made during this skill
 
-Unlike Tickets (`PROD_TICKETS_API_KEY`), the requirements module has no API surface at all (`module.json`'s `"surface": "backend"` only) — every change here goes through the backend UI as the logged-in human session. That means requirement edits made during this skill are indistinguishable in the audit log from the user's own manual edits (`actor_user_id` is the real logged-in user either way) — unlike Tickets API-key writes, which already show up as a distinct null-actor "System / unknown" row. If this attribution gap needs closing, that's a real build (a new API controller + `ApiKeyAuth` wiring for this module), not something this skill works around — flag it rather than pretending the UI path gives you audit separation it doesn't.
+The requirements module has its own JSON API (Session 16) at `/requirements/api/...` — `index`/`view`/`create`/`update`, same fields/validation as the backend UI, reached with `PROD_REQUIREMENTS_API_KEY`-style auth exactly like Tickets. Use it for every status/priority/notes/etc. change made during a review pass: an API-key-authenticated write records a null `actor_user_id` in the audit log (see `App_skeleton\Audit` — it only reads session state, never the API-key principal), distinguishable from the user's own manual edits, which always carry their real user id. Going through the backend UI as the logged-in human defeats this — don't do that for edits this skill makes, even though it's technically still possible.
 
 ## What "open" means for this step-through
 

@@ -33,5 +33,12 @@
 
     php_fastcgi {$PHP_FPM_UPSTREAM:app:9000}
 
+    # Project audit Fix Kit, 2026-08-11. Short max-age, not the
+    # aggressive `immutable`/1-year form — asset filenames under
+    # public/assets/ aren't fingerprinted/versioned on change, so a long
+    # cache would serve a stale file after a real deploy until it expires.
+    @static path /assets/* /favicon/*
+    header @static Cache-Control "public, max-age=3600"
+
     file_server
 }
