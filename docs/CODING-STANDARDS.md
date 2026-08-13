@@ -76,6 +76,26 @@ docblocks only where the types themselves don't tell the story.
   embeds — this is enforced centrally in `ControllerBase::enforceCsrf()`,
   not per-action.
 
+## Views (i18n-ready, even though i18n isn't built yet)
+
+No translation infrastructure exists yet (see `i18n-plan.md`, private —
+scoped but not built). New UI-facing strings should still avoid the
+patterns that make retrofitting expensive later, since this costs
+nothing today and saves a second pass:
+
+- Prefer a single templated string with placeholders over concatenating
+  fragments around a variable — `"{$count} tickets closed"` (or a
+  `sprintf`-style equivalent), not `$count . ' tickets closed'` built
+  from separately-translatable pieces. Word order isn't universal
+  across languages; concatenation bakes in English's order.
+- Don't hardcode English pluralization logic (`$count === 1 ? 'item' :
+  'items'`) — plural rules vary by language (some have more than two
+  forms). Keep the count and the noun in one templated string for now
+  rather than branching on it by hand.
+- Keep UI copy in views, not scattered into controller logic — already
+  the natural shape of this codebase, worth keeping deliberate as new
+  controllers/views get added.
+
 ## Security (non-negotiable)
 
 - No raw SQL string concatenation — use the ORM/query builder or bound
