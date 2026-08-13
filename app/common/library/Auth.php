@@ -42,9 +42,11 @@ class Auth extends Injectable
         }
 
         $this->session->set('auth', [
-            'id'      => $user->id,
-            'email'   => $user->email,
-            'role_id' => $user->role_id,
+            'id'         => $user->id,
+            'email'      => $user->email,
+            'role_id'    => $user->role_id,
+            'first_name' => $user->first_name,
+            'last_name'  => $user->last_name,
         ]);
 
         $userSettings = [];

@@ -61,6 +61,14 @@ class AccountController extends ControllerBase
             return $this->response->redirect($this->homeUrl());
         }
 
+        // Also update the session copy so the top-nav display name reflects
+        // the change on this response's own redirect, not just after the
+        // next login — same pattern as saveThemeAction below.
+        $auth               = $this->session->get('auth') ?? [];
+        $auth['first_name'] = $user->first_name;
+        $auth['last_name']  = $user->last_name;
+        $this->session->set('auth', $auth);
+
         $timezone = (string) $this->request->getPost('timezone') ?: 'UTC';
         $locale   = (string) $this->request->getPost('locale') ?: 'en-AU';
 
