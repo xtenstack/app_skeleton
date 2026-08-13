@@ -1,0 +1,36 @@
+---
+name: requirements-review
+description: Step through open requirements in the production requirements module, highest priority first, and triage each one with the user. Use when the user asks to review/triage/step through open requirements, or invokes /requirements-review.
+---
+
+# Reviewing open production requirements
+
+The production `/requirements` module (see `CLAUDE.md`) is the sole system of record for REQ-NNN entries. This skill is a periodic triage pass — not a bug hunt like `review-tickets`, and not the same thing as `session-wrapup`'s per-session logging. It exists so requirements that have gone stale, drifted, or quietly become irrelevant get caught, and so `hold`/priority/target_version stay meaningful instead of write-once fields nobody revisits.
+
+## No API for this module — a real gap, not a design choice
+
+Unlike Tickets (`PROD_TICKETS_API_KEY`), the requirements module has no API surface at all (`module.json`'s `"surface": "backend"` only) — every change here goes through the backend UI as the logged-in human session. That means requirement edits made during this skill are indistinguishable in the audit log from the user's own manual edits (`actor_user_id` is the real logged-in user either way) — unlike Tickets API-key writes, which already show up as a distinct null-actor "System / unknown" row. If this attribution gap needs closing, that's a real build (a new API controller + `ApiKeyAuth` wiring for this module), not something this skill works around — flag it rather than pretending the UI path gives you audit separation it doesn't.
+
+## What "open" means for this step-through
+
+`hold` and `complete` are both deliberately excluded — `hold` because the user parked it on purpose (that's the whole point of the status), `complete` because it's done. Step through in this order, one priority tier fully before the next:
+
+1. `?status=open&priority=high` , then `?status=in_progress&priority=high`, then `?status=done_pending_changelog_decision&priority=high`
+2. Same three statuses at `priority=normal`
+3. Same three statuses at `priority=low`
+
+(Priority is a plain VARCHAR column — don't rely on the list view's alphabetical sort to order tiers correctly; filter by `priority=` explicitly per tier instead, per the loop above.)
+
+## The workflow, per requirement
+
+1. **Read title/description/notes/project/branch/target_version** — build a real picture of what this requirement actually is before judging it, not just its title.
+2. **Ask: is this still accurate?** Check against current repo state (`git log`, does the branch still exist/get merged, does the described thing already exist in code) rather than trusting the requirement's own text as ground truth — requirements can go stale the same way tickets' reported symptoms can be wrong.
+3. **Propose a disposition, don't just apply one**: still open and correct as-is / needs a status change / needs a priority change / needs `target_version` or `branch` filled in or corrected / should move to `hold` / looks actually complete and just never got marked. Say what you found and what you'd change — let the user confirm, same as `review-tickets`' "don't assume closing authority."
+4. **Apply the confirmed change** via the edit form, then move to the next one.
+5. **Report a running tally**, not just a final summary — per-tier counts (reviewed/changed/left as-is) as you go, so a long session can be checked on mid-way.
+
+## Don't
+
+- Don't silently reclassify a requirement's status/priority without confirming — these are the project's own record of what happened and why; a wrong silent edit corrupts history the same way a bad `git commit --amend` would.
+- Don't touch `complete` requirements in this pass — they're out of scope by definition (see "What 'open' means" above). A requirement that looks wrongly marked complete is worth flagging to the user directly, not silently reopening.
+- Don't skip low-priority tiers just because they're less interesting — work through all three tiers per status unless the user explicitly says to stop after high.
