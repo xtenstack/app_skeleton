@@ -21,6 +21,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Guard against the private module leaking into composer.lock
+        # composer.local.json (gitignored, see docs/INTERNAL-MODULES.md)
+        # merges a `path` repository (`../internal/*`) into composer.json's
+        # effective require set on any machine that has it checked out.
+        # Running `composer update`/`composer require` on such a machine
+        # bakes a `dist.type: path` entry for the private module straight
+        # into composer.lock — and since composer.lock IS committed (unlike
+        # composer.local.json itself), that entry silently rides along into
+        # the public repo. This has recurred multiple times (REQ-098 and
+        # repeats) because nothing caught it before merge. A fresh clone/CI/
+        # a droplet without ../internal present can't resolve that path,
+        # which is exactly the "composer.lock regression" fix commits kept
+        # re-applying by hand.
+        run: |
+          if grep -q "xtenstack/requirements-module\|\.\./internal" composer.lock; then
+            echo "::error::composer.lock references the private ../internal path repo (xtenstack/requirements-module)." >&2
+            echo "This means composer.lock was regenerated on a machine with composer.local.json present and committed as-is." >&2
+            echo "Fix: remove composer.local.json (or run 'composer update' without it) and regenerate composer.lock before committing." >&2
+            exit 1
+          fi
+
       - name: Set up .env and required bind-mount targets
         run: |
           cp .env.example .env

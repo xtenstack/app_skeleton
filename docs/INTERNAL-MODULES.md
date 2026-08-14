@@ -66,6 +66,21 @@ prod droplet, a teammate's laptop) maintains its own copy, listing only
 the private modules it actually needs. A fresh clone of this repo with
 no `composer.local.json` behaves identically to the public release.
 
+**`composer.lock` *is* committed, and this is the recurring trap
+(REQ-098 and repeats, including Session 17).** Any `composer
+update`/`composer require` run on a machine with `composer.local.json`
+present bakes a `path`-type entry for the private module straight into
+`composer.lock` — with a `dist.url` (`../internal/...`) that only
+resolves on machines with that sibling checkout. If that regenerated
+`composer.lock` gets `git add`ed and committed, every other
+install — a fresh clone, CI, a droplet without the private repo —
+breaks trying to fetch a path that doesn't exist there. **Before
+committing a `composer.lock` change, confirm it doesn't reference the
+private module**: `grep -c "xtenstack/requirements-module\|\.\./internal" composer.lock`
+should print `0`. CI now enforces this on every push (`.github/workflows/build.yml`'s
+first step) as a backstop, but catching it before committing is
+cheaper than waiting for the red build.
+
 ## Why not a git submodule / vendored copy in this repo
 
 A submodule or an in-tree private module folder both mean the private
