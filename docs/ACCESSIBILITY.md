@@ -64,3 +64,31 @@ This document itself is a starting point, not a finished audit — a
 full pass (keyboard-only walkthrough, screen reader spot-check, 200%
 zoom/narrow-viewport check) is worth doing deliberately at some point,
 not assumed complete because this file exists.
+
+## What "WCAG 2.1 AA certification" actually is (Session 17)
+
+There's no single global certifying body or seal for WCAG — "AA
+certified" in practice means one of two things, and they're not
+equivalent:
+
+- **A self-published conformance statement**, usually a **VPAT**
+  (Voluntary Product Accessibility Template — the standard US
+  government/enterprise-procurement format) or an informal "Accessibility
+  Conformance Report." You write it yourself, based on your own testing
+  against all 50 WCAG 2.1 AA success criteria. This is what most open
+  source and small commercial products actually have, if they have
+  anything.
+- **A third-party audit**, done by an accessibility firm (deque,
+  Level Access, TPGi, and similar) that tests against every AA success
+  criterion with real assistive tech and issues a report under their
+  name. This is what "certified" tends to imply when a client asks for
+  it specifically, and it costs real money — not something to plan for
+  until there's a client/deal that actually requires it.
+
+Either path requires the full pass this document already says hasn't
+happened yet (keyboard-only walkthrough, screen reader spot-check, all
+50 criteria — not just the auth-flow/shared-component pass done so
+far). Worth deciding which one (if either) is actually the goal before
+investing in the full pass — a self-published VPAT is realistic for
+this project pre-release; a paid third-party audit is a "when a real
+client needs it" decision, not a base-product one.

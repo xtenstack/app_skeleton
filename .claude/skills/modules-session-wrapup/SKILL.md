@@ -64,8 +64,14 @@ identical here.
    - `## Reference notes` — anything a future Modules session would
      otherwise have to rediscover.
 
-2. **`Modules-Handover-YYYY-MM-DD.md`** — dated to the day written.
-   Shorter, action-oriented:
+2. **`Modules-Handover-YYYY-MM-DD-HHMM-TZ.md`** (e.g.
+   `Modules-Handover-2026-08-14-0930-AWST.md`, or the offset form
+   `Modules-Handover-2026-08-14-0930+0800.md` — both acceptable) —
+   stamped to the day *and time* written, plus timezone, not just the day (as
+   of Session 17 — see the main thread's `session-wrapup` skill for
+   why: more-than-daily sessions make a date-only name collide, and a
+   bare local time is ambiguous without the zone). Sort by the full
+   stamp when finding the most recent one. Shorter, action-oriented:
    - `## First thing, next session` — next agenda item plus any
      guidance already given about how to approach it.
    - `## Needed from the user to unblock other things`.

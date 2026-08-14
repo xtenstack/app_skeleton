@@ -102,6 +102,47 @@ based on an adapter choice at install time — see `docs/user-guide.md`
 and the project's requirements log. Fine to stay Postgres-only until
 then; this section exists for the shared-hosting case that can't wait.
 
+## Shared hosting (no command line, no Docker)
+
+Most shared hosts don't give you SSH, Composer, or Docker — just FTP/SFTP
+and a database. The pattern is: build the instance somewhere that *does*
+have Composer (your own machine, a VPS, a CI runner), then upload the
+already-built result.
+
+1. On a machine with Composer + PHP 8.3 (the Composer path above, minus
+   actually serving it there): `git clone`, install any optional
+   modules you want (see below), `composer install`, but **point
+   `app/config/config.local.php` at your shared host's real database**
+   before running it — `bin/install.php` (migrations/seed/module sync)
+   needs to run against the database it'll actually use, not a local
+   throwaway one, since seeded data and migration state travel with
+   that database, not with the uploaded files.
+2. Upload the whole tree — including the now-populated `vendor/`
+   directory `composer install` created — to the shared host via
+   FTP/SFTP. `vendor/` is what makes this work without Composer ever
+   running on the host itself.
+3. Point the shared host's document root at `public/`, same as any
+   other install.
+
+### Installing optional modules this way
+
+Same idea, one extra step, and it's the same pattern paid modules use:
+
+1. Download the module package (a Composer package with its own
+   `module.json` — see [`docs/MODULE-SPEC.md`](MODULE-SPEC.md)) to your
+   build machine. A paid module means getting a license key first —
+   the download/install mechanics afterward are identical to a free
+   one.
+2. `composer require <module-package-name>` before your `composer
+   install`/upload cycle, so it lands in `vendor/` along with
+   everything else.
+3. `./run modules sync` **before uploading** — this registers the
+   module in the database (same database `config.local.php` points at
+   in step 1 above) so it shows up on the admin Configuration page
+   already discovered, not just physically present in `vendor/`.
+4. Upload as normal. Enable the module from the admin Configuration
+   page once it's live.
+
 ## Planned deployment targets
 
 The Docker install above works on any host with Docker + Compose —

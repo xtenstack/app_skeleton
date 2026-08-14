@@ -14,6 +14,16 @@ the same calendar date — always match a wrap-up to a report by its
 not something that gets auto-applied; this skill is the "did we
 actually do any of that" follow-up pass, not a build step.
 
+**Note (Session 17):** the session-wrapup skills' `Handover-*` filenames
+picked up a trailing timezone abbreviation (e.g. `-AWST`) alongside
+`HHMM`, for the same reason `HHMM` itself was added — sessions now run
+more than once a day. `project-audit` (the global skill that generates
+these reports, `~/.claude/skills/project-audit`, not in this repo)
+hasn't been updated to match yet — if a report shows up with a `-TZ`
+suffix, that's expected and the same matching rule applies; if it still
+uses the old `HHMM`-only stamp, that's not a bug, just not yet
+reconciled.
+
 ## Steps
 
 1. **Find the latest report.** List
