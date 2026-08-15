@@ -18,6 +18,19 @@ class Mailer extends Injectable
 {
     public function send(string $to, string $subject, string $body): bool
     {
+        // Ticket #19: real signup/password-reset flows exercised by
+        // PHPUnit's RbacTest (and Playwright's fixtures) use this
+        // project's own convention of an @*.invalid address -- the IANA-
+        // reserved TLD (RFC 2606) guaranteed to never be a real,
+        // deliverable domain. Attempting real delivery to one is never
+        // correct for *any* caller, not just tests -- skip mail()
+        // entirely rather than queuing undeliverable mail locally.
+        if (preg_match('/\.invalid$/i', substr($to, strrpos($to, '@') + 1))) {
+            error_log("Mailer: skipped '{$subject}' to {$to} -- .invalid is a reserved non-deliverable TLD (RFC 2606)");
+
+            return true;
+        }
+
         $from    = $this->settings->get('mail_from', 'no-reply@localhost');
         $replyTo = $this->settings->get('mail_reply_to', '');
         $headers = "From: {$from}\r\nContent-Type: text/plain; charset=UTF-8\r\n";
