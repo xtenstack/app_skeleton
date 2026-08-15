@@ -23,7 +23,7 @@ class RolesController extends ControllerBase
 
         $this->view->roles       = $list['results'];
         $this->view->listState   = $list;
-        $this->view->preserveQuery = [];
+        $this->view->preserveQuery = $list['preserve'];
     }
 
     public function newAction()

@@ -22,7 +22,7 @@ class ApiKeysController extends ControllerBase
 
         $this->view->apiKeys      = $list['results'];
         $this->view->listState    = $list;
-        $this->view->preserveQuery = [];
+        $this->view->preserveQuery = $list['preserve'];
     }
 
     public function createAction()
@@ -72,7 +72,7 @@ class ApiKeysController extends ControllerBase
         $this->view->newToken     = $raw;
         $this->view->apiKeys      = $list['results'];
         $this->view->listState    = $list;
-        $this->view->preserveQuery = [];
+        $this->view->preserveQuery = $list['preserve'];
         $this->view->pick('api-keys/index');
     }
 

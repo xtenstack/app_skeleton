@@ -25,7 +25,7 @@ class CronController extends ControllerBase
 
         $this->view->jobs         = $list['results'];
         $this->view->listState    = $list;
-        $this->view->preserveQuery = [];
+        $this->view->preserveQuery = $list['preserve'];
         $this->view->cronMode     = $this->settings->get('cron_mode', 'manual');
     }
 

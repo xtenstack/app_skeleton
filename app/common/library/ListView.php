@@ -22,7 +22,7 @@ class ListView
      * @param array<string,string> $sortable sort key => real column; first entry is the default
      * @param string[] $conditions pre-built SQL conditions to AND in
      * @param array<string,mixed> $bind bind params matching $conditions
-     * @return array{results: \Phalcon\Mvc\Model\ResultsetInterface, q: string, sort: string, dir: string, page: int, totalPages: int, total: int, perPage: int}
+     * @return array{results: \Phalcon\Mvc\Model\ResultsetInterface, q: string, sort: string, dir: string, page: int, totalPages: int, total: int, perPage: int, preserve: array<string,string>}
      */
     public static function paginate(
         \Phalcon\Http\Request $request,
@@ -73,6 +73,19 @@ class ListView
         $params['limit']  = $perPage;
         $params['offset'] = ($page - 1) * $perPage;
 
+        // Ticket #20: every list controller's own $preserveQuery omitted
+        // q/sort/dir entirely, so a page-2 link (built by pagination()
+        // below from $preserveQuery) silently dropped the current search
+        // *and* sort order, landing on page 2 of the unfiltered/default-
+        // sorted list instead. Returned here, once, so a controller only
+        // has to merge this in rather than re-deriving it (and getting it
+        // wrong the same way every existing controller already had).
+        $preserve = array_filter([
+            'q'    => $q !== '' ? $q : null,
+            'sort' => $sort !== ($sortKeys[0] ?? 'id') ? $sort : null,
+            'dir'  => $dir !== $defaultDir ? $dir : null,
+        ], fn ($v) => $v !== null);
+
         return [
             'results'    => $modelClass::find($params),
             'q'          => $q,
@@ -82,6 +95,7 @@ class ListView
             'totalPages' => $totalPages,
             'total'      => $total,
             'perPage'    => $perPage,
+            'preserve'   => $preserve,
         ];
     }
 
@@ -101,6 +115,12 @@ class ListView
     public static function searchForm(string $action, string $q, array $preserve = [], string $placeholder = 'Search…'): string
     {
         $hidden = '';
+
+        // 'q' has its own visible input below — rendering it again as a
+        // hidden field too (now that $preserve includes it, per the
+        // paginate()/pagination() fix above) would duplicate the name
+        // attribute on this form.
+        unset($preserve['q']);
 
         foreach ($preserve as $key => $value) {
             $hidden .= sprintf(

@@ -23,7 +23,7 @@ class ExternalConnectionsController extends ControllerBase
 
         $this->view->connections  = $list['results'];
         $this->view->listState    = $list;
-        $this->view->preserveQuery = [];
+        $this->view->preserveQuery = $list['preserve'];
     }
 
     public function newAction()

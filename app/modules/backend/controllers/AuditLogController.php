@@ -25,7 +25,7 @@ class AuditLogController extends ControllerBase
 
         $this->view->entries      = $list['results'];
         $this->view->listState    = $list;
-        $this->view->preserveQuery = [];
+        $this->view->preserveQuery = $list['preserve'];
     }
 
     public function viewAction($id)

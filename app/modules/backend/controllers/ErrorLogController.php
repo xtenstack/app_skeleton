@@ -38,9 +38,9 @@ class ErrorLogController extends ControllerBase
         $this->view->entries       = $list['results'];
         $this->view->currentStatus = $status;
         $this->view->listState     = $list;
-        $this->view->preserveQuery = array_filter([
+        $this->view->preserveQuery = array_merge($list['preserve'], array_filter([
             'status' => $status !== '' ? $status : null,
-        ], fn ($v) => $v !== null);
+        ], fn ($v) => $v !== null));
     }
 
     public function viewAction($id)

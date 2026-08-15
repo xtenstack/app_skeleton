@@ -75,11 +75,11 @@ class TicketsController extends ControllerBase
         $this->view->listState     = $list;
         // Preserved on every search/sort/pagination link so navigating
         // those doesn't drop the current status/filter/assigned_to state.
-        $this->view->preserveQuery = array_filter([
+        $this->view->preserveQuery = array_merge($list['preserve'], array_filter([
             'filter'      => $filter !== '' ? $filter : null,
             'status'      => $status !== '' ? $status : null,
             'assigned_to' => $assignedTo ?: null,
-        ], fn ($v) => $v !== null);
+        ], fn ($v) => $v !== null));
 
         // Spot-check banner: what share of this week's auto-closes haven't
         // been QA-reviewed yet — a human-driven filtered queue rather than
