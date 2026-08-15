@@ -36,8 +36,9 @@ document.
    per day, check the register for the highest existing number on that
    date (or `001` if none yet today).
 2. **Create the detail file** at
-   `OneDrive(XTen)/Entities/xten.au/MAAMA/Handovers/MAA-YYYYMMDD-NNN-short-subject.md`,
-   following the spec's Section 7 template exactly: Metadata table,
+   `OneDrive(XTen)/Entities/xten.au/MAAMA/Handovers/MAA-YYYYMMDD-NNN-short-subject.md`
+   — copy `MAAMA/Handovers/TEMPLATE-handover-detail.md` as the starting
+   point, don't retype the shape by hand. Metadata table,
    `## Context` (why this exists — which session, what triggered it),
    `## Content` (the actual actionable detail — specific file/system
    named, not just the general topic), `## Update Trail` (first entry:

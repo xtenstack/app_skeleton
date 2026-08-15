@@ -21,6 +21,8 @@ The requirements module has its own JSON API (Session 16) at `/requirements/api/
 
 (Priority is a plain VARCHAR column — don't rely on the list view's alphabetical sort to order tiers correctly; filter by `priority=` explicitly per tier instead, per the loop above.)
 
+**Default scope (Session 18):** unless the user asks for a full pass, step through the top 5 only — priority order as above, oldest-first (`created_at` ascending) as the tiebreaker within a tier. Say up front which 5 you're covering and offer to continue if the user wants more.
+
 ## The workflow, per requirement
 
 1. **Read title/description/notes/project/branch/target_version** — build a real picture of what this requirement actually is before judging it, not just its title.
