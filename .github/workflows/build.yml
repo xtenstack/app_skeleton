@@ -138,12 +138,12 @@ jobs:
           retention-days: 7
 
       - name: Dependency vulnerability audit
-        # Advisory first pass (project audit Fix Kit, 2026-08-11) — this
-        # hasn't run before and may surface pre-existing advisories that
-        # need triage before the build can safely fail on them. Flip
-        # continue-on-error off once a clean baseline is confirmed.
+        # First run confirmed clean (project audit Fix Kit, 2026-08-13:
+        # `composer audit` reported "No security vulnerability advisories
+        # found") — continue-on-error dropped now that there's a clean
+        # baseline to gate on, so a real advisory actually fails the build
+        # going forward instead of only being advisory.
         run: docker compose exec -T app php /tmp/composer.phar audit
-        continue-on-error: true
 
       - name: Show app container logs on failure
         if: failure()
