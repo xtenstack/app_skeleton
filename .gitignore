@@ -29,6 +29,9 @@
 # Local Claude Code overrides (auto-accumulated permission grants, machine-specific)
 /.claude/settings.local.json
 
+# PreCompact hook's own log output (machine-specific, not project config)
+/.claude/logs/
+
 # Phalcon DevTools local log (machine-specific, not project config)
 /.phalcon/
 
