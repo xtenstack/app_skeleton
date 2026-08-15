@@ -8,6 +8,10 @@
 [![Azure: Deployable](https://img.shields.io/badge/Azure-Deployable-blue)](docs/INSTALL.md)
 [![IBM Cloud: Deployable Soon](https://img.shields.io/badge/IBM_Cloud-Deployable_Soon-red)](docs/INSTALL.md#planned-deployment-targets)
 
+> **Pre-release.** This repo is public ahead of a tagged version — there's
+> no `v0.0.1` yet. If you've found this early, expect things to move;
+> it's not abandoned, it's just not "done" yet.
+
 A Phalcon 5.8 multi-module PHP application skeleton: a server-rendered
 AdminLTE backend plus a JSON API module, sharing one codebase. Comes with
 authentication, RBAC, audit logging (with reversal), soft deletes, a cron

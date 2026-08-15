@@ -92,3 +92,42 @@ far). Worth deciding which one (if either) is actually the goal before
 investing in the full pass — a self-published VPAT is realistic for
 this project pre-release; a paid third-party audit is a "when a real
 client needs it" decision, not a base-product one.
+
+## What a self-published VPAT actually takes (Session 18)
+
+Concretely, not just conceptually — the steps to produce one:
+
+1. **Get the template.** The ITI (Information Technology Industry
+   Council) publishes the standard VPAT template, currently the
+   VPAT 2.5 edition — the "WCAG 2.x" edition variant is the one that
+   maps directly to WCAG 2.1 AA (there are also Section 508/EN 301 549
+   editions covering overlapping but not identical criteria; not
+   needed unless a client specifically asks for one). Free download,
+   no cost to obtain the template itself.
+2. **Run the full pass**, not the partial one this doc already
+   describes: keyboard-only walkthrough of every screen (not just
+   auth), a real screen reader spot-check (VoiceOver on macOS is the
+   zero-install option), and a 200%-zoom/narrow-viewport check —
+   exactly the three checks this document has flagged as outstanding
+   since it was first written.
+3. **Score every one of the 50 WCAG 2.1 A/AA success criteria**
+   against what the pass actually found, using the VPAT's own
+   four-way scale: *Supports*, *Partially Supports*, *Does Not
+   Support*, *Not Applicable* — each with a one-line remark citing the
+   real evidence (a screen name, a component, a specific gap), not a
+   blanket "supports" claim.
+4. **Fix or explicitly accept known gaps before publishing** — a VPAT
+   that admits "Partially Supports, see remark" for a real known issue
+   is normal and expected; a VPAT that quietly omits a known issue is
+   not.
+5. **Publish it** — `docs/VPAT.md` (or a linked PDF, the ITI template's
+   native format) alongside this file, referenced from the README docs
+   list the same way this file is.
+6. **Re-run and re-date it** after any UI change substantial enough to
+   plausibly affect conformance — a VPAT is a dated snapshot, not a
+   one-time certificate; stale ones are worse than none since they
+   misrepresent current state.
+
+None of this is started yet — this section exists so "let's do a VPAT"
+has a concrete checklist to work from when the time's actually spent,
+not to imply it's already underway.

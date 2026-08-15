@@ -143,6 +143,47 @@ Same idea, one extra step, and it's the same pattern paid modules use:
 4. Upload as normal. Enable the module from the admin Configuration
    page once it's live.
 
+### Shared hosting with no remote database access
+
+The approach above assumes your build machine can reach the shared
+host's database directly (a real, if not universal, shared-hosting
+capability). **Plenty of shared hosts don't allow remote database
+connections at all** — the database is only reachable from the host
+itself, often only through a bundled tool like phpMyAdmin/Adminer. If
+that's the case, build the database side locally instead of remotely:
+
+1. On your build machine, point `app/config/config.local.php` at a
+   **local, throwaway** database (Docker Postgres is fine) instead of
+   the host's real one, then `composer install` as normal — this runs
+   migrations/seed/module-sync against that local database, which
+   you're about to discard; its only job is generating a known-good
+   schema to copy from.
+2. Export that local database's schema (and seed data, if you want the
+   default roles/module registry pre-populated rather than re-syncing
+   later) — `pg_dump --schema-only` for structure, `pg_dump --data-only`
+   for seed rows, or the adapter-appropriate equivalent if you've
+   translated migrations to MySQL/SQLite (see above).
+3. On the shared host, create the actual database and import that
+   dump through whatever tool the host provides — phpMyAdmin, Adminer,
+   a cPanel database wizard, or a raw SQL import if you have that much
+   access. This is the step that makes remote connectivity from your
+   build machine irrelevant: the schema arrives as a file upload/import,
+   not a live connection.
+4. Update `app/config/config.local.php` (or `.env`, for the Docker
+   path) to point at the host's real database credentials — same file
+   you'll upload — before packaging the tree for upload.
+5. Upload the tree (including `vendor/`) as in the main shared-hosting
+   steps above. Since the database already has its schema and seed
+   data from the import, there's no `bin/install.php` migration step
+   left to run on first request against it — the app should just
+   connect and work.
+
+This is more manual than the direct-connection path (a schema dump and
+a host-side import tool, instead of one `composer install` run talking
+straight to the real database) but it's the only option on hosts that
+block remote database access entirely — a real and common shared-hosting
+constraint, not an edge case.
+
 ## Planned deployment targets
 
 The Docker install above works on any host with Docker + Compose —
