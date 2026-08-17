@@ -19,6 +19,16 @@
 
 <div class="row mb-2">
   <div class="col-12">
+    <div class="btn-group" role="group">
+      <a href="<?= $baseUrl ?>" class="btn btn-sm btn-outline-secondary <?= $currentStatus === '' ? 'active' : '' ?>">All</a>
+      <a href="<?= $baseUrl ?>?status=active" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'active' ? 'active' : '' ?>">Active</a>
+      <a href="<?= $baseUrl ?>?status=revoked" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'revoked' ? 'active' : '' ?>">Revoked</a>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
     <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search name…') ?>
   </div>
 </div>

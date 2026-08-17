@@ -8,6 +8,24 @@
 
 <div class="row mb-2">
   <div class="col-12">
+    <div class="btn-group flex-wrap" role="group">
+      <a href="<?= $baseUrl ?>" class="btn btn-sm btn-outline-secondary <?= $currentStatus === '' ? 'active' : '' ?>">All</a>
+      <a href="<?= $baseUrl ?>?status=insert" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'insert' ? 'active' : '' ?>">Insert</a>
+      <a href="<?= $baseUrl ?>?status=update" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'update' ? 'active' : '' ?>">Update</a>
+      <a href="<?= $baseUrl ?>?status=delete" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'delete' ? 'active' : '' ?>">Delete</a>
+      <a href="<?= $baseUrl ?>?status=reversal" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'reversal' ? 'active' : '' ?>">Reversal</a>
+      <a href="<?= $baseUrl ?>?status=login" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'login' ? 'active' : '' ?>">Login</a>
+      <a href="<?= $baseUrl ?>?status=login_failed" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'login_failed' ? 'active' : '' ?>">Login failed</a>
+      <a href="<?= $baseUrl ?>?status=login_blocked" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'login_blocked' ? 'active' : '' ?>">Login blocked</a>
+      <a href="<?= $baseUrl ?>?status=logout" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'logout' ? 'active' : '' ?>">Logout</a>
+      <a href="<?= $baseUrl ?>?status=cron_run_triggered" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'cron_run_triggered' ? 'active' : '' ?>">Cron run triggered</a>
+      <a href="<?= $baseUrl ?>?status=attachment_upload_blocked" class="btn btn-sm btn-outline-secondary <?= $currentStatus === 'attachment_upload_blocked' ? 'active' : '' ?>">Attachment upload blocked</a>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
     <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search entity/action…') ?>
   </div>
 </div>
