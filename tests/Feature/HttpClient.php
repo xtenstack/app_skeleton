@@ -43,7 +43,24 @@ final class HttpClient
         return $this->request('POST', $path, http_build_query($fields));
     }
 
-    private function request(string $method, string $path, ?string $body = null): array
+    /**
+     * Raw JSON body, for the api module's getJsonBody()-based controllers
+     * (form-encoded $fields wouldn't parse as JSON there, so post() alone
+     * can't exercise those actions). $headers is plain "Name: value"
+     * strings, merged onto the request's own — e.g. ['X-Api-Key: ' . $token]
+     * for api-key auth instead of the cookie-jar session path.
+     *
+     * @param array<string, mixed> $data
+     * @param string[] $headers
+     * @return array{status: int, body: string}
+     */
+    public function postJson(string $path, array $data, array $headers = []): array
+    {
+        return $this->request('POST', $path, json_encode($data), array_merge(['Content-Type: application/json'], $headers));
+    }
+
+    /** @param string[] $extraHeaders */
+    private function request(string $method, string $path, ?string $body = null, array $extraHeaders = []): array
     {
         $ch = curl_init($this->baseUrl . $path);
 
@@ -70,7 +87,7 @@ final class HttpClient
             // of routing to the app (confirmed directly: Content-Length:
             // 0, not a connection failure — curl_exec() alone can't
             // distinguish that from a real empty page).
-            CURLOPT_HTTPHEADER     => ['Host: ' . (getenv('APP_TEST_HOST') ?: 'localhost')],
+            CURLOPT_HTTPHEADER     => array_merge(['Host: ' . (getenv('APP_TEST_HOST') ?: 'localhost')], $extraHeaders),
         ];
 
         if ($method === 'POST') {

@@ -4,11 +4,17 @@ declare(strict_types=1);
 namespace App_skeleton\Modules\Api\Controllers;
 
 /**
- * Scope: create + list + view + retest-result reporting only. Assignment,
- * consolidation, manual close, and QA review stay human-only via the
- * backend UI (App_skeleton\Modules\Backend\Controllers\TicketsController)
- * — ticket *triage authority* stays with humans even though agents can
- * create and eventually resolve-via-retest. This is the entire
+ * Scope: create + list + view + retest-result reporting, plus (as of
+ * REQ-168) a manual closeAction() for admin/operator callers only.
+ * Assignment, consolidation, and QA review stay human-UI-only via the
+ * backend (App_skeleton\Modules\Backend\Controllers\TicketsController)
+ * — but closeAction() is a deliberate, scoped exception to this
+ * controller's original "ticket triage authority stays with humans"
+ * docblock: Session 18 extended closing authority to the API for
+ * admin/operator callers, provided they supply a real close_reason
+ * (not a generic 'manual' stamp) and, optionally, root-cause/fix notes.
+ * Agents are excluded — their resolution path is retestResultAction()'s
+ * auto_retest close, not this. This is otherwise still the entire
  * ticket-side runner hook; it does not build or assume a specific
  * task-runner.
  */
@@ -147,6 +153,91 @@ class TicketsController extends ControllerBase
             $ticket->close_reason   = 'auto_retest';
         } else {
             $ticket->status = 'in_review';
+        }
+
+        if (!$ticket->save()) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => implode(', ', $ticket->getMessages())]);
+        }
+
+        return $this->response->setJsonContent(['ticket' => $this->serialize($ticket)]);
+    }
+
+    /**
+     * REQ-168: manual close via the API, admin/operator callers only —
+     * see this class's own docblock for the Session 18 authority
+     * decision. Gated per-action (not via ControllerBase's
+     * $allowedRoles/onConstruct(), which would apply to every action in
+     * this controller including createAction()/retestResultAction(),
+     * both meant to stay reachable by agent-role callers).
+     *
+     * Side effects mirror App_skeleton\Modules\Backend\Controllers\
+     * TicketTriageActions::closeAction() exactly (status/closed_at) with
+     * one deliberate difference: close_reason is caller-supplied here
+     * instead of the backend action's hardcoded 'manual', and required
+     * — a short code (<=20 chars, matching the column and the existing
+     * 'manual'/'auto_retest' values, see the check below), not the
+     * root-cause narrative itself. notes is optional and, when given, is
+     * stored on the ticket's existing notes field (TEXT, the same field
+     * the backend edit form writes to, "staff-only... never returned by
+     * the API module's serialize()" per migration 012's own comment —
+     * this endpoint writes it but still never returns it, same as
+     * serialize() already didn't) as the accompanying root-cause/fix
+     * note Session 18 conditioned this authority on.
+     */
+    public function closeAction($id)
+    {
+        if (!$this->request->isPost()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'POST required']);
+        }
+
+        $allowedRoleIds = \Roles::idsByNames(['admin', 'operator']);
+
+        if (!in_array($this->principal['role_id'], $allowedRoleIds, true)) {
+            $this->response->setStatusCode(403, 'Forbidden');
+
+            return $this->response->setJsonContent(['error' => 'Forbidden']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+
+        if (!$ticket) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $body        = $this->getJsonBody();
+        $closeReason = trim((string) ($body['close_reason'] ?? ''));
+
+        // close_reason is a short code, not the root-cause narrative —
+        // tickets.close_reason is VARCHAR(20) (migration 011_tickets.sql),
+        // matching the existing values this column already holds
+        // ('manual' from the backend close action, 'auto_retest' from
+        // retestResultAction() above). The actual root-cause/fix note
+        // Session 18 conditioned this endpoint on belongs in `notes`
+        // (TEXT, unbounded) below, not here.
+        if ($closeReason === '') {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'close_reason is required']);
+        }
+
+        if (strlen($closeReason) > 20) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'close_reason must be 20 characters or fewer']);
+        }
+
+        $ticket->status       = 'closed';
+        $ticket->closed_at    = date('Y-m-d H:i:s');
+        $ticket->close_reason = $closeReason;
+
+        if (isset($body['notes'])) {
+            $ticket->notes = (string) $body['notes'];
         }
 
         if (!$ticket->save()) {
