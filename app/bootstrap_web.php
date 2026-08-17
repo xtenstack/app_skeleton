@@ -177,7 +177,7 @@ try {
 
     try {
         if ($di->getShared('settings')->get('maintenance_mode', '0') === '1') {
-            $path = (string) (parse_url($requestUri, PHP_URL_PATH) ?: '/');
+            $path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
 
             $isLoginRoute = (bool) preg_match('#^/backend/session(/|$)#', $path);
             $isApiRequest = (bool) preg_match('#^/api(/|$)#', $path);
