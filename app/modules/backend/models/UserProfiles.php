@@ -67,7 +67,7 @@ class UserProfiles extends \Phalcon\Mvc\Model
     /**
      * Initialize method for model.
      */
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('user_profiles');
         $this->keepSnapshots(true);

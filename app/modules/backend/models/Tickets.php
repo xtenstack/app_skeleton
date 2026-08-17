@@ -9,6 +9,8 @@ use App_skeleton\Models\SoftDeletes;
  * docs/ticketing-module-plan.md) for a human operator to triage.
  * assigned_to_user_id is always meant to be a human — agents are never a
  * valid assignee, enforced in the backend controller, not here.
+ *
+ * @method static Tickets|null findFirstById(int $id)
  */
 class Tickets extends \Phalcon\Mvc\Model
 {
@@ -42,7 +44,7 @@ class Tickets extends \Phalcon\Mvc\Model
     public $created_at;
     public $updated_at;
 
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('tickets');
         $this->keepSnapshots(true);
@@ -54,7 +56,7 @@ class Tickets extends \Phalcon\Mvc\Model
         $this->hasMany('id', 'TicketAttachments', 'ticket_id', ['alias' => 'Attachments']);
     }
 
-    public function beforeSave()
+    public function beforeSave(): void
     {
         $this->updated_at = date('Y-m-d H:i:s');
     }

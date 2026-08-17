@@ -15,6 +15,9 @@ class ControllerBase extends Controller
      */
     private const UNAUTHENTICATED_CONTROLLERS = ['index'];
 
+    /**
+     * @return void
+     */
     protected function onConstruct()
     {
         $this->response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');

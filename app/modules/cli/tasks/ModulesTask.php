@@ -17,12 +17,12 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class ModulesTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run modules sync | list | enable <key> | disable <key>' . PHP_EOL;
     }
 
-    public function syncAction()
+    public function syncAction(): void
     {
         $discovered = $this->moduleManager->discover();
 
@@ -61,6 +61,9 @@ class ModulesTask extends \Phalcon\Cli\Task
         echo 'Sync complete.' . PHP_EOL;
     }
 
+    /**
+     * @return void
+     */
     public function listAction()
     {
         $rows = \ModuleRegistry::find(['order' => 'module_key']);
@@ -77,12 +80,12 @@ class ModulesTask extends \Phalcon\Cli\Task
         }
     }
 
-    public function enableAction($key = null)
+    public function enableAction($key = null): void
     {
         $this->setEnabled($key, true);
     }
 
-    public function disableAction($key = null)
+    public function disableAction($key = null): void
     {
         $this->setEnabled($key, false);
     }

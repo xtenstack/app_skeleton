@@ -9,6 +9,9 @@ class SystemLogController extends ControllerBase
 
     private const MAX_BYTES = 200000;
 
+    /**
+     * @return void
+     */
     public function indexAction()
     {
         $path = BASE_PATH . '/logs/app.log';

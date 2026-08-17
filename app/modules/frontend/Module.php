@@ -19,6 +19,9 @@ use Phalcon\Config\Config;
  */
 class Module implements ModuleDefinitionInterface
 {
+    /**
+     * @return void
+     */
     public function registerAutoloaders(?DiInterface $di = null)
     {
         $loader = new Loader();
@@ -30,6 +33,9 @@ class Module implements ModuleDefinitionInterface
         $loader->register();
     }
 
+    /**
+     * @return void
+     */
     public function registerServices(DiInterface $di)
     {
         if (file_exists(__DIR__ . '/config/config.php')) {
@@ -43,7 +49,7 @@ class Module implements ModuleDefinitionInterface
             }
         }
 
-        $di['view'] = function () {
+        $di['view'] = function (): \Phalcon\Mvc\View {
             $config = $this->getConfig();
 
             $view = new View();

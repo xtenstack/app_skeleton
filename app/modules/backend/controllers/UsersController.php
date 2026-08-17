@@ -7,7 +7,7 @@ class UsersController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
         // Search/sort/pagination (Session 15, list-view convention).
         $list = \App_skeleton\ListView::paginate(
@@ -26,7 +26,7 @@ class UsersController extends ControllerBase
         $this->view->preserveQuery = $list['preserve'];
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->user  = new \Users();
         $this->view->roles = \Roles::find(['order' => 'name']);

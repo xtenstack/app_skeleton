@@ -24,6 +24,9 @@ class ControllerBase extends Controller
      */
     protected ?array $principal = null;
 
+    /**
+     * @return void
+     */
     protected function onConstruct()
     {
         $this->response->setContentType('application/json', 'UTF-8');

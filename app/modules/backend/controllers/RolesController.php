@@ -7,7 +7,7 @@ class RolesController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
         // Search/sort/pagination (list-view convention, RB-03).
         $list = \App_skeleton\ListView::paginate(
@@ -26,7 +26,7 @@ class RolesController extends ControllerBase
         $this->view->preserveQuery = $list['preserve'];
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->role = new \Roles();
     }

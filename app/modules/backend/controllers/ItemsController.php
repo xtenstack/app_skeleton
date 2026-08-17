@@ -5,12 +5,12 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 class ItemsController extends ControllerBase
 {
-    public function indexAction()
+    public function indexAction(): void
     {
         $this->view->items = \Items::find(['order' => 'id DESC']);
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->item  = new \Items();
         $this->view->users = \Users::find(['order' => 'email']);

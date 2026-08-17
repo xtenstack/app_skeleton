@@ -1,0 +1,61 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Call to an undefined method App_skeleton\\Modules\\Backend\\Module\:\:getConfig\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/modules/backend/Module.php
+
+		-
+			message: '#^Call to an undefined static method ApiKeys\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/modules/backend/controllers/ApiKeysController.php
+
+		-
+			message: '#^Call to an undefined static method AuditLog\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/modules/backend/controllers/AuditLogController.php
+
+		-
+			message: '#^Call to an undefined static method CronJobs\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/modules/backend/controllers/CronController.php
+
+		-
+			message: '#^Call to an undefined static method ErrorLog\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/modules/backend/controllers/ErrorLogController.php
+
+		-
+			message: '#^Call to an undefined static method ExternalConnections\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 4
+			path: app/modules/backend/controllers/ExternalConnectionsController.php
+
+		-
+			message: '#^Call to an undefined static method Items\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: app/modules/backend/controllers/ItemsController.php
+
+		-
+			message: '#^Call to an undefined static method Settings\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: app/modules/backend/controllers/SettingsController.php
+
+		-
+			message: '#^Call to an undefined static method UserSettings\:\:findFirstById\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/modules/backend/controllers/UsersController.php
+
+		-
+			message: '#^Call to an undefined method App_skeleton\\Modules\\Frontend\\Module\:\:getConfig\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/modules/frontend/Module.php

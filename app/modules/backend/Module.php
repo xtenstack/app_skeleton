@@ -16,6 +16,8 @@ class Module implements ModuleDefinitionInterface
      * Registers an autoloader related to the module
      *
      * @param DiInterface $di
+     *
+     * @return void
      */
     public function registerAutoloaders(?DiInterface $di = null)
     {
@@ -32,6 +34,8 @@ class Module implements ModuleDefinitionInterface
      * Registers services related to the module
      *
      * @param DiInterface $di
+     *
+     * @return void
      */
     public function registerServices(DiInterface $di)
     {
@@ -54,7 +58,7 @@ class Module implements ModuleDefinitionInterface
         /**
          * Setting up the view component
          */
-        $di['view'] = function () {
+        $di['view'] = function (): \Phalcon\Mvc\View {
             $config = $this->getConfig();
 
             $view = new View();
@@ -71,7 +75,7 @@ class Module implements ModuleDefinitionInterface
         /**
          * Database connection is created based in the parameters defined in the configuration file
          */
-        $di['db'] = function () {
+        $di['db'] = function (): object {
             $config = $this->getConfig();
 
             $dbConfig = $config->database->toArray();

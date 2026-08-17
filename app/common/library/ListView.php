@@ -179,7 +179,7 @@ class ListView
         // hardcoded &laquo;/&raquo; strings below), never user input — not
         // htmlspecialchars'd here so those entities render as arrows
         // instead of literal "&laquo;" text.
-        $link = function (int $targetPage, string $label, bool $disabled = false, bool $active = false) use ($action, $preserve) {
+        $link = function (int $targetPage, string $label, bool $disabled = false, bool $active = false) use ($action, $preserve): string {
             if ($disabled) {
                 return sprintf('<li class="page-item disabled"><span class="page-link">%s</span></li>', $label);
             }

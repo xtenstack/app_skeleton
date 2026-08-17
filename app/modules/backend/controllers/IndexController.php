@@ -10,7 +10,7 @@ class IndexController extends ControllerBase
      * redirects an unauthenticated request to login before this runs
      * (the guest splash moved to the `frontend` module, REQ-020/031).
      */
-    public function indexAction()
+    public function indexAction(): void
     {
         $menu   = $this->moduleManager->mergedMenu('backend');
         $roleId = $this->session->get('auth')['role_id'] ?? null;
@@ -30,7 +30,7 @@ class IndexController extends ControllerBase
      * by the dispatcher's beforeException listener for a valid route whose
      * controller/action doesn't exist.
      */
-    public function notFoundAction()
+    public function notFoundAction(): void
     {
         $this->response->setStatusCode(404, 'Not Found');
     }
@@ -41,7 +41,7 @@ class IndexController extends ControllerBase
      * already logged by that listener before forwarding — this action just
      * renders the page.
      */
-    public function serverErrorAction()
+    public function serverErrorAction(): void
     {
         $this->response->setStatusCode(500, 'Internal Server Error');
     }

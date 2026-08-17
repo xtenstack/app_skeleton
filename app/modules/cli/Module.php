@@ -13,6 +13,8 @@ class Module implements ModuleDefinitionInterface
      * Registers an autoloader related to the module
      *
      * @param DiInterface $di
+     *
+     * @return void
      */
     public function registerAutoloaders(?DiInterface $di = null)
     {
@@ -29,6 +31,8 @@ class Module implements ModuleDefinitionInterface
      * Registers services related to the module
      *
      * @param DiInterface $di
+     *
+     * @return void
      */
     public function registerServices(DiInterface $di)
     {

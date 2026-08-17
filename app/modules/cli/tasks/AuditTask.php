@@ -16,12 +16,12 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class AuditTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run audit archive' . PHP_EOL;
     }
 
-    public function archiveAction()
+    public function archiveAction(): void
     {
         $this->archive("entity_type = 'auth'", '-1 day', 'auth events (older than 1 day)');
         $this->archive("entity_type != 'auth'", '-1 year', 'data changes (older than 1 year)');

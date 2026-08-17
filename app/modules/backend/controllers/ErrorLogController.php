@@ -13,7 +13,7 @@ class ErrorLogController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
         $status = (string) $this->request->getQuery('status', 'string', '');
 

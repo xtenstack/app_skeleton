@@ -37,6 +37,9 @@ class ControllerBase extends Controller
      */
     private const UNAUTHENTICATED_INDEX_ACTIONS = ['notFound', 'serverError'];
 
+    /**
+     * @return void
+     */
     protected function onConstruct()
     {
         $this->preventCaching();

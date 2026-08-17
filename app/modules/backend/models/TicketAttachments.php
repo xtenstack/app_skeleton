@@ -18,7 +18,7 @@ class TicketAttachments extends \Phalcon\Mvc\Model
     public $uploaded_by_user_id;
     public $created_at;
 
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('ticket_attachments');
         $this->belongsTo('ticket_id', 'Tickets', 'id', ['alias' => 'Ticket']);

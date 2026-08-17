@@ -8,7 +8,7 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class VersionTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         $config = $this->getDI()->get('config');
 

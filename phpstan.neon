@@ -1,0 +1,17 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 1
+    bootstrapFiles:
+        - app/bootstrap_web.php
+    paths:
+        - app/common
+        - app/modules/api
+        - app/modules/backend
+        - app/modules/cli
+        - app/modules/frontend
+    excludePaths:
+        - vendor
+        - cache
+        - storage

@@ -12,12 +12,12 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class SeedTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run seed run' . PHP_EOL;
     }
 
-    public function runAction()
+    public function runAction(): void
     {
         $this->seedRoles();
         $this->seedSettings();

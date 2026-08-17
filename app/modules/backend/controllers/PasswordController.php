@@ -5,7 +5,7 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 class PasswordController extends ControllerBase
 {
-    public function forgotAction()
+    public function forgotAction(): void
     {
     }
 

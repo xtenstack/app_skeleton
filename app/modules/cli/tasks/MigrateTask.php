@@ -31,11 +31,14 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class MigrateTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run migrate run | ./run migrate status' . PHP_EOL;
     }
 
+    /**
+     * @return void
+     */
     public function runAction()
     {
         $this->ensureMigrationsTable();
@@ -76,7 +79,7 @@ class MigrateTask extends \Phalcon\Cli\Task
         echo 'Migrations complete (' . count($pending) . ' applied).' . PHP_EOL;
     }
 
-    public function statusAction()
+    public function statusAction(): void
     {
         $this->ensureMigrationsTable();
 

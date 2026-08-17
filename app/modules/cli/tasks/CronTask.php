@@ -17,11 +17,14 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class CronTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run cron run' . PHP_EOL;
     }
 
+    /**
+     * @return void
+     */
     public function runAction()
     {
         $results = $this->getDI()->get('cronRunner')->runDueJobs();

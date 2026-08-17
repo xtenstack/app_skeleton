@@ -27,13 +27,13 @@ class ExternalConnections extends \Phalcon\Mvc\Model
     public $created_at;
     public $updated_at;
 
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('external_connections');
         $this->keepSnapshots(true);
     }
 
-    public function beforeSave()
+    public function beforeSave(): void
     {
         $this->updated_at = date('Y-m-d H:i:s');
     }

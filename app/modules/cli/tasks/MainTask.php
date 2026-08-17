@@ -13,7 +13,7 @@ namespace App_skeleton\Modules\Cli\Tasks;
  */
 class MainTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run <task> <action> [params...]' . PHP_EOL . PHP_EOL;
         echo 'Available tasks:' . PHP_EOL . PHP_EOL;

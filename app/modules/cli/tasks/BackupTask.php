@@ -20,11 +20,14 @@ class BackupTask extends \Phalcon\Cli\Task
 {
     private const RETENTION_DAYS = 14;
 
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run backup run' . PHP_EOL;
     }
 
+    /**
+     * @return void
+     */
     public function runAction()
     {
         $db        = $this->config->database;

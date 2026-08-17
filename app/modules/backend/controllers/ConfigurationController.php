@@ -14,7 +14,7 @@ class ConfigurationController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
         $this->view->modules = \ModuleRegistry::find(['order' => 'module_key']);
     }

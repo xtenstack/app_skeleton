@@ -51,7 +51,7 @@ class Items extends Phalcon\Mvc\Model
     /**
      * Initialize method for model.
      */
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('items');
         $this->keepSnapshots(true);

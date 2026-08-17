@@ -33,12 +33,12 @@ use Phalcon\Mvc\Router;
  */
 class RoutesTask extends \Phalcon\Cli\Task
 {
-    public function mainAction()
+    public function mainAction(): void
     {
         echo 'Usage: ./run routes list' . PHP_EOL;
     }
 
-    public function listAction()
+    public function listAction(): void
     {
         $di = $this->getDI();
 

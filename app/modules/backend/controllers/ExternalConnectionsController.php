@@ -7,26 +7,44 @@ class ExternalConnectionsController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
+        $conditions = [];
+        $bind       = [];
+
+        // Status-filter button bar (list-view convention, RB-03) —
+        // filters on the `is_active` column.
+        $status = (string) $this->request->getQuery('status', 'string', '');
+
+        if ($status === 'active') {
+            $conditions[] = 'is_active = 1';
+        } elseif ($status === 'inactive') {
+            $conditions[] = 'is_active = 0';
+        }
+
         // Search/sort/pagination (list-view convention, RB-03).
         $list = \App_skeleton\ListView::paginate(
             $this->request,
             \ExternalConnections::class,
             ['name', 'base_url'],
             ['name' => 'name', 'auth_type' => 'auth_type', 'created' => 'id'],
-            [],
-            [],
+            $conditions,
+            $bind,
             25,
             'asc'
         );
 
         $this->view->connections  = $list['results'];
+        $this->view->currentStatus = $status;
         $this->view->listState    = $list;
-        $this->view->preserveQuery = $list['preserve'];
+        // Preserved on every search/sort/pagination link so navigating
+        // those doesn't drop the current status filter.
+        $this->view->preserveQuery = array_merge($list['preserve'], array_filter([
+            'status' => $status !== '' ? $status : null,
+        ], fn ($v) => $v !== null));
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->connection = new \ExternalConnections();
         $this->view->authTypes  = \ExternalConnections::AUTH_TYPES;

@@ -9,23 +9,41 @@ class CronController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
+        $conditions = [];
+        $bind       = [];
+
+        // Status-filter button bar (list-view convention, RB-03) —
+        // filters on the `enabled` column.
+        $status = (string) $this->request->getQuery('status', 'string', '');
+
+        if ($status === 'enabled') {
+            $conditions[] = 'enabled = 1';
+        } elseif ($status === 'disabled') {
+            $conditions[] = 'enabled = 0';
+        }
+
         // Search/sort/pagination (list-view convention, RB-03).
         $list = \App_skeleton\ListView::paginate(
             $this->request,
             \CronJobs::class,
             ['name', 'task'],
             ['name' => 'name', 'frequency' => 'frequency', 'last_run' => 'last_run_at'],
-            [],
-            [],
+            $conditions,
+            $bind,
             25,
             'asc'
         );
 
         $this->view->jobs         = $list['results'];
+        $this->view->currentStatus = $status;
         $this->view->listState    = $list;
-        $this->view->preserveQuery = $list['preserve'];
+        // Preserved on every search/sort/pagination link so navigating
+        // those doesn't drop the current status filter.
+        $this->view->preserveQuery = array_merge($list['preserve'], array_filter([
+            'status' => $status !== '' ? $status : null,
+        ], fn ($v) => $v !== null));
         $this->view->cronMode     = $this->settings->get('cron_mode', 'manual');
     }
 
@@ -38,7 +56,7 @@ class CronController extends ControllerBase
      * with no cron_job_id at all (e.g. the daily backup script, which
      * writes here directly — see cron_run_log's migration comment).
      */
-    public function logAction($jobId = null)
+    public function logAction($jobId = null): void
     {
         $conditions = [];
         $bind       = [];
@@ -61,7 +79,7 @@ class CronController extends ControllerBase
         $this->view->entries = \CronRunLog::find($params);
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->job = new \CronJobs();
     }

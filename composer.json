@@ -15,7 +15,9 @@
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.64",
         "phalcon/devtools": "^5.0",
-        "phpunit/phpunit": "^10.5"
+        "phpstan/phpstan": "^2.2.8",
+        "phpunit/phpunit": "^10.5",
+        "vimeo/psalm": "^5.26.1"
     },
     "autoload": {
         "psr-4": {

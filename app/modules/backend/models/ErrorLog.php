@@ -71,7 +71,7 @@ class ErrorLog extends \Phalcon\Mvc\Model
     /**
      * Initialize method for model.
      */
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('error_log');
         $this->belongsTo('user_id', 'Users', 'id', ['alias' => 'Users']);

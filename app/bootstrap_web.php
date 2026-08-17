@@ -39,7 +39,7 @@ $logThrowable = function (\Throwable $e): string {
     return $summary;
 };
 
-$sendCrashResponse = function (string $summary) {
+$sendCrashResponse = function (string $summary): void {
     http_response_code(500);
 
     $isApiRequest = preg_match('#^/api(/|$)#', $_SERVER['REQUEST_URI'] ?? '');

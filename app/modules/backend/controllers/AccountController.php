@@ -21,7 +21,7 @@ class AccountController extends ControllerBase
     private const ALLOWED_PALETTES = ['blue', 'purple', 'green', 'orange', 'stack'];
     private const ALLOWED_MODES    = ['light', 'dark', 'auto'];
 
-    public function indexAction()
+    public function indexAction(): void
     {
         $userId = $this->currentUserId();
         $user   = \Users::findFirstById($userId);

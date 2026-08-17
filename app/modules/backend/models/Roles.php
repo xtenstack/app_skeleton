@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @method static Roles|null findFirstById(int $id)
+ */
 class Roles extends Phalcon\Mvc\Model
 {
     /**
@@ -23,7 +26,7 @@ class Roles extends Phalcon\Mvc\Model
     /**
      * Initialize method for model.
      */
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('roles');
         $this->keepSnapshots(true);
@@ -34,7 +37,6 @@ class Roles extends Phalcon\Mvc\Model
      * Allows to query a set of records that match the specified conditions
      *
      * @param mixed $parameters
-     * @return Roles[]|Roles|\Phalcon\Mvc\Model\ResultSetInterface
      */
     public static function find($parameters = null): \Phalcon\Mvc\Model\ResultsetInterface
     {
@@ -45,9 +47,8 @@ class Roles extends Phalcon\Mvc\Model
      * Allows to query the first record that match the specified conditions
      *
      * @param mixed $parameters
-     * @return Roles|\Phalcon\Mvc\Model\ResultInterface|\Phalcon\Mvc\ModelInterface|null
      */
-    public static function findFirst($parameters = null): ?\Phalcon\Mvc\ModelInterface
+    public static function findFirst($parameters = null): \Phalcon\Mvc\ModelInterface|null
     {
         return parent::findFirst($parameters);
     }

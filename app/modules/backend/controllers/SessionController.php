@@ -5,7 +5,7 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 class SessionController extends ControllerBase
 {
-    public function indexAction()
+    public function indexAction(): void
     {
     }
 

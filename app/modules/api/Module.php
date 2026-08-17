@@ -14,6 +14,8 @@ class Module implements ModuleDefinitionInterface
      * Registers an autoloader related to the module
      *
      * @param DiInterface $di
+     *
+     * @return void
      */
     public function registerAutoloaders(?DiInterface $di = null)
     {
@@ -32,6 +34,8 @@ class Module implements ModuleDefinitionInterface
      * after dispatch to render — so it still needs to exist, just disabled.
      *
      * @param DiInterface $di
+     *
+     * @return void
      */
     public function registerServices(DiInterface $di)
     {

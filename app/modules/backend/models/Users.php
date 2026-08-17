@@ -4,6 +4,9 @@ use App_skeleton\Models\SoftDeletes;
 use Phalcon\Filter\Validation;
 use Phalcon\Filter\Validation\Validator\Email as EmailValidator;
 
+/**
+ * @method static Users|null findFirstById(int $id)
+ */
 class Users extends Phalcon\Mvc\Model
 {
     use SoftDeletes;
@@ -117,7 +120,7 @@ class Users extends Phalcon\Mvc\Model
     /**
      * Initialize method for model.
      */
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('users');
         $this->keepSnapshots(true);

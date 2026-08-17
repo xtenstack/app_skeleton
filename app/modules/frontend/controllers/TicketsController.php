@@ -21,7 +21,6 @@ namespace App_skeleton\Modules\Frontend\Controllers;
 class TicketsController extends ControllerBase
 {
     private const TICKET_TYPES = ['bug' => 'Bug', 'issue' => 'Issue', 'feature' => 'Feature', 'support' => 'Support'];
-    private const SEVERITIES   = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'];
 
     private const ALLOWED_ATTACHMENT_TYPES = [
         'image/jpeg'      => 'jpg',
@@ -35,7 +34,7 @@ class TicketsController extends ControllerBase
 
     private const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
-    public function indexAction()
+    public function indexAction(): void
     {
         $this->view->tickets = \Tickets::find([
             'conditions' => 'reporter_user_id = :uid:',
@@ -44,7 +43,7 @@ class TicketsController extends ControllerBase
         ]);
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->ticket = new \Tickets();
     }

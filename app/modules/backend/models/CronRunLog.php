@@ -10,7 +10,7 @@ class CronRunLog extends \Phalcon\Mvc\Model
     public $output;
     public $ran_at;
 
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('cron_run_log');
     }

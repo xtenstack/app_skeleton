@@ -7,7 +7,7 @@ class SettingsController extends ControllerBase
 {
     protected ?array $allowedRoles = [1];
 
-    public function indexAction()
+    public function indexAction(): void
     {
         // Search/sort/pagination (list-view convention, RB-03). No bulk
         // operations here, deliberately — each row is a distinct
@@ -31,7 +31,7 @@ class SettingsController extends ControllerBase
         $this->view->preserveQuery = $list['preserve'];
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->setting = new \Settings();
     }

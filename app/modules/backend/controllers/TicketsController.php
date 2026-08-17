@@ -28,6 +28,9 @@ class TicketsController extends ControllerBase
 
     private const TICKET_TYPES = ['bug' => 'Bug', 'issue' => 'Issue', 'feature' => 'Feature', 'support' => 'Support'];
 
+    /**
+     * @return void
+     */
     protected function onConstruct()
     {
         $this->allowedRoles = \Roles::idsByNames(['admin', 'operator']);
@@ -35,7 +38,7 @@ class TicketsController extends ControllerBase
         parent::onConstruct();
     }
 
-    public function indexAction()
+    public function indexAction(): void
     {
         $conditions = [];
         $bind       = [];
@@ -102,7 +105,7 @@ class TicketsController extends ControllerBase
         $this->view->needsQaPercent = $totalAutoClosed > 0 ? (int) round($needsQaCount / $totalAutoClosed * 100) : 0;
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->ticket = new \Tickets();
     }

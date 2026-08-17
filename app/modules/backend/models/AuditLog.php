@@ -62,7 +62,7 @@ class AuditLog extends \Phalcon\Mvc\Model
     /**
      * Initialize method for model.
      */
-    public function initialize()
+    public function initialize(): void
     {
         $this->setSource('audit_log');
         $this->belongsTo('actor_user_id', 'Users', 'id', ['alias' => 'Users']);

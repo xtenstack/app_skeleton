@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files psalm-version="5.26.1@d747f6500b38ac4f7dfc5edbcae6e4b637d7add0">
+  <file src="app/common/library/ApiKeyAuth.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$apiKey->id]]></code>
+      <code><![CDATA[$apiKey->last_used_at]]></code>
+      <code><![CDATA[$apiKey->name]]></code>
+      <code><![CDATA[$apiKey->user_id]]></code>
+      <code><![CDATA[$user->id]]></code>
+      <code><![CDATA[$user->role_id]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/common/library/Audit.php">
+    <UndefinedInterfaceMethod>
+      <code><![CDATA[readAttribute]]></code>
+      <code><![CDATA[toArray]]></code>
+      <code><![CDATA[toArray]]></code>
+    </UndefinedInterfaceMethod>
+  </file>
+  <file src="app/common/library/Auth.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$user->email]]></code>
+      <code><![CDATA[$user->first_name]]></code>
+      <code><![CDATA[$user->id]]></code>
+      <code><![CDATA[$user->last_name]]></code>
+      <code><![CDATA[$user->password_hash]]></code>
+      <code><![CDATA[$user->role_id]]></code>
+      <code><![CDATA[$user?->id]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/common/library/Crypto.php">
+    <UndefinedConstant>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/common/library/LocaleOptions.php">
+    <RedundantCondition>
+      <code><![CDATA[$name !== null]]></code>
+    </RedundantCondition>
+    <TypeDoesNotContainNull>
+      <code><![CDATA[$code]]></code>
+    </TypeDoesNotContainNull>
+  </file>
+  <file src="app/common/library/ModuleManager.php">
+    <UndefinedConstant>
+      <code><![CDATA[APP_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/common/library/SettingsRegistry.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$setting->setting_value]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/config/config.php">
+    <RedundantCast>
+      <code><![CDATA[(array) include $localConfigFile]]></code>
+    </RedundantCast>
+  </file>
+  <file src="app/config/loader.php">
+    <UndefinedConstant>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/config/routes.php">
+    <UndefinedGlobalVariable>
+      <code><![CDATA[$application]]></code>
+      <code><![CDATA[$di]]></code>
+    </UndefinedGlobalVariable>
+  </file>
+  <file src="app/config/services.php">
+    <InvalidClass>
+      <code><![CDATA[MetaDataAdapter]]></code>
+    </InvalidClass>
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedConstant>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+    <UndefinedGlobalVariable>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </UndefinedGlobalVariable>
+  </file>
+  <file src="app/config/services_cli.php">
+    <UndefinedGlobalVariable>
+      <code><![CDATA[$di]]></code>
+    </UndefinedGlobalVariable>
+  </file>
+  <file src="app/config/services_web.php">
+    <InvalidScope>
+      <code><![CDATA[$this]]></code>
+    </InvalidScope>
+    <UndefinedGlobalVariable>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </UndefinedGlobalVariable>
+  </file>
+  <file src="app/modules/api/Module.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </MethodSignatureMismatch>
+    <ParamNameMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </ParamNameMismatch>
+  </file>
+  <file src="app/modules/api/controllers/TicketsController.php">
+    <InvalidArgument>
+      <code><![CDATA[$tickets]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="app/modules/backend/Module.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </MethodSignatureMismatch>
+    <ParamNameMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </ParamNameMismatch>
+    <UndefinedMethod>
+      <code><![CDATA[getConfig]]></code>
+      <code><![CDATA[getConfig]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="app/modules/backend/controllers/AccountController.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$setting->setting_key]]></code>
+      <code><![CDATA[$setting->setting_value]]></code>
+      <code><![CDATA[$setting->user_id]]></code>
+    </NoInterfaceProperties>
+    <UndefinedConstant>
+      <code><![CDATA[BASE_PATH]]></code>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/modules/backend/controllers/ConfigurationController.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$module->enabled]]></code>
+      <code><![CDATA[$module->module_key]]></code>
+      <code><![CDATA[$module->module_key]]></code>
+      <code><![CDATA[$module->updated_at]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/modules/backend/controllers/PasswordController.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$user->email]]></code>
+      <code><![CDATA[$user->password_hash]]></code>
+      <code><![CDATA[$user->password_reset_expires_at]]></code>
+      <code><![CDATA[$user->password_reset_expires_at]]></code>
+      <code><![CDATA[$user->password_reset_token]]></code>
+      <code><![CDATA[$user->password_reset_token]]></code>
+      <code><![CDATA[$user->password_reset_token]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/modules/backend/controllers/SignupController.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$user->email_verified_at]]></code>
+      <code><![CDATA[$user->verification_token]]></code>
+      <code><![CDATA[$user->verification_token_expires_at]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/modules/backend/controllers/SystemLogController.php">
+    <UndefinedConstant>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/modules/backend/controllers/TicketAttachmentActions.php">
+    <UndefinedConstant>
+      <code><![CDATA[BASE_PATH]]></code>
+      <code><![CDATA[BASE_PATH]]></code>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/modules/backend/controllers/TicketsController.php">
+    <InvalidArgument>
+      <code><![CDATA[$autoClosedThisWeek]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="app/modules/backend/controllers/UsersController.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$setting->setting_key]]></code>
+      <code><![CDATA[$setting->setting_value]]></code>
+      <code><![CDATA[$setting->user_id]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/modules/cli/Module.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </MethodSignatureMismatch>
+    <ParamNameMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </ParamNameMismatch>
+  </file>
+  <file src="app/modules/cli/tasks/BackupTask.php">
+    <UndefinedConstant>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/modules/cli/tasks/MigrateTask.php">
+    <UndefinedConstant>
+      <code><![CDATA[APP_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/modules/cli/tasks/ModulesTask.php">
+    <NoInterfaceProperties>
+      <code><![CDATA[$row->code]]></code>
+      <code><![CDATA[$row->enabled]]></code>
+      <code><![CDATA[$row->package_name]]></code>
+      <code><![CDATA[$row->tier]]></code>
+      <code><![CDATA[$row->updated_at]]></code>
+      <code><![CDATA[$row->updated_at]]></code>
+      <code><![CDATA[$row->version]]></code>
+    </NoInterfaceProperties>
+    <TypeDoesNotContainType>
+      <code><![CDATA[!$discovered]]></code>
+      <code><![CDATA[$discovered]]></code>
+    </TypeDoesNotContainType>
+    <UndefinedInterfaceMethod>
+      <code><![CDATA[count]]></code>
+    </UndefinedInterfaceMethod>
+  </file>
+  <file src="app/modules/cli/tasks/RoutesTask.php">
+    <UndefinedConstant>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+      <code><![CDATA[APP_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+  <file src="app/modules/frontend/Module.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </MethodSignatureMismatch>
+    <ParamNameMismatch>
+      <code><![CDATA[$di]]></code>
+      <code><![CDATA[$di]]></code>
+    </ParamNameMismatch>
+    <UndefinedMethod>
+      <code><![CDATA[getConfig]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="app/modules/frontend/controllers/TicketsController.php">
+    <UndefinedConstant>
+      <code><![CDATA[BASE_PATH]]></code>
+      <code><![CDATA[BASE_PATH]]></code>
+    </UndefinedConstant>
+  </file>
+</files>

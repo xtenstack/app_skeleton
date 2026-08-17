@@ -5,9 +5,22 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 class ApiKeysController extends ControllerBase
 {
-    public function indexAction()
+    public function indexAction(): void
     {
         $userId = $this->session->get('auth')['id'];
+
+        $conditions = ['user_id = :user_id:'];
+        $bind       = ['user_id' => $userId];
+
+        // Status-filter button bar (list-view convention, RB-03) — Active
+        // = revoked_at IS NULL, Revoked = revoked_at IS NOT NULL.
+        $status = (string) $this->request->getQuery('status', 'string', '');
+
+        if ($status === 'active') {
+            $conditions[] = 'revoked_at IS NULL';
+        } elseif ($status === 'revoked') {
+            $conditions[] = 'revoked_at IS NOT NULL';
+        }
 
         // Search/sort/pagination (list-view convention, RB-03) — still
         // scoped to the logged-in user's own keys, same as before.
@@ -16,13 +29,18 @@ class ApiKeysController extends ControllerBase
             \ApiKeys::class,
             ['name'],
             ['created' => 'id', 'name' => 'name', 'last_used' => 'last_used_at'],
-            ['user_id = :user_id:'],
-            ['user_id' => $userId]
+            $conditions,
+            $bind
         );
 
         $this->view->apiKeys      = $list['results'];
+        $this->view->currentStatus = $status;
         $this->view->listState    = $list;
-        $this->view->preserveQuery = $list['preserve'];
+        // Preserved on every search/sort/pagination link so navigating
+        // those doesn't drop the current status filter.
+        $this->view->preserveQuery = array_merge($list['preserve'], array_filter([
+            'status' => $status !== '' ? $status : null,
+        ], fn ($v) => $v !== null));
     }
 
     public function createAction()
@@ -71,6 +89,7 @@ class ApiKeysController extends ControllerBase
 
         $this->view->newToken     = $raw;
         $this->view->apiKeys      = $list['results'];
+        $this->view->currentStatus = '';
         $this->view->listState    = $list;
         $this->view->preserveQuery = $list['preserve'];
         $this->view->pick('api-keys/index');

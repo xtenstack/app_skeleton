@@ -13,7 +13,7 @@ namespace App_skeleton\Modules\Frontend\Controllers;
  */
 class DashboardController extends ControllerBase
 {
-    public function indexAction()
+    public function indexAction(): void
     {
         $userId = (int) ($this->session->get('auth')['id'] ?? 0);
 

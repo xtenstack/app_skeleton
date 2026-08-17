@@ -5,12 +5,12 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 class SignupController extends ControllerBase
 {
-    public function indexAction()
+    public function indexAction(): void
     {
         $this->view->pick('signup/new');
     }
 
-    public function newAction()
+    public function newAction(): void
     {
         $this->view->pick('signup/new');
     }

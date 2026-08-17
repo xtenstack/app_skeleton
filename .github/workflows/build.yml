@@ -107,6 +107,12 @@ jobs:
       - name: Run PHPUnit
         run: docker compose exec -T app vendor/bin/phpunit
 
+      - name: Run PHPStan
+        run: docker compose exec -T app vendor/bin/phpstan analyse -c phpstan.neon
+
+      - name: Run Psalm
+        run: docker compose exec -T app vendor/bin/psalm
+
       - name: Set up Node for Playwright
         # Playwright runs on the runner itself (needs a real browser),
         # not inside the app container the way PHPUnit does — hits the
