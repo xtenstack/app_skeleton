@@ -24,4 +24,22 @@ class IndexController extends ControllerBase
             return $this->response->redirect($this->url->get($home));
         }
     }
+
+    /**
+     * REQ-172: the maintenance-mode view. Reached two ways — directly, if
+     * someone bookmarks/links it, or (the real path) via
+     * app/bootstrap_web.php overriding the request URI to this route for
+     * any non-admin visitor while maintenance_mode is on. 'index' is
+     * already guest-reachable (see frontend\ControllerBase's
+     * UNAUTHENTICATED_CONTROLLERS), so no further exemption is needed
+     * here for a logged-out visitor.
+     */
+    public function maintenanceAction(): void
+    {
+        $until = (string) $this->settings->get('maintenance_mode_until', '');
+        $timestamp = $until !== '' ? strtotime($until) : false;
+
+        $this->view->maintenanceUntilIso  = $timestamp !== false ? date('c', $timestamp) : null;
+        $this->view->maintenanceUntilText = $timestamp !== false ? date('j M Y, g:i A', $timestamp) : null;
+    }
 }

@@ -144,7 +144,69 @@ try {
      */
     require APP_PATH . '/config/routes.php';
 
-    echo $application->handle($_SERVER['REQUEST_URI'])->getContent();
+    /**
+     * Admin-settable maintenance mode (REQ-172). Checked once per request,
+     * here rather than as a dispatcher event, so it applies uniformly
+     * before ANY module's services are even registered — no risk of a
+     * cross-module dispatcher forward leaving the wrong module's view/
+     * services state loaded. Read the same DB-tolerant way debug_mode is
+     * read above: a fresh/not-yet-migrated install just behaves as if
+     * maintenance mode is off instead of crashing every request.
+     *
+     * Non-admin traffic gets silently rerouted to the frontend module's
+     * own maintenance view (reusing its styling, per the spec) by
+     * overriding the URI fed to Application::handle() — the module system
+     * then boots frontend/IndexController normally, exactly as if the
+     * visitor had requested that URL directly. The method is forced to
+     * GET alongside it: a maintenance-page visit must never trip frontend
+     * ControllerBase's CSRF check against whatever method the original,
+     * now-abandoned request used (e.g. a guest's in-flight POST at the
+     * moment maintenance mode flips on).
+     *
+     * Exemptions — both required for an admin to actually turn maintenance
+     * back off: the login controller itself (backend/session/*, so an
+     * admin can authenticate while maintenance is on), and any request
+     * from an already-authenticated admin (role_id 1) — once logged in an
+     * admin gets the whole site as normal, not just the toggle screen, so
+     * they can confirm the fix before flipping maintenance back off. API
+     * traffic has no session-based "admin" concept (API-key auth is
+     * per-endpoint, not global), so it's treated as non-admin uniformly
+     * and gets a JSON 503 instead of the HTML view.
+     */
+    $requestUri = $_SERVER['REQUEST_URI'];
+
+    try {
+        if ($di->getShared('settings')->get('maintenance_mode', '0') === '1') {
+            $path = (string) (parse_url($requestUri, PHP_URL_PATH) ?: '/');
+
+            $isLoginRoute = (bool) preg_match('#^/backend/session(/|$)#', $path);
+            $isApiRequest = (bool) preg_match('#^/api(/|$)#', $path);
+
+            $isAdmin = false;
+
+            if ($di->getShared('auth')->isLoggedIn()) {
+                $isAdmin = ((int) ($di->getShared('session')->get('auth')['role_id'] ?? 0)) === 1;
+            }
+
+            if (!$isLoginRoute && !$isAdmin) {
+                if ($isApiRequest) {
+                    http_response_code(503);
+                    header('Content-Type: application/json; charset=UTF-8');
+                    echo json_encode(['error' => 'Service temporarily unavailable for maintenance']);
+
+                    exit;
+                }
+
+                $requestUri                = '/frontend/index/maintenance';
+                $_SERVER['REQUEST_METHOD'] = 'GET';
+            }
+        }
+    } catch (\Throwable $e) {
+        // settings table not migrated yet, or DB unreachable — fall back
+        // to "maintenance mode off", same as the debug_mode read above.
+    }
+
+    echo $application->handle($requestUri)->getContent();
 } catch (\Throwable $e) {
     $sendCrashResponse($logThrowable($e));
 }
