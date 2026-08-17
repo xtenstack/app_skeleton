@@ -9,6 +9,11 @@ For anything beyond a small fix, open an issue first to discuss the
 approach. It's much cheaper to align on direction before writing code
 than to rework a finished PR.
 
+For questions, ideas, and discussions (as distinct from bug reports),
+use GitHub Discussions (github.com/xtenstack/app_skeleton/discussions) —
+that's the space for broader conversation, separate from Issues (bugs)
+and PRs (code changes).
+
 ## Workflow
 
 Standard GitHub fork-and-PR: fork the repo, branch off `main`, open a
@@ -58,6 +63,30 @@ docker compose up -d --build
 # build.yml's "Install PHPUnit..." step for the exact commands)
 docker compose exec app vendor/bin/phpunit
 ```
+
+On macOS, a locally-installed native Postgres can also bind to :5432
+alongside Docker's container, causing E2E test fixture cleanup
+(e.g. Playwright's global-teardown.ts `psql -h localhost` calls) to
+silently hit the wrong database instead. This doesn't affect CI.
+If local E2E test cleanup seems to not be working, check for a port
+conflict first.
+
+The production Docker image is built with `composer install --no-dev`,
+so a fresh `docker compose up -d --build` has no PHPUnit available until
+you redo the full install inside the running container. Check
+`.github/workflows/build.yml` for the exact commands CI uses, and run
+that same pattern: `docker compose exec app composer install` (full,
+not `--no-dev`).
+
+**`docker compose restart app` does not pick up source changes.** The
+`app` service doesn't bind-mount the application code — only `public/`,
+`.encryption_key`, and a few data/log directories are mounted; everything
+else is baked in via the Dockerfile's `COPY . .` at build time. A restart
+re-runs the same already-built image. If you've edited PHP and want the
+container to actually run it, you need `docker compose build app &&
+docker compose up -d app` (or `docker compose up -d --build`) — a plain
+restart proves nothing about whether your change works. Don't treat "still
+fails after a restart" as evidence against staleness; it isn't one.
 
 Coverage beyond those three patterns is thin — this is a baseline, not
 comprehensive coverage, and growing it is a legitimate contribution.

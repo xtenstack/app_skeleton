@@ -200,3 +200,17 @@ install.
   (`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE email = '...'`).
 - `./run` with no arguments lists every available CLI task.
 - `./run modules sync` after installing any additional module package.
+- **Outgoing mail (signup verification, password reset, etc.) is your
+  responsibility to get working.** By default the app calls PHP's
+  native `mail()`, which relies on a local MTA (sendmail/postfix/etc.)
+  already being configured on the host — this is not something the app
+  can set up for you, and most fresh hosts/containers don't have one
+  ready out of the box. If `mail()` has no MTA, sending fails silently
+  (logged via `error_log()`, the triggering request still succeeds —
+  e.g. signup completes even if the verification email never sends).
+  Set the four `SMTP_*` variables in `.env` to relay through an
+  authenticated SMTP account instead (see `.env.example`'s comments) if
+  you don't want to rely on local MTA configuration — this is the
+  simpler path on most hosting providers. Either way, test that a real
+  email actually arrives before relying on signup/password-reset in
+  production.

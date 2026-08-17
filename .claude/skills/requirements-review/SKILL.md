@@ -21,14 +21,15 @@ The requirements module has its own JSON API (Session 16) at `/requirements/api/
 
 (Priority is a plain VARCHAR column — don't rely on the list view's alphabetical sort to order tiers correctly; filter by `priority=` explicitly per tier instead, per the loop above.)
 
-**Default scope (Session 18):** unless the user asks for a full pass, step through the top 5 only — priority order as above, oldest-first (`created_at` ascending) as the tiebreaker within a tier. Say up front which 5 you're covering and offer to continue if the user wants more.
+**Default scope (Session 18):** unless the user asks for a full pass, step through the top 5 only — priority order as above, within each tier rank requirements matching the current in-development target_version above those targeting future versions, then oldest-first (`created_at` ascending) as the final tiebreaker. Say up front which 5 you're covering and offer to continue if the user wants more.
 
 ## The workflow, per requirement
 
 1. **Read title/description/notes/project/branch/target_version** — build a real picture of what this requirement actually is before judging it, not just its title.
 2. **Ask: is this still accurate?** Check against current repo state (`git log`, does the branch still exist/get merged, does the described thing already exist in code) rather than trusting the requirement's own text as ground truth — requirements can go stale the same way tickets' reported symptoms can be wrong.
 3. **Propose a disposition, don't just apply one**: still open and correct as-is / needs a status change / needs a priority change / needs `target_version` or `branch` filled in or corrected / should move to `hold` / looks actually complete and just never got marked. Say what you found and what you'd change — let the user confirm, same as `review-tickets`' "don't assume closing authority."
-4. **Apply the confirmed change** via the edit form, then move to the next one.
+4. **The intent of this pass is to action reviewed requirements, not just re-confirm them (clarified Session 19).** "Still open and correct as-is" describes the finding, not the disposition to stop at — a requirement that checks out as accurate and buildable should actually get built (time/scope permitting, same real-code/real-verification standard as any other work in this repo), not left open with a note saying it's still valid. If something in the top N genuinely isn't ready to build (needs its own design pass first, too risky/large to rush, blocked on something else), say so explicitly and why, rather than silently deferring by treating "confirmed accurate" as if it were the finish line.
+5. **Apply the confirmed change** via the edit form, then move to the next one.
 5. **Report a running tally**, not just a final summary — per-tier counts (reviewed/changed/left as-is) as you go, so a long session can be checked on mid-way.
 
 ## Don't

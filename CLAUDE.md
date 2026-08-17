@@ -90,3 +90,11 @@ the `modules-session-wrapup` skill for how it stays part of the same
 project (same `REQ-NNN` id space, same production requirements module,
 own session numbering, own `Modules-Session-N-Summary`/`Modules-
 Handover-*` naming).
+
+## Tooling decisions
+
+This project deliberately does not use Postgres or GitHub MCP servers.
+`psql`/`gh`/`ssh`/`docker compose exec` via the shell have covered every
+real database and GitHub interaction need across many sessions with no
+friction. This is a settled architectural decision, not backlog work
+— repeatedly re-evaluating it in audits is no longer useful.
