@@ -16,9 +16,17 @@ off-instance storage (DigitalOcean Spaces or similar) exists.
 ## Running it
 
 ```bash
+rsync -avz stack-prod:/opt/app_skeleton/backups/ ~/Developer/xten/prod-backups/
+```
+
+This relies on the `stack-prod` host defined in `~/.ssh/config`, which
+carries the user and key — see stack `RB-12` for that setup. On a
+machine without it, the long form still works:
+
+```bash
 rsync -avz -e "ssh -i ~/.ssh/xten_stack_internal" \
     root@stack-internal.xten.au:/opt/app_skeleton/backups/ \
-    /opt/local/www/apache2/html/prod/backups/
+    ~/Developer/xten/prod-backups/
 ```
 
 `rsync` only transfers files that are new or changed — safe to run
