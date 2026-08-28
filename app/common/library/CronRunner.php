@@ -20,8 +20,40 @@ class CronRunner extends Injectable
         $results = [];
 
         foreach (\CronJobs::find(['conditions' => 'enabled = 1']) as $job) {
-            if ($job->isDue()) {
+            if (!$job->isDue()) {
+                continue;
+            }
+
+            // CronTask is meant to be invoked fresh by an OS cron tick every
+            // minute (see BackupTask's own docblock), and CronJobs::isDue()
+            // only ever sees last_run_at as of the last completed run --
+            // execute() doesn't persist it until the task returns. A job
+            // that runs longer than the tick interval therefore still looks
+            // "due" to the next tick's freshly-loaded row, and would
+            // otherwise fire a second, overlapping execution of itself.
+            // Confirmed live 2026-08-28: BackupTask's pg_dump ran past 60s
+            // and the every-minute tick re-triggered it six times in ~10
+            // minutes before one run finally errored out.
+            //
+            // A Postgres advisory lock keyed by the job's own id closes
+            // this without a schema change or a lock file that could go
+            // stale on a hard crash -- it's tied to this CLI process's own
+            // database connection and Postgres releases it automatically
+            // the moment that connection closes, crash or not.
+            $locked = (bool) $this->db->fetchOne(
+                'SELECT pg_try_advisory_lock(:id)::int AS locked',
+                \Phalcon\Db\Enum::FETCH_ASSOC,
+                ['id' => $job->id]
+            )['locked'];
+
+            if (!$locked) {
+                continue;
+            }
+
+            try {
                 $results[] = $this->execute($job);
+            } finally {
+                $this->db->execute('SELECT pg_advisory_unlock(:id)', ['id' => $job->id]);
             }
         }
 
