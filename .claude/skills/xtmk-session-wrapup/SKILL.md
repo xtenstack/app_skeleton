@@ -74,7 +74,7 @@ An "on hold" requirement (a named idea with no scope yet) still gets a
 real row — `status = 'hold'`, `notes` explaining why, same as
 `session-wrapup`'s own rule.
 
-## At the end: two files, in `claude/sessions/XTMK/`
+## At the end: three files, in `claude/sessions/XTMK/`
 
 1. **`Session-N-Summary.md`** — one per XTMK-thread session, numbered
    sequentially from this thread's own count (this skill's first use is
@@ -103,6 +103,26 @@ real row — `status = 'hold'`, `notes` explaining why, same as
    - `## Resolved this session, no longer open` — point at `REQ-NNN`
      ids (`project = 'xtmk'`) rather than repeating detail.
    - `## Reference notes`.
+
+3. **`wrap-up-request(XTMK Session N).md`** — matches the main thread's
+   own convention (see e.g. `claude/sessions/App Skeleton/
+   wrap-up-request(App Skeleton Session 18).md`), not previously
+   documented in either that skill or this one until XTMK Session 2
+   caught the gap. One heading per item from the original
+   `Request (XTMK Session N).pdf`, **in the order given**, each answered
+   directly and concisely — what was built/decided, `REQ-NNN`
+   cross-references, a pointer to `Session-N-Summary.md` for full
+   technical detail rather than repeating it. After the original items,
+   add a heading per substantive follow-on thread the session surfaced
+   even if it wasn't in the request doc (a mid-session question that led
+   to real work, an unplanned incident found and fixed, a scope
+   negotiation) — same spirit as the main thread's examples, which cover
+   things like a found production issue or a raised-and-resolved open
+   question alongside the literal original bullets. If a past XTMK
+   session skipped this file, that's likely an oversight (per the main
+   thread's own precedent of backfilling a missed one) worth raising
+   with the user rather than silently leaving a gap — but don't backfill
+   it unasked.
 
 If a session ends mid-stream rather than at a natural stopping point,
 say so explicitly at the top of the handover.
