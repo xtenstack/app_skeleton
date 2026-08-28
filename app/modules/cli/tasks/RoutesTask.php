@@ -112,11 +112,18 @@ class RoutesTask extends \Phalcon\Cli\Task
             ...$this->endpointsFromDir('frontend', APP_PATH . '/modules/frontend/controllers', 'App_skeleton\Modules\Frontend\Controllers'),
         ];
 
-        // Discovered feature modules (e.g. requirements-module) — same
-        // src/controllers/ layout docs/MODULE-SPEC.md documents as the
-        // reference shape.
+        // Discovered feature modules (e.g. requirements-module,
+        // marketing-module) — same src/controllers/ layout
+        // docs/MODULE-SPEC.md documents as the reference shape. Both
+        // routable tiers (see ModuleManager::ROUTABLE_TIERS) — this used
+        // to check 'application' only, so a plugin-tier module's very
+        // real, dispatchable routes (marketing-module, tier=plugin)
+        // never appeared here even though ./run routes list is meant to
+        // be "what routes does this app actually have" (REQ-183, found
+        // building XTMK, fixed as a general app_skeleton fix since this
+        // file isn't marketing-specific).
         foreach ($manifests as $moduleKey => $manifest) {
-            if (($manifest['tier'] ?? null) !== 'application' || empty($manifest['className']) || empty($manifest['installPath'])) {
+            if (!in_array($manifest['tier'] ?? null, ['application', 'plugin'], true) || empty($manifest['className']) || empty($manifest['installPath'])) {
                 continue;
             }
 
