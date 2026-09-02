@@ -47,9 +47,11 @@
     },
     "scripts": {
         "post-install-cmd": [
+            "[ -d .githooks ] && git config core.hooksPath .githooks || true",
             "[ -f bin/install.php ] && php bin/install.php || true"
         ],
         "post-update-cmd": [
+            "[ -d .githooks ] && git config core.hooksPath .githooks || true",
             "[ -f bin/install.php ] && php bin/install.php || true"
         ],
         "test": "phpunit"

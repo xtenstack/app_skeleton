@@ -77,9 +77,15 @@ install — a fresh clone, CI, a droplet without the private repo —
 breaks trying to fetch a path that doesn't exist there. **Before
 committing a `composer.lock` change, confirm it doesn't reference the
 private module**: `grep -c "xtenstack/requirements-module\|\.\./internal" composer.lock`
-should print `0`. CI now enforces this on every push (`.github/workflows/build.yml`'s
-first step) as a backstop, but catching it before committing is
-cheaper than waiting for the red build.
+should print `0`. This is now automated (REQ-128, Modules Session 2) — a
+local `pre-commit` hook (`.githooks/pre-commit`, wired up automatically
+via `composer install`/`composer update`'s `post-install-cmd` setting
+`core.hooksPath`) runs the same check on any staged `composer.lock` and
+blocks the commit if it fails. CI still enforces this on every push
+(`.github/workflows/build.yml`'s first step) as a backstop for anyone
+whose hook isn't wired up yet (e.g. before their first `composer
+install` on a fresh clone), but the local hook now catches it before the
+commit even lands.
 
 ## Why not a git submodule / vendored copy in this repo
 

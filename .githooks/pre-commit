@@ -1,0 +1,26 @@
+#!/bin/sh
+# Local guard against the recurring composer.lock regression (REQ-098 and
+# repeats -- see docs/INTERNAL-MODULES.md). Mirrors the CI check in
+# .github/workflows/build.yml, but runs before the commit even lands
+# locally instead of after a push.
+#
+# composer.local.json (gitignored) merges a `path` repository
+# (`../internal/*`) into composer.json's effective require set on any
+# machine that has it checked out. Running `composer update`/`composer
+# require` on such a machine bakes a `dist.type: path` entry for the
+# private module straight into composer.lock -- and since composer.lock
+# IS committed (unlike composer.local.json itself), that entry silently
+# rides along into the public repo if nothing catches it before commit.
+#
+# Installed automatically via `composer install`/`composer update`
+# (composer.json's post-install-cmd/post-update-cmd set core.hooksPath to
+# this directory) -- see bin/install.php.
+
+if git diff --cached --name-only | grep -q '^composer\.lock$'; then
+    if git show :composer.lock | grep -q 'xtenstack/requirements-module\|\.\./internal'; then
+        echo "ERROR: composer.lock (staged) references the private ../internal path repo (xtenstack/requirements-module)." >&2
+        echo "This means composer.lock was regenerated on a machine with composer.local.json present and staged as-is." >&2
+        echo "Fix: remove composer.local.json (or run 'composer update' without it) and regenerate composer.lock before committing." >&2
+        exit 1
+    fi
+fi

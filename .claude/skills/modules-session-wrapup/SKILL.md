@@ -1,6 +1,6 @@
 ---
 name: modules-session-wrapup
-description: Log requirements directly to the production requirements module as they surface during a Modules-thread session, and write the end-of-session Modules-Session-N-Summary/Handover pair into stack.xten.au/claude/sessions/modules/. Use at the end of a module design/scoping/build-review session (the separate "Modules Session #N" thread), not the main App Skeleton session count.
+description: Log requirements directly to the production requirements module as they surface during a Modules-thread session, and write the end-of-session Modules-Session-N-Summary/Handover/wrap-up-request trio into stack.xten.au/claude/sessions/modules/. Use at the end of a module design/scoping/build-review session (the separate "Modules Session #N" thread), not the main App Skeleton session count.
 ---
 
 # Modules session wrap-up
@@ -49,7 +49,7 @@ against prod's `requirements` table for several at once — see
 `session-wrapup`'s own "During the session" section for the mechanics,
 identical here.
 
-## At the end: two files, in `claude/sessions/modules/`
+## At the end: three files, in `claude/sessions/modules/`
 
 1. **`Modules-Session-N-Summary.md`** — one per Modules-thread session,
    numbered sequentially from this thread's own count (this skill's
@@ -79,6 +79,38 @@ identical here.
      `REQ-NNN` ids in prod rather than repeating detail.
    - `## Reference notes`.
 
+3. **`wrap-up-request(Modules Session N)-YYYY-MM-DD.md`** — the
+   Modules-thread variant of the main thread's
+   `session-request-wrapup` skill, run inline as part of this skill
+   rather than as a separate invocation (this thread doesn't have its
+   own copy of that skill). This is *not* the same document as the
+   Summary or the Handover:
+   - The **Summary** covers the whole session, including side tracks
+     and anything raised mid-session that wasn't in the original
+     request.
+   - The **Handover** is forward-looking — what the next session should
+     do first.
+   - The **wrap-up-request** looks *backward only*, at the session's own
+     originating Request doc (whatever its actual filename —
+     `Request (Modules Session N).pdf/.pages` for Session 1,
+     `Request-Modules-Session-N-Final-*.md` from Session 2 on; find
+     the most recent Request-shaped file in this folder rather than
+     assuming a fixed pattern), and is strictly a point-by-point
+     comparison against *that document's own items only*. For each
+     numbered/topic item the request doc actually raised: what was
+     decided, any inline back-and-forth (including the user's own
+     margin annotations if they edited the doc directly, e.g. "(TS)"
+     notes), and the outcome — built, deferred, discussion-only, or
+     asked-back. Cross-reference `REQ-NNN` ids rather than repeating
+     technical detail that belongs in the Summary.
+   - Don't include anything raised mid-session that wasn't in the
+     original request doc — that belongs in the Summary instead, not
+     here (same scope rule as `session-request-wrapup`).
+   - Write it in the same folder as the Request doc
+     (`claude/sessions/modules/`), dated to the day the session
+     actually wrapped (not the day the request doc was drafted, if
+     they differ).
+
 If a session ends mid-stream rather than at a natural stopping point,
 say so explicitly at the top of the handover, same as the main thread's
 convention.
@@ -90,3 +122,11 @@ convention.
 - Don't write to the retired `claude/modules/` path.
 - Don't create a separate requirements log for this thread — there is
   only one, shared with App Skeleton.
+- Don't skip the wrap-up-request file even on a "quick session" — it's
+  the one artifact of the three that a future session (or the user)
+  uses to confirm nothing from the original agenda got silently
+  dropped; the Summary alone doesn't guarantee that, since it's free to
+  reorganize around what actually happened rather than the doc's own
+  structure.
+- Don't fold mid-session asks into the wrap-up-request doc — that's the
+  Summary's job (see the wrap-up-request bullet above).
