@@ -56,6 +56,11 @@ services:
       # they're served through an authenticated action rather than Caddy's
       # static file_server, and this mount is app-only — no caddy mount.
       - ./data/ticket-attachments:/app/storage/ticket-attachments
+      # Agent Rooms message attachments (xtenstack/agent-rooms-module,
+      # Modules Session 2) — same rationale as ticket-attachments above:
+      # served through an authenticated action, not Caddy's static
+      # file_server, so this is an app-only mount too.
+      - ./data/agent-room-attachments:/app/storage/agent-room-attachments
       # Same host path docker/backup-db.sh already wrote to (not under
       # data/) — BackupTask (REQ-077) reuses it so existing backups on
       # any already-deployed instance stay in one place, not split
