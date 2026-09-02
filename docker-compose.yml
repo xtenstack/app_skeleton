@@ -8,6 +8,10 @@
 # First-time setup (see docker/entrypoint.sh for why):
 #   mkdir -p data && touch data/encryption_key
 #   cp .env.example .env   # then fill in real values
+#
+# Internal Prod only needs one more thing on top of this file — see
+# docker-compose.prod.yml for why, and RB-05 for the actual deploy
+# command.
 services:
   app:
     build:
@@ -19,6 +23,14 @@ services:
       additional_contexts:
         internal-modules: ../internal
     restart: unless-stopped
+    # Container logs default to unbounded — on a long-running droplet
+    # that fills the disk eventually. Capped the same way on all three
+    # services below.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       APP_ENV: ${APP_ENV:-development}
       DB_HOST: db
@@ -73,6 +85,11 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       # Default to non-privileged local ports so this doesn't fight
       # anything already on :80/:443 during local dev. Real deployments
@@ -107,6 +124,11 @@ services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: ${DB_NAME:-app_skeleton}
       POSTGRES_USER: ${DB_USER:-app_skeleton}

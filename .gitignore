@@ -62,6 +62,11 @@
 # committed.
 /backups/
 
+# Real DigitalOcean Spaces credentials for docker/sync-backup-offsite.sh
+# — copy docker/.env.spaces.example to get started, never commit the
+# real one.
+/docker/.env.spaces
+
 # Scratch task-prompt file staged by the dev droplet's AutoClaudeDev
 # runner (xtenstack/internal's bin/autoclaudedev-runner.sh) so the
 # sandbox container can read it — always cleaned up after the run, this

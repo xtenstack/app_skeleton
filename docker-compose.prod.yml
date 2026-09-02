@@ -1,0 +1,42 @@
+# Internal Prod only — layer this on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# This stack's Caddy also fronts xtmk.xten.au (xten-marketing),
+# reverse-proxying to that sibling stack's app container over the
+# external `edge_shared` Docker network — one shared front door on
+# :80/:443 for both apps on that droplet, rather than two Caddy
+# instances fighting over the same ports. `edge_shared` is created once,
+# outside either stack (`docker network create edge_shared`), and both
+# docker-compose projects join it; xten-marketing's own compose file
+# needs the matching network wiring for `xten-marketing-app-1` to be
+# reachable by name from here.
+#
+# Split out of the base docker-compose.yml (2026-09-02, Modules Session
+# 2) rather than committed inline: `edge_shared` is declared `external:
+# true`, which makes Compose refuse to start at all — not just skip the
+# network — on any machine that doesn't already have it (every dev
+# laptop, CI, every client droplet). Baking it into the file every
+# environment uses would have broken all of them the next `docker
+# compose up`, this repo's own CI included. This file only applies where
+# it's explicitly requested with `-f`.
+services:
+  app:
+    networks:
+      - default
+      - edge_shared
+
+  caddy:
+    volumes:
+      # xten-marketing's built static assets, read-only — see the
+      # xtmk.xten.au block in docker/Caddyfile, which php_fastcgi-proxies
+      # PHP requests to xten-marketing-app-1:9000 over edge_shared and
+      # serves everything else straight from this mount.
+      - /opt/xten-marketing/public:/marketing-public:ro
+    networks:
+      - default
+      - edge_shared
+
+networks:
+  default:
+  edge_shared:
+    external: true
