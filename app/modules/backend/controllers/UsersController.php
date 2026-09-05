@@ -127,6 +127,62 @@ class UsersController extends ControllerBase
         return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
     }
 
+    public function deleteAction($id)
+    {
+        $user = \Users::findFirstById($id);
+
+        if (!$user) {
+            $this->flash->error('User was not found');
+
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
+        }
+
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
+        }
+
+        $currentUserId = $this->session->get('auth')['id'] ?? null;
+
+        if ((int) $user->id === (int) $currentUserId) {
+            $this->flash->error('You cannot delete your own account');
+
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
+        }
+
+        // Soft delete only (see App_skeleton\Models\SoftDeletes) — a hard
+        // delete would violate every FK that references users.id
+        // (audit_log.actor_user_id, tickets.reporter_user_id, api_keys,
+        // etc.), and those references need to keep resolving to a real
+        // row for history to stay readable.
+        if (in_array((int) $user->role_id, \Roles::idsByNames(['admin']), true)) {
+            // count() isn't covered by SoftDeletes (only find()/findFirst()
+            // exclude trashed rows automatically), so deleted_at IS NULL
+            // has to be explicit here — without it, every admin ever
+            // soft-deleted keeps counting as "another active admin"
+            // forever, silently defeating this guard the moment one exists.
+            $otherActiveAdmins = \Users::count([
+                'role_id = :role_id: AND is_active = 1 AND deleted_at IS NULL AND id != :id:',
+                'bind' => ['role_id' => $user->role_id, 'id' => $user->id],
+            ]);
+
+            if ($otherActiveAdmins === 0) {
+                $this->flash->error('Cannot delete the last active admin account');
+
+                return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
+            }
+        }
+
+        if (!$user->softDelete()) {
+            foreach ($user->getMessages() as $message) {
+                $this->flash->error((string) $message);
+            }
+        } else {
+            $this->flash->success('User was deleted successfully');
+        }
+
+        return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
+    }
+
     public function profileAction($userId)
     {
         $user = \Users::findFirstById($userId);

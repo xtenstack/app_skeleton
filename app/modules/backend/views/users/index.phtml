@@ -38,6 +38,11 @@
                 <a href="<?= $this->url->get('backend/users/edit/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
                 <a href="<?= $this->url->get('backend/users/profile/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Profile</a>
                 <a href="<?= $this->url->get('backend/users/settings/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Settings</a>
+<?php if ((int) $user->id !== (int) ($this->session->get('auth')['id'] ?? null)): ?>
+                <form method="post" action="<?= $this->url->get('backend/users/delete/' . $user->id) ?>" class="d-inline" onsubmit="return confirm('Delete this user? This cannot be undone from here.')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+<?php endif; ?>
               </td>
             </tr>
 <?php endforeach; ?>
