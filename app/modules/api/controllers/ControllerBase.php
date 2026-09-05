@@ -41,6 +41,21 @@ class ControllerBase extends Controller
         } else {
             $token = $this->apiKeyAuth->tokenFromRequest($this->request);
             $this->principal = $token ? $this->apiKeyAuth->resolve($token) : null;
+
+            // Audit::record() only ever reads session('auth') to attribute a
+            // change (see app/common/library/Audit.php) — it predates
+            // ApiKeyAuth and was never taught about the API-key path. Mirror
+            // the resolved principal into the same slot so an API-key
+            // caller's model changes land in audit_log against their real
+            // user_id instead of NULL. This session is otherwise unused for
+            // a stateless API-key request (no cookie comes back), so it's
+            // scoped to this request only.
+            if ($this->principal) {
+                $this->session->set('auth', [
+                    'id'      => $this->principal['user_id'],
+                    'role_id' => $this->principal['role_id'],
+                ]);
+            }
         }
 
         if (!$this->principal) {

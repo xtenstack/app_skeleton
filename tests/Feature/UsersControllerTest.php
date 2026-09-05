@@ -154,4 +154,113 @@ final class UsersControllerTest extends TestCase
 
         $this->assertSame((int) $operatorRole->id, (int) $target->role_id, 'role change did not round-trip through save');
     }
+
+    /**
+     * MAA-20260827-002 — upstreamed from the xten-marketing instance
+     * clone, where this was built and verified live but never landed in
+     * app_skeleton itself. Covers the three cases the fix's own guards
+     * exist for: a normal delete succeeds (soft, not hard), an admin
+     * can't delete themselves, and the last active admin can't be
+     * deleted even by another admin.
+     */
+    public function testAdminCanDeleteAnotherUser(): void
+    {
+        $client = $this->loggedInClient();
+
+        $memberRole = \Roles::findFirst(['conditions' => "name = 'member'"]);
+
+        $target                = new \Users();
+        $target->email         = 'phpunit-users-fixture-' . bin2hex(random_bytes(4)) . '@example.invalid';
+        $target->password_hash = password_hash('PhpunitTest123!', PASSWORD_DEFAULT);
+        $target->first_name    = 'PHPUnit';
+        $target->last_name     = 'DeleteFixture';
+        $target->role_id       = $memberRole->id;
+        $target->is_active     = 1;
+        $target->save();
+
+        $indexPage = $client->get('/backend/users');
+        $csrf      = HttpClient::extractCsrf($indexPage['body']);
+
+        $client->post('/backend/users/delete/' . $target->id, [
+            $csrf['key'] => $csrf['token'],
+        ]);
+
+        $target->refresh();
+
+        $this->assertNotNull($target->deleted_at, 'user was not soft-deleted');
+        $this->assertNull(
+            \Users::findFirst(['conditions' => 'id = :id:', 'bind' => ['id' => $target->id]]),
+            'soft-deleted user still appears in the default (non-trashed) scope'
+        );
+    }
+
+    public function testAdminCannotDeleteTheirOwnAccount(): void
+    {
+        $client = $this->loggedInClient();
+
+        $admin = \Users::findFirst(['conditions' => 'email = :email:', 'bind' => ['email' => self::$adminEmail]]);
+
+        $indexPage = $client->get('/backend/users');
+        $csrf      = HttpClient::extractCsrf($indexPage['body']);
+
+        $response = $client->post('/backend/users/delete/' . $admin->id, [
+            $csrf['key'] => $csrf['token'],
+        ]);
+
+        $this->assertStringContainsString('You cannot delete your own account', $response['body']);
+
+        $admin->refresh();
+        $this->assertNull($admin->deleted_at, 'admin deleted their own account');
+    }
+
+    public function testCannotDeleteTheLastActiveAdmin(): void
+    {
+        // The guard counts *all* active admins system-wide other than the
+        // target, so the only way to exercise it without touching any
+        // pre-existing admin (real or another test's fixture) is to have
+        // the acting admin itself be the one that stops counting: log in
+        // while active (required to even reach this RBAC-gated
+        // controller), then flip is_active off directly, simulating an
+        // admin deactivated by someone else mid-session — their cookie is
+        // still valid (no per-request is_active re-check), but they no
+        // longer count as "another active admin" once deactivated.
+        $adminRole = \Roles::findFirst(['conditions' => "name = 'admin'"]);
+
+        $actingAdminEmail    = 'phpunit-users-fixture-acting-' . bin2hex(random_bytes(4)) . '@example.invalid';
+        $actingAdminPassword = 'PhpunitTest123!';
+        $actingAdmin                = new \Users();
+        $actingAdmin->email         = $actingAdminEmail;
+        $actingAdmin->password_hash = password_hash($actingAdminPassword, PASSWORD_DEFAULT);
+        $actingAdmin->first_name    = 'PHPUnit';
+        $actingAdmin->last_name     = 'ActingAdmin';
+        $actingAdmin->role_id       = $adminRole->id;
+        $actingAdmin->is_active     = 1;
+        $actingAdmin->save();
+
+        $actingClient = new HttpClient();
+        $loginPage    = $actingClient->get('/backend/session');
+        $loginCsrf    = HttpClient::extractCsrf($loginPage['body']);
+        $actingClient->post('/backend/session/login', [
+            'email'           => $actingAdminEmail,
+            'password'        => $actingAdminPassword,
+            $loginCsrf['key'] => $loginCsrf['token'],
+        ]);
+
+        $actingAdmin->is_active = 0;
+        $actingAdmin->save();
+
+        $lastAdmin = \Users::findFirst(['conditions' => 'email = :email:', 'bind' => ['email' => self::$adminEmail]]);
+
+        $indexPage = $actingClient->get('/backend/users');
+        $csrf      = HttpClient::extractCsrf($indexPage['body']);
+
+        $response = $actingClient->post('/backend/users/delete/' . $lastAdmin->id, [
+            $csrf['key'] => $csrf['token'],
+        ]);
+
+        $this->assertStringContainsString('Cannot delete the last active admin account', $response['body']);
+
+        $lastAdmin->refresh();
+        $this->assertNull($lastAdmin->deleted_at, 'the last active admin was deleted');
+    }
 }

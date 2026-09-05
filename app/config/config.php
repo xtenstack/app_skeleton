@@ -24,6 +24,18 @@ $base = [
         'password' => '',
     ],
 
+    /**
+     * Resend's HTTP API is the only outbound-mail transport that works
+     * from DigitalOcean droplets — every SMTP port (25/465/587) is
+     * blocked regardless of credentials, confirmed on both stack-dev and
+     * stack-prod. Set mail.resend_api_key in config.local.php per
+     * environment (same mechanism as the DB password above); Mailer.php
+     * logs and no-ops rather than failing the request if it's empty.
+     */
+    'mail' => [
+        'resend_api_key' => '',
+    ],
+
     'application' => [
         'appDir'         => APP_PATH . '/',
         'modelsDir'      => APP_PATH . '/common/models/',

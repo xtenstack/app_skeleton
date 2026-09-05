@@ -69,7 +69,26 @@ class ListView
         $totalPages = max(1, (int) ceil($total / $perPage));
         $page       = min(max(1, (int) $request->getQuery('page', 'int', 1)), $totalPages);
 
-        $params['order']  = ($sortable[$sort] ?? 'id') . ' ' . strtoupper($dir);
+        // NULLS LAST regardless of direction — Postgres's own default
+        // (NULLS FIRST on DESC) means any column with unmatched/missing
+        // data sorts to the very top of a "highest first" view, ahead of
+        // every real value. That's never what "sort by X descending" means
+        // to someone looking at the list (found via marketing-module's
+        // Score column, where most rows have no qualification match yet —
+        // 2026-08-27).
+        //
+        // Can't write `NULLS LAST` directly — this goes through Phalcon's
+        // PHQL, not raw SQL, and PHQL's ORDER BY grammar doesn't have a
+        // NULLS clause at all (confirmed the hard way: it broke every
+        // list in the app the moment a real request hit it, despite
+        // testing clean against psql directly — psql was never running
+        // the actual code path this method uses). Equivalent PHQL-legal
+        // form: sort on "is this null" first (false/0 before true/1
+        // ascending, i.e. nulls last) as a tiebreak ahead of the real
+        // column, which every backend here (just Postgres today) can
+        // still translate correctly.
+        $column           = $sortable[$sort] ?? 'id';
+        $params['order']  = "({$column} IS NULL) ASC, {$column} " . strtoupper($dir);
         $params['limit']  = $perPage;
         $params['offset'] = ($page - 1) * $perPage;
 
