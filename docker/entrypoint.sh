@@ -25,6 +25,9 @@ chown -R www-data:www-data /app/logs /app/public/files /app/sessions /app/storag
 cat > /app/app/config/config.local.php <<PHP
 <?php
 return [
+    'mail' => [
+        'resend_api_key' => '${RESEND_API_KEY}',
+    ],
     'database' => [
         'host'     => '${DB_HOST}',
         'port'     => (int) '${DB_PORT:-5432}',

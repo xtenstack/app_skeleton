@@ -43,12 +43,40 @@ class BackupTask extends \Phalcon\Cli\Task
 
         putenv("PGPASSWORD={$db->password}");
 
+        // This instance shares its database with bulk ABR/ASIC reference
+        // data (~20.4M abns rows, ~7.5M trading_names, plus the ASIC
+        // registers) that is 100% re-derivable from the source XML/CSV
+        // already stored in ~/Developer/xten/marketing-data/ — see
+        // marketing-data/abr/README-LOAD.md (load_abn_local.py) and
+        // marketing-data/asic/load_asic.sql. Dumping that data on every
+        // backup would make each run large and slow for no benefit: schema
+        // is kept (so views joining against these tables still restore
+        // correctly), only the bulk row data is skipped. Restore path:
+        // restore this dump, then re-run the two loaders against the
+        // already-downloaded source files to repopulate them — faster
+        // than re-downloading or re-dumping millions of unchanged rows
+        // every day (2026-08-27).
+        $excludeTableData = [
+            'abn_lookup.abns',
+            'abn_lookup.trading_names',
+            'abn_lookup.dgr',
+            'abn_lookup.asic_companies',
+            'abn_lookup.asic_business_names',
+        ];
+
+        $excludeFlags = '';
+
+        foreach ($excludeTableData as $table) {
+            $excludeFlags .= ' --exclude-table-data=' . escapeshellarg($table);
+        }
+
         $cmd = sprintf(
-            'pg_dump -h %s -p %s -U %s -d %s --no-owner --no-privileges > %s 2>&1',
+            'pg_dump -h %s -p %s -U %s -d %s --no-owner --no-privileges%s > %s 2>&1',
             escapeshellarg($db->host),
             escapeshellarg((string) $db->port),
             escapeshellarg($db->username),
             escapeshellarg($db->dbname),
+            $excludeFlags,
             escapeshellarg($tmpSql)
         );
 
