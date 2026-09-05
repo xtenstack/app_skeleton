@@ -168,7 +168,16 @@ class ListView
         );
     }
 
-    /** Prev/page-numbers/next — silently renders nothing for a single page. */
+    /**
+     * First/Prev/page-numbers/Next/Last — silently renders nothing for a
+     * single page. Only the 3 smallest and 3 largest page numbers are ever
+     * rendered as individual links (a large dataset's every-page-number
+     * row otherwise grows to cover the whole screen width, as seen on
+     * XTMK's bigger lists) — a "…" fills the gap between them when one
+     * exists, wired up by app.js's `.page-jump` handler to prompt for a
+     * page number rather than link to one, since there's no fixed page to
+     * link to.
+     */
     public static function pagination(string $action, int $page, int $totalPages, array $preserve = []): string
     {
         if ($totalPages <= 1) {
@@ -195,13 +204,36 @@ class ListView
             );
         };
 
-        $items = $link($page - 1, '&laquo; Prev', $page <= 1);
+        $ellipsis = function () use ($action, $preserve, $totalPages): string {
+            return sprintf(
+                '<li class="page-item"><a class="page-link page-jump" href="#" data-action="%s" data-total-pages="%d" data-preserve="%s">&hellip;</a></li>',
+                htmlspecialchars($action, ENT_QUOTES),
+                $totalPages,
+                htmlspecialchars(json_encode($preserve), ENT_QUOTES)
+            );
+        };
 
-        for ($i = 1; $i <= $totalPages; $i++) {
+        $items = $link(1, '&laquo; First', $page <= 1);
+        $items .= $link($page - 1, '&laquo; Prev', $page <= 1);
+
+        // 3 smallest + 3 largest, deduplicated (they overlap once
+        // totalPages <= 6) and only "…"-gapped when they don't meet.
+        $lowest  = array_slice(range(1, $totalPages), 0, 3);
+        $highest = array_slice(range(1, $totalPages), -3);
+        $pageNumbers = array_unique(array_merge($lowest, $highest));
+
+        $hasGap = end($lowest) < $highest[0] - 1;
+
+        foreach ($pageNumbers as $i) {
+            if ($hasGap && $i === $highest[0]) {
+                $items .= $ellipsis();
+            }
+
             $items .= $link($i, (string) $i, false, $i === $page);
         }
 
         $items .= $link($page + 1, 'Next &raquo;', $page >= $totalPages);
+        $items .= $link($totalPages, 'Last &raquo;', $page >= $totalPages);
 
         return '<nav><ul class="pagination pagination-sm mb-0">' . $items . '</ul></nav>';
     }
