@@ -55,6 +55,7 @@ class SeedTask extends \Phalcon\Cli\Task
     {
         $defaults = [
             'site_name'            => 'App Skeleton',
+            'site_tagline'         => 'You have successfully installed App Skeleton.',
             'cron_mode'            => 'manual',
             'mail_from'            => 'no-reply@app-skeleton.local',
             'mail_reply_to'        => 'stack@xten.au',

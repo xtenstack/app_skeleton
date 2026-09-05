@@ -7,6 +7,8 @@ description: Log requirements directly to the production requirements module as 
 
 Per CLAUDE.md: *"Each working session against this repo produces a Session Summary and Handover in the private `stack.xten.au/claude/sessions/` folder, and logs anything requirement-shaped to the requirements in production as it comes up rather than only at the end."* This skill is the concrete how-to.
 
+**Also run `session-request-wrapup` (a separate skill) if this session started from a `Request (... Session N).pdf/.pages` doc.** It's easy to miss: it's *not* one of the 8 skills/commands a request doc typically lists at the bottom, so running all of those and this one can feel like "the wrap-up is done" while the point-by-point `wrap-up-request(...).md` doc never gets written — this happened for real in Sessions 18 and 19. Check for a Request doc in this session's own folder before considering wrap-up complete, regardless of what the doc's own bottom-of-page list does or doesn't mention.
+
 Both files live in `stack.xten.au/claude/sessions/` (private, not in this repo — see CLAUDE.md's "Where things live"). Never write session docs into the public `docs/` folder.
 
 ## `Requirements-List.md` is archived (Session 15) — production is the sole system of record
