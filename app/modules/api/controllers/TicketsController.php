@@ -5,16 +5,26 @@ namespace App_skeleton\Modules\Api\Controllers;
 
 /**
  * Scope: create + list + view + retest-result reporting, plus (as of
- * REQ-168) a manual closeAction() for admin/operator callers only.
- * Assignment, consolidation, and QA review stay human-UI-only via the
- * backend (App_skeleton\Modules\Backend\Controllers\TicketsController)
- * — but closeAction() is a deliberate, scoped exception to this
- * controller's original "ticket triage authority stays with humans"
- * docblock: Session 18 extended closing authority to the API for
- * admin/operator callers, provided they supply a real close_reason
- * (not a generic 'manual' stamp) and, optionally, root-cause/fix notes.
- * Agents are excluded — their resolution path is retestResultAction()'s
- * auto_retest close, not this. This is otherwise still the entire
+ * REQ-168) a manual closeAction() for admin/operator callers only, and
+ * (as of the Tim/SSA integration, 2026-09-05) a selfAssignAction() for
+ * any authenticated caller. Reassignment, consolidation, and QA review
+ * stay human-UI-only via the backend
+ * (App_skeleton\Modules\Backend\Controllers\TicketsController) — but
+ * closeAction() and selfAssignAction() are each a deliberate, scoped
+ * exception to this controller's original "ticket triage authority
+ * stays with humans" docblock. closeAction(): Session 18 extended
+ * closing authority to the API for admin/operator callers, provided
+ * they supply a real close_reason (not a generic 'manual' stamp) and,
+ * optionally, root-cause/fix notes. Agents are excluded — their
+ * resolution path is retestResultAction()'s auto_retest close, not
+ * this. selfAssignAction(): narrower than general assignment — a
+ * caller may only claim a ticket for themselves, and only while it is
+ * unassigned, so this does not reopen the "agents are never a valid
+ * assignee" question TicketTriageActions::assignAction() still
+ * enforces for human-driven reassignment; it only lets an agent (e.g.
+ * Tim, the SSA) that receives a support request with no clear human
+ * owner claim it and start triaging, rather than the ticket sitting
+ * unowned until a human notices it. This is otherwise still the entire
  * ticket-side runner hook; it does not build or assume a specific
  * task-runner.
  */
@@ -239,6 +249,49 @@ class TicketsController extends ControllerBase
         if (isset($body['notes'])) {
             $ticket->notes = (string) $body['notes'];
         }
+
+        if (!$ticket->save()) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => implode(', ', $ticket->getMessages())]);
+        }
+
+        return $this->response->setJsonContent(['ticket' => $this->serialize($ticket)]);
+    }
+
+    /**
+     * Claim an unassigned ticket for the calling principal. Deliberately
+     * self-only (no target user id accepted) and unassigned-only (won't
+     * steal a ticket already assigned to someone else) — see this
+     * class's docblock for why this doesn't reopen the general
+     * agents-can't-be-assignees question. Idempotent if the caller has
+     * already claimed it.
+     */
+    public function selfAssignAction($id)
+    {
+        if (!$this->request->isPost()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'POST required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+
+        if (!$ticket) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $callerId = (int) $this->principal['user_id'];
+
+        if ($ticket->assigned_to_user_id !== null && (int) $ticket->assigned_to_user_id !== $callerId) {
+            $this->response->setStatusCode(409, 'Conflict');
+
+            return $this->response->setJsonContent(['error' => 'Ticket is already assigned to a different user']);
+        }
+
+        $ticket->assigned_to_user_id = $callerId;
 
         if (!$ticket->save()) {
             $this->response->setStatusCode(422, 'Unprocessable Entity');

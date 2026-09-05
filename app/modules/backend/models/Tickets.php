@@ -7,8 +7,15 @@ use App_skeleton\Models\SoftDeletes;
  * An escalation/report raised by an agent, staff member, or customer
  * (reporter_user_id — all three are just `users` rows, see
  * docs/ticketing-module-plan.md) for a human operator to triage.
- * assigned_to_user_id is always meant to be a human — agents are never a
- * valid assignee, enforced in the backend controller, not here.
+ * assigned_to_user_id is meant to be a human for reassignment purposes —
+ * TicketTriageActions::assignAction() (backend, human-driven) still
+ * rejects an agent as a *reassignment* target. The one deliberate
+ * exception (2026-09-05, Tim/SSA integration) is self-assignment via
+ * App_skeleton\Modules\Api\Controllers\TicketsController::selfAssignAction(),
+ * which lets an agent claim a currently-unassigned ticket for itself —
+ * see that method's docblock. So: agents can end up as
+ * assigned_to_user_id via self-claim, but never via being assigned by
+ * someone else.
  *
  * @method static Tickets|null findFirstById(int $id)
  */

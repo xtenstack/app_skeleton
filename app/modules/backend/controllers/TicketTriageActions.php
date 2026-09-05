@@ -40,9 +40,13 @@ trait TicketTriageActions
         $assignee         = $assignedToUserId ? \Users::findFirstById($assignedToUserId) : null;
 
         // Agents are ordinary `users` rows in this revision, so excluding
-        // them from being a valid assignee has to be explicit here — it
-        // doesn't fall out for free the way a separate identity type
-        // would have.
+        // them from being a valid *reassignment* target has to be
+        // explicit here — it doesn't fall out for free the way a
+        // separate identity type would have. This doesn't cover
+        // self-assignment: an agent can still claim an unassigned
+        // ticket for itself via the API's selfAssignAction() (see
+        // Tickets model docblock) — this human-driven action just never
+        // lets someone else hand a ticket to an agent.
         if (!$assignee || ($agentRoleId !== null && (int) $assignee->role_id === $agentRoleId)) {
             $this->flash->error('Choose a valid human assignee');
 
