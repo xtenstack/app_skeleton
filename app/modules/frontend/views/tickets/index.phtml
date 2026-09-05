@@ -26,7 +26,7 @@
             <tr>
               <td><?= $this->escaper->escapeHtml($ticket->title) ?></td>
               <td><?= $this->escaper->escapeHtml($ticket->ticket_type) ?></td>
-              <td><?= $this->escaper->escapeHtml($ticket->severity) ?></td>
+              <td><?= $this->escaper->escapeHtml(\Tickets::severityOptions()[$ticket->severity] ?? $ticket->severity) ?></td>
               <td>
                 <span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
               </td>
