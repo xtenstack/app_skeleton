@@ -8,6 +8,15 @@
  *
  * 'roles' is a list of role ids allowed to see the item, or null for any
  * authenticated backend user. Ties into ControllerBase::$allowedRoles.
+ *
+ * 'group' (optional) nests an item under a collapsible sidebar dropdown
+ * labeled with that string, rather than rendering it as its own top-level
+ * link — added once the flat list grew long enough to cover the whole
+ * sidebar height. Omit it for a top-level item (Dashboard, Items,
+ * Tickets). A module's own menu.php contribution (ModuleManager::menu())
+ * doesn't need to set this — an omitted 'group' renders top-level, same
+ * as before this existed, so existing module menu files keep working
+ * unchanged.
  */
 return [
     [
@@ -30,6 +39,7 @@ return [
         'controller' => 'account',
         'url'        => 'backend/account',
         'roles'      => null,
+        'group'      => 'Users',
     ],
     [
         'label'      => 'Users',
@@ -37,6 +47,7 @@ return [
         'controller' => 'users',
         'url'        => 'backend/users',
         'roles'      => [1],
+        'group'      => 'Users',
     ],
     [
         'label'      => 'Roles',
@@ -44,20 +55,7 @@ return [
         'controller' => 'roles',
         'url'        => 'backend/roles',
         'roles'      => [1],
-    ],
-    [
-        'label'      => 'Settings',
-        'icon'       => 'fas fa-cogs',
-        'controller' => 'settings',
-        'url'        => 'backend/settings',
-        'roles'      => [1],
-    ],
-    [
-        'label'      => 'Configuration',
-        'icon'       => 'fas fa-sliders-h',
-        'controller' => 'configuration',
-        'url'        => 'backend/configuration',
-        'roles'      => [1],
+        'group'      => 'Users',
     ],
     [
         'label'      => 'API Keys (Internal)',
@@ -65,6 +63,31 @@ return [
         'controller' => 'api-keys',
         'url'        => 'backend/api-keys',
         'roles'      => null,
+        'group'      => 'Users',
+    ],
+    [
+        'label'      => 'System Settings',
+        'icon'       => 'fas fa-cogs',
+        'controller' => 'settings',
+        'url'        => 'backend/settings',
+        'roles'      => [1],
+        'group'      => 'Settings',
+    ],
+    [
+        'label'      => 'Configuration',
+        'icon'       => 'fas fa-sliders-h',
+        'controller' => 'configuration',
+        'url'        => 'backend/configuration',
+        'roles'      => [1],
+        'group'      => 'Settings',
+    ],
+    [
+        'label'      => 'Cron',
+        'icon'       => 'fas fa-clock',
+        'controller' => 'cron',
+        'url'        => 'backend/cron',
+        'roles'      => [1],
+        'group'      => 'Settings',
     ],
     [
         'label'      => 'External Connections',
@@ -72,6 +95,7 @@ return [
         'controller' => 'external-connections',
         'url'        => 'backend/external-connections',
         'roles'      => [1],
+        'group'      => 'Settings',
     ],
     [
         'label'      => 'Tickets',
@@ -81,18 +105,12 @@ return [
         'roles'      => \Roles::idsByNames(['admin', 'operator']),
     ],
     [
-        'label'      => 'Cron',
-        'icon'       => 'fas fa-clock',
-        'controller' => 'cron',
-        'url'        => 'backend/cron',
-        'roles'      => [1],
-    ],
-    [
         'label'      => 'Audit Log',
         'icon'       => 'fas fa-clipboard-list',
         'controller' => 'audit-log',
         'url'        => 'backend/audit-log',
         'roles'      => [1],
+        'group'      => 'Logs',
     ],
     [
         'label'      => 'System Log',
@@ -100,6 +118,7 @@ return [
         'controller' => 'system-log',
         'url'        => 'backend/system-log',
         'roles'      => [1],
+        'group'      => 'Logs',
     ],
     [
         'label'      => 'Error Log',
@@ -107,5 +126,6 @@ return [
         'controller' => 'error-log',
         'url'        => 'backend/error-log',
         'roles'      => [1],
+        'group'      => 'Logs',
     ],
 ];
