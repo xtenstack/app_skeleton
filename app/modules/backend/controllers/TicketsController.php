@@ -129,7 +129,7 @@ class TicketsController extends ControllerBase
         $ticket              = new \Tickets();
         $ticket->title       = $title;
         $ticket->description = (string) $this->request->getPost('description') ?: null;
-        $ticket->severity    = (string) $this->request->getPost('severity') ?: 'normal';
+        $ticket->severity    = \Tickets::normalizeSeverity((string) $this->request->getPost('severity')) ?? 'normal';
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : 'bug';
 
         // Staff filing via the backend UI — reporter is always whoever's
@@ -212,7 +212,7 @@ class TicketsController extends ControllerBase
 
         $ticket->title       = $title;
         $ticket->description = (string) $this->request->getPost('description') ?: null;
-        $ticket->severity    = (string) $this->request->getPost('severity') ?: 'normal';
+        $ticket->severity    = \Tickets::normalizeSeverity((string) $this->request->getPost('severity')) ?? 'normal';
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
         $ticket->notes       = (string) $this->request->getPost('notes') ?: null;
         $ticket->project     = (string) $this->request->getPost('project') ?: null;
@@ -319,8 +319,10 @@ class TicketsController extends ControllerBase
                 $ticket->ticket_type = $ticketType;
             }
 
-            if ($severity !== '' && in_array($severity, ['low', 'normal', 'high', 'critical'], true)) {
-                $ticket->severity = $severity;
+            $normalizedSeverity = $severity !== '' ? \Tickets::normalizeSeverity($severity) : null;
+
+            if ($normalizedSeverity !== null) {
+                $ticket->severity = $normalizedSeverity;
             }
 
             if ($status === 'closed') {

@@ -77,7 +77,7 @@ class TicketsController extends ControllerBase
         $ticket                   = new \Tickets();
         $ticket->title            = $title;
         $ticket->description      = (string) $this->request->getPost('description') ?: null;
-        $ticket->severity         = (string) $this->request->getPost('severity') ?: 'normal';
+        $ticket->severity         = \Tickets::normalizeSeverity((string) $this->request->getPost('severity')) ?? 'normal';
         $ticket->ticket_type      = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : 'support';
         $ticket->project          = (string) $this->request->getPost('project') ?: null;
         $ticket->reporter_user_id = $this->currentUserId();
@@ -154,7 +154,7 @@ class TicketsController extends ControllerBase
         // qualify for SLA timing (Support-Operations-Pack RB-18).
         $ticket->title       = $title;
         $ticket->description = (string) $this->request->getPost('description') ?: null;
-        $ticket->severity    = (string) $this->request->getPost('severity') ?: $ticket->severity;
+        $ticket->severity    = \Tickets::normalizeSeverity((string) $this->request->getPost('severity')) ?? $ticket->severity;
         $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
         $ticket->project     = (string) $this->request->getPost('project') ?: null;
 

@@ -25,7 +25,7 @@
           <div class="form-group">
             <label for="severity">Severity</label>
             <select class="form-control" id="severity" name="severity">
-<?php foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'] as $value => $label): ?>
+<?php foreach (\Tickets::severityOptions() as $value => $label): ?>
               <option value="<?= $value ?>" <?= ($ticket->severity ?: 'normal') === $value ? 'selected' : '' ?>><?= $label ?></option>
 <?php endforeach; ?>
             </select>
