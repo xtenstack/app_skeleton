@@ -17,3 +17,4 @@ docs/
 frontend/
 *.md
 .DS_Store
+backups/
