@@ -56,12 +56,32 @@ class BackupTask extends \Phalcon\Cli\Task
         // already-downloaded source files to repopulate them — faster
         // than re-downloading or re-dumping millions of unchanged rows
         // every day (2026-08-27).
+        //
+        // gnaf.* (Geoscape/PSMA's public G-NAF address dataset) added
+        // 2026-09-05 (REQ-207) — same order-of-magnitude problem
+        // (address_view/address_detail/address_default_geocode/
+        // street_locality alone are ~8.4GB) and the same public-source
+        // justification in principle, but UNLIKE abr/asic there is no
+        // retained source extract or loader script for it anywhere on
+        // this machine as of this date (checked ~/Developer/xten/marketing-data/
+        // directly — only abr/ and asic/ exist there). Excluded anyway,
+        // deliberately, because the unrotated growth was actively
+        // breaking backups/deploys (see REQ-206) — Travis's explicit
+        // call, accepting the restore-time gap over the disk-space
+        // incident. If this instance is ever actually restored: G-NAF is
+        // a public dataset (Geoscape/PSMA, released quarterly) — download
+        // a fresh extract and write a loader before assuming this data
+        // comes back from the dump.
         $excludeTableData = [
             'abn_lookup.abns',
             'abn_lookup.trading_names',
             'abn_lookup.dgr',
             'abn_lookup.asic_companies',
             'abn_lookup.asic_business_names',
+            'gnaf.address_view',
+            'gnaf.address_detail',
+            'gnaf.address_default_geocode',
+            'gnaf.street_locality',
         ];
 
         $excludeFlags = '';
