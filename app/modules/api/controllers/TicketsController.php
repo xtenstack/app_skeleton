@@ -85,7 +85,7 @@ class TicketsController extends ControllerBase
         $ticket                   = new \Tickets();
         $ticket->title            = $title;
         $ticket->description      = isset($body['description']) ? (string) $body['description'] : null;
-        $ticket->severity         = isset($body['severity']) ? (string) $body['severity'] : 'normal';
+        $ticket->severity         = isset($body['severity']) ? (\Tickets::normalizeSeverity((string) $body['severity']) ?? 'normal') : 'normal';
         $ticket->ticket_type      = in_array($ticketType, ['bug', 'issue', 'feature', 'support'], true) ? $ticketType : 'bug';
         $ticket->source_ref       = isset($body['source_ref']) ? (string) $body['source_ref'] : null;
         $ticket->retest_agent_key = isset($body['retest_agent_key']) ? (string) $body['retest_agent_key'] : null;

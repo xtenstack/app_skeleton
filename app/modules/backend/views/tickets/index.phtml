@@ -57,7 +57,7 @@
             <label class="small mb-1">Set severity</label>
             <select class="form-control form-control-sm" name="severity">
               <option value="">— No change —</option>
-<?php foreach (['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'] as $value => $label): ?>
+<?php foreach (\Tickets::severityOptions() as $value => $label): ?>
               <option value="<?= $value ?>"><?= $label ?></option>
 <?php endforeach; ?>
             </select>
@@ -105,7 +105,7 @@
                 <td><?= $ticket->id ?></td>
                 <td><?= $this->escaper->escapeHtml($ticket->title) ?></td>
                 <td><span class="badge badge-light"><?= $this->escaper->escapeHtml(ucfirst($ticket->ticket_type ?: 'bug')) ?></span></td>
-                <td><span class="badge badge-<?= $ticket->severity === 'critical' ? 'danger' : ($ticket->severity === 'high' ? 'warning' : 'secondary') ?>"><?= $this->escaper->escapeHtml($ticket->severity) ?></span></td>
+                <td><span class="badge badge-<?= $ticket->severity === 'critical' ? 'danger' : ($ticket->severity === 'high' ? 'warning' : 'secondary') ?>"><?= $this->escaper->escapeHtml(\Tickets::severityOptions()[$ticket->severity] ?? $ticket->severity) ?></span></td>
                 <td><span class="badge badge-<?= $ticket->status === 'closed' ? 'success' : ($ticket->status === 'consolidated' ? 'secondary' : ($ticket->status === 'in_review' ? 'info' : 'primary')) ?>"><?= $this->escaper->escapeHtml($ticket->status) ?></span>
 <?php if ($ticket->auto_closed_at && !$ticket->qa_reviewed_at): ?>
                   <span class="badge badge-warning">needs QA</span>

@@ -67,4 +67,55 @@ class Tickets extends \Phalcon\Mvc\Model
     {
         $this->updated_at = date('Y-m-d H:i:s');
     }
+
+    /**
+     * REQ-195: the app's own severity scale (low/normal/high/critical)
+     * predates RB-18/the SLA docs' S1-S4 scale and the two never got
+     * reconciled — S1 is the most severe (outage/security), S4 the
+     * least (a question), the reverse order of this enum's own name
+     * ordering. Paired here rather than replacing the stored enum, so
+     * every existing sort/filter against the low/normal/high/critical
+     * column keeps working unchanged.
+     */
+    public const SEVERITIES = [
+        'low'      => ['label' => 'Low',      'sla_code' => 'S4'],
+        'normal'   => ['label' => 'Normal',   'sla_code' => 'S3'],
+        'high'     => ['label' => 'High',     'sla_code' => 'S2'],
+        'critical' => ['label' => 'Critical', 'sla_code' => 'S1'],
+    ];
+
+    /**
+     * Accepts either a canonical value (any case) or its SLA code (S1-S4,
+     * any case) and returns the canonical value, or null if neither
+     * matches — callers decide their own fallback (existing call sites
+     * mostly default to 'normal' on no match, matching prior behavior).
+     */
+    public static function normalizeSeverity(string $value): ?string
+    {
+        $value = strtolower(trim($value));
+
+        if (isset(self::SEVERITIES[$value])) {
+            return $value;
+        }
+
+        foreach (self::SEVERITIES as $canonical => $meta) {
+            if (strtolower($meta['sla_code']) === $value) {
+                return $canonical;
+            }
+        }
+
+        return null;
+    }
+
+    /** "Low / S4" — the paired label used by every severity <select>. */
+    public static function severityOptions(): array
+    {
+        $options = [];
+
+        foreach (self::SEVERITIES as $value => $meta) {
+            $options[$value] = "{$meta['label']} / {$meta['sla_code']}";
+        }
+
+        return $options;
+    }
 }
