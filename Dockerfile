@@ -120,6 +120,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # — switched to TCP :9000 since Caddy and PHP-FPM are separate
     # containers here, not sharing a filesystem for a socket.
     && sed -i 's|^listen = .*|listen = 9000|' /etc/php/8.3/fpm/pool.d/www.conf \
+    # Sury's php8.3-phalcon pulls in an unversioned php-phalcon5 dependency,
+    # which as of 2026-08-28 (the day php8.5 packages appeared in this repo)
+    # drags php8.5-cli in too and update-alternatives happily switches the
+    # unversioned `php` on PATH to it -- silently, no install error, since
+    # 8.5 is a perfectly valid install, just not the one this image's own
+    # extensions (php8.3-pgsql et al) are for. entrypoint.sh's `php -r`/
+    # `php bin/install.php` calls then run under 8.5, which has no pgsql
+    # extension at all ("could not find driver"), while php8.3-fpm itself
+    # (invoked by version, not via PATH) is unaffected -- this is why the
+    # smoke test failed with no corresponding code change to blame (REQ-204).
+    && update-alternatives --set php /usr/bin/php8.3 \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
