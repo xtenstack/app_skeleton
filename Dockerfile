@@ -4,12 +4,14 @@
 # three"). Per-instance differences (DB creds, site branding, enabled
 # modules) come from env vars and the database, not from separate images.
 #
-# Pinned to PHP 8.3, not the 8.5 that Ubuntu ships by default: Phalcon 5
-# only publishes prebuilt binaries up to PHP 8.3 (verified against
-# packages.sury.org's php-phalcon5 source package, 2026-07-30 — an earlier
-# claim that 8.5 binaries existed was wrong, and there's a long-standing
-# gap even for 8.4 — see the plan doc). Compiling Phalcon from source to
-# chase a newer PHP would defeat the entire point of using prebuilt binaries.
+# Pinned to PHP 8.3 (see the plan doc, stack.xten.au/roadmap/Library-Upgrade-Roadmap.md,
+# for the sequencing rationale beyond this one dependency). Phalcon
+# itself comes straight from its own GitHub releases now, not
+# packages.sury.org — see the dedicated RUN block below (REQ-204,
+# 2026-09-06): sury.org quietly dropped its PHP 8.3 Phalcon package
+# around 2026-08-28, and Phalcon's own release assets are a more
+# durable source for this one dependency regardless of what sury does
+# next. Still a prebuilt binary either way, not compiling from source.
 
 # ---- Stage 1: vendor/ ------------------------------------------------
 # Composer only, no Phalcon extension needed here — --ignore-platform-req
@@ -106,7 +108,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -sc)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update && apt-get install -y --no-install-recommends \
         php8.3-fpm \
-        php8.3-phalcon \
         php8.3-pgsql \
         php8.3-sqlite3 \
         php8.3-curl \
@@ -120,18 +121,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # — switched to TCP :9000 since Caddy and PHP-FPM are separate
     # containers here, not sharing a filesystem for a socket.
     && sed -i 's|^listen = .*|listen = 9000|' /etc/php/8.3/fpm/pool.d/www.conf \
-    # Sury's php8.3-phalcon pulls in an unversioned php-phalcon5 dependency,
-    # which as of 2026-08-28 (the day php8.5 packages appeared in this repo)
-    # drags php8.5-cli in too and update-alternatives happily switches the
-    # unversioned `php` on PATH to it -- silently, no install error, since
-    # 8.5 is a perfectly valid install, just not the one this image's own
-    # extensions (php8.3-pgsql et al) are for. entrypoint.sh's `php -r`/
-    # `php bin/install.php` calls then run under 8.5, which has no pgsql
-    # extension at all ("could not find driver"), while php8.3-fpm itself
-    # (invoked by version, not via PATH) is unaffected -- this is why the
-    # smoke test failed with no corresponding code change to blame (REQ-204).
-    && update-alternatives --set php /usr/bin/php8.3 \
     && apt-get purge -y --auto-remove curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Phalcon installed from its own GitHub release, not sury.org's apt
+# package -- REQ-204: sury.org's php8.3-phalcon quietly became an empty
+# "(dummy)" transitional package around 2026-08-28 (the day php8.5
+# packages appeared in that repo; php-phalcon5 now only targets 8.5
+# there), which also drags php8.5-cli onto PATH via an unversioned
+# dependency with no install-time error -- entrypoint.sh's CLI calls
+# then silently ran under a PHP with neither pdo_pgsql nor Phalcon
+# loaded. Phalcon's own releases (github.com/phalcon/cphalcon) still
+# publish a PHP 8.3 NTS build directly and verified working (loads
+# cleanly, phpversion('phalcon') === 5.20.3) against this exact
+# sury.org PHP 8.3 build on debian:bookworm-slim -- pinned by version +
+# a checksum computed from that verified download, not "latest", so a
+# future release change fails the build loudly instead of silently
+# swapping in an unverified binary. Two conf.d copies (not one
+# phpenmod-style symlink) because phpenmod already showed itself
+# unreliable across SAPIs once a stray php8.5 was on this system (see
+# the now-removed update-alternatives workaround this replaces) --
+# writing both directly removes that failure mode entirely.
+ARG PHALCON_VERSION=5.20.3
+ARG PHALCON_SHA256=62b4034164326848260d264c486f3811dc494f7c891a8c37440ed79afa33bd3f
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+    && curl -sSL -o /tmp/phalcon.zip \
+        "https://github.com/phalcon/cphalcon/releases/download/v${PHALCON_VERSION}/phalcon-php8.3-nts-ubuntu-gcc-x64.zip" \
+    && cd /tmp && unzip -q phalcon.zip phalcon.so \
+    && echo "${PHALCON_SHA256}  phalcon.so" | sha256sum -c - \
+    && install -m 644 phalcon.so "$(php -r 'echo ini_get("extension_dir");')/phalcon.so" \
+    && echo "extension=phalcon.so" > /etc/php/8.3/cli/conf.d/20-phalcon.ini \
+    && echo "extension=phalcon.so" > /etc/php/8.3/fpm/conf.d/20-phalcon.ini \
+    && rm -f /tmp/phalcon.zip /tmp/phalcon.so \
+    && php -m | grep -qi '^phalcon$' \
+    && apt-get purge -y --auto-remove curl unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # sury's default upload_max_filesize (2M)/post_max_size (8M) are both below
