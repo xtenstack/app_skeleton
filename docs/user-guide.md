@@ -50,6 +50,20 @@ for the pattern below, not Ticketing.
 
 ## Building your own module
 
+Two blank/template modules exist specifically to copy as a starting
+point rather than assembling the shape below by hand: `application-template`
+(application-tier, demo entity **Widgets**) and `plugin-template`
+(plugin-tier, demo entity **Tags**), both public packages in the
+`xtenstack/module-templates` repo. Each is line-for-line the same shape
+a real module needs — manifest, `Module.php`, controllers, models,
+migrations, views, menu — minus any actual feature; their own `README.md`
+walks through renaming the package/namespace/`key` and swapping the demo
+entity for your real one. `composer require xtenstack/application-template`
+or `xtenstack/plugin-template` to pull one in (see INSTALL.md's "After
+install"), then copy its directory rather than starting from nothing.
+`requirements-module` (in this project's private `internal` repo) is the
+fuller worked example once you need more than the template shows.
+
 1. A Composer package (its own repo, or a local `path` repository during
    development) with a `module.json` manifest at its root. Required
    fields: `key` (unique, used as the `module_registry` key) and `tier`
@@ -97,6 +111,11 @@ module.
   or `fix/<issue>` branch names, Conventional Commits — see
   CODING-STANDARDS.md's Git workflow section.
 - Soft deletes, audit logging, CSRF, RBAC: CODING-STANDARDS.md.
+- Starting from a blank template module (`application-template` or
+  `plugin-template`, see above) already satisfies every convention on
+  this list out of the box — the fastest way to conform isn't checking
+  each bullet by hand against a module you built from scratch, it's
+  starting from scaffolding that already passes them.
 
 ## Why the split
 
