@@ -31,6 +31,11 @@ session.
 5. **`AutoClaudeDev/Task Prompts/`** and
    `internal/queue/{pending,done,failed}/` — an ACD launch prompt
    existing here but no matching run log means "queued, not yet run."
+6. **Prod `/requirements` module, `status='hold'`** — some modules never
+   got a `docs/module-plans/` doc at all, only a logged `REQ-NNN` (e.g.
+   Geonames, Currency Exchange, Tenders, Permissions, Messaging,
+   Projects) — these are real On hold rows this list would otherwise
+   miss entirely. Use the REQ's `created_at` as its first-mention date.
 
 ## What counts as a status
 
@@ -57,13 +62,25 @@ guessing from the plan's mere existence. Roughly:
    and the MAAMA register (steps 1-4 above).
 2. For each distinct module (not engine features like nav takeover or
    the dependency framework — those live in the requirements module as
-   `REQ-NNN` items, not here), produce one line: **name — status —
-   one-clause why**, plus the specific blocker for anything queued or on
-   hold.
-3. Present as a flat list grouped by status (Shipped / In progress /
-   Queued / Mooted / On hold), not by discovery order.
-4. Cross-reference open MAAMA rows or `REQ-NNN` ids inline rather than
-   repeating their detail.
+   `REQ-NNN` items, not here), produce one row of a table with these
+   columns:
+   - **Date** — the module's *first-mention* date: the earliest of its
+     `docs/module-plans/*.md` file's own version date (the `*vN.N —
+     YYYY-MM-DD*` line most of these plans open with) and any MAAMA
+     handover date that raised it, whichever is earlier. Not the date
+     of this list itself.
+   - **Module Name**.
+   - **Status** — Shipped / In progress / Queued / Mooted / On hold
+     (see below).
+   - **Comments** — the one-clause why, plus the specific blocker for
+     anything Queued or On hold, plus a MAAMA/`REQ-NNN` cross-reference
+     where one exists.
+   - **Due Date** — blank/`—` unless Travis has actually set one; don't
+     invent a target date to fill the column.
+3. Sort the table by Status (Shipped / In progress / Queued / Mooted /
+   On hold, in that order), not by discovery order or Date.
+4. Cross-reference open MAAMA rows or `REQ-NNN` ids in Comments rather
+   than repeating their detail.
 
 ## Don't
 
