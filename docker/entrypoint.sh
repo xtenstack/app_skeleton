@@ -108,8 +108,8 @@ fi
 i=0
 until php -r "new PDO('pgsql:host=${DB_HOST};port=${DB_PORT:-5432};dbname=${DB_NAME}', '${DB_USER}', '${DB_PASSWORD}');" 2>/dev/null; do
     i=$((i + 1))
-    if [ "$i" -ge 30 ]; then
-        echo "entrypoint: database never became reachable after 30s, giving up" >&2
+    if [ "$i" -ge 60 ]; then
+        echo "entrypoint: database never became reachable after 60s, giving up" >&2
         exit 1
     fi
     sleep 1
