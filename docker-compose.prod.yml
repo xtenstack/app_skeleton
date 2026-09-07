@@ -19,19 +19,18 @@
 # environment uses would have broken all of them the next `docker
 # compose up`, this repo's own CI included. This file only applies where
 # it's explicitly requested with `-f`.
+# The actual shared Caddy container (reading xten-marketing's static
+# assets via the /opt/xten-marketing/public bind mount, proxying
+# xtmk.xten.au to xten-marketing-app-1 over edge_shared) is defined in
+# app_skeleton's own docker-compose.prod.yml, not here -- this project
+# never runs its own caddy service (confirmed: only
+# app_skeleton-caddy-1 exists, no xten-marketing-caddy-1). A `caddy:`
+# stanza used to be duplicated here with no image/build of its own,
+# which made `docker compose -f ... -f docker-compose.prod.yml up
+# --build` fail outright ("service caddy has neither an image nor a
+# build context") -- removed 2026-09-07.
 services:
   app:
-    networks:
-      - default
-      - edge_shared
-
-  caddy:
-    volumes:
-      # xten-marketing's built static assets, read-only — see the
-      # xtmk.xten.au block in docker/Caddyfile, which php_fastcgi-proxies
-      # PHP requests to xten-marketing-app-1:9000 over edge_shared and
-      # serves everything else straight from this mount.
-      - /opt/xten-marketing/public:/marketing-public:ro
     networks:
       - default
       - edge_shared
