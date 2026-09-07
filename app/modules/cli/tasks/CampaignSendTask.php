@@ -24,16 +24,19 @@ namespace App_skeleton\Modules\Cli\Tasks;
  *    default (see 2026-08-27's Perth_IT_Businesses.xlsx finding for why
  *    that default matters).
  *  - campaigns.mail_template_id must be set -- no silent fallback template.
- *  - a member is only eligible once first_line is non-empty. That field
- *    carries the one-line, specific, verified fact Health-Check-Outreach-
- *    Emails.md rule 2 calls "the whole game" -- a merge field is
+ *  - a member is only eligible once first_paragraph is non-empty. That
+ *    field carries the specific, verified fact Data-Restore-Audit-
+ *    Outreach-Emails.md rule 2 calls "the whole game" -- a merge field is
  *    explicitly NOT personalisation per that doc, so this task refuses to
  *    fabricate one and refuses to send without it, however qualified a
  *    member otherwise looks. This is the main lever a human has over what
- *    actually goes out: write first_line, the record becomes eligible;
- *    leave it blank, it never sends. (Migration 008, XTMK Session 1: this
- *    was `notes` until this session -- moved to its own column so `notes`
- *    is free for general use without silently changing what sends.)
+ *    actually goes out: write first_paragraph, the record becomes
+ *    eligible; leave it blank, it never sends. (Migration 008, XTMK
+ *    Session 1: this was `notes` until this session -- moved to its own
+ *    column so `notes` is free for general use without silently changing
+ *    what sends. Renamed from first_line to first_paragraph by migration
+ *    016, matching the merge-field rename in the documented outreach copy
+ *    since 2026-08-29 -- MAA-20260829-001.)
  *  - abn_lookup.unsubscribes is checked immediately before every single
  *    send, not once at the start of the run.
  *  - priority = 0 is a manual exclude -- ignored regardless of every other
@@ -99,11 +102,11 @@ class CampaignSendTask extends \Phalcon\Cli\Task
         $limit = $limitArg !== null ? (int) $limitArg : (int) $campaign['daily_send_limit'];
 
         $candidates = $db->fetchAll(
-            "SELECT abn, main_ent_name, first_line, best_contact_kind, best_contact_value, best_contact_person_name
+            "SELECT abn, main_ent_name, first_paragraph, best_contact_kind, best_contact_value, best_contact_person_name
              FROM abn_lookup.v_campaign_prospects
              WHERE campaign_code = :code
                AND outreach_status = 'not contacted'
-               AND first_line IS NOT NULL AND btrim(first_line) != ''
+               AND first_paragraph IS NOT NULL AND btrim(first_paragraph) != ''
                AND best_contact_kind = 'email'
                AND best_contact_value IS NOT NULL
                AND priority IS DISTINCT FROM 0
@@ -119,7 +122,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
         );
 
         if (!$candidates) {
-            echo "No eligible members in {$campaignCode} -- need: not contacted, priority not 0, first_line set on campaign_members, and a real email." . PHP_EOL;
+            echo "No eligible members in {$campaignCode} -- need: not contacted, priority not 0, first_paragraph set on campaign_members, and a real email." . PHP_EOL;
 
             return;
         }
@@ -144,8 +147,8 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             $name    = $row['best_contact_person_name'] ?: 'there';
             $subject = $template['subject'];
             $body    = str_replace(
-                ['{{name}}', '{{first_line}}'],
-                [$name, trim($row['first_line'])],
+                ['{{name}}', '{{first_paragraph}}'],
+                [$name, trim($row['first_paragraph'])],
                 $template['body']
             );
 
