@@ -200,6 +200,19 @@ install.
   (`UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE email = '...'`).
 - `./run` with no arguments lists every available CLI task.
 - `./run modules sync` after installing any additional module package.
+- **Template modules** (optional) — `xtenstack/application-template` and
+  `xtenstack/plugin-template` are blank scaffolding for building your own
+  module, not features with value on their own (their demo entities,
+  "Widgets" and "Tags", are deliberately trivial). Both are public
+  packages in the `xtenstack/module-templates` repo. Install either with
+  `composer require xtenstack/application-template` and/or
+  `composer require xtenstack/plugin-template`, then `./run modules sync`
+  and enable from the Configuration page (or `./run modules enable
+  widgets`/`tags`) if you want to see the demo running; more commonly
+  you'll copy the package directory as a starting point instead of
+  enabling it at all — see "Building your own module" in
+  `docs/user-guide.md`. Safe to leave uninstalled if you're not about to
+  build a module.
 - **Outgoing mail (signup verification, password reset, etc.) is your
   responsibility to get working.** By default the app calls PHP's
   native `mail()`, which relies on a local MTA (sendmail/postfix/etc.)

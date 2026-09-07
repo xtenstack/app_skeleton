@@ -51,10 +51,13 @@ identical here.
 
 ## At the end: three files, in `claude/sessions/modules/`
 
-1. **`Modules-Session-N-Summary.md`** — one per Modules-thread session,
-   numbered sequentially from this thread's own count (this skill's
-   first use is Modules Session #1). Same structure as the main
-   thread's `Session-NN-Summary.md`:
+1. **`Modules-Session-N-Summary-YYYY-MM-DD-HHMM-TZ.md`** (as of Session 3
+   — stamped to the day *and time* written, plus timezone, same reason
+   as the Handover below: a bare session number doesn't sort or
+   disambiguate against same-day re-visits to a session's own docs) —
+   one per Modules-thread session, numbered sequentially from this
+   thread's own count (this skill's first use is Modules Session #1).
+   Same structure as the main thread's `Session-NN-Summary.md`:
    - Start/end time line near the top.
    - Opening paragraph: agenda vs. what actually landed, honest framing
      if something was deferred rather than padded to look done.
@@ -79,7 +82,9 @@ identical here.
      `REQ-NNN` ids in prod rather than repeating detail.
    - `## Reference notes`.
 
-3. **`wrap-up-request(Modules Session N)-YYYY-MM-DD.md`** — the
+3. **`wrap-up-request(Modules Session N)-YYYY-MM-DD-HHMM-TZ.md`** (as of
+   Session 3 — time and zone added to the stamp, same reason as the
+   other two files in this trio) — the
    Modules-thread variant of the main thread's
    `session-request-wrapup` skill, run inline as part of this skill
    rather than as a separate invocation (this thread doesn't have its
@@ -107,9 +112,9 @@ identical here.
      original request doc — that belongs in the Summary instead, not
      here (same scope rule as `session-request-wrapup`).
    - Write it in the same folder as the Request doc
-     (`claude/sessions/modules/`), dated to the day the session
-     actually wrapped (not the day the request doc was drafted, if
-     they differ).
+     (`claude/sessions/modules/`), stamped to the day and time the
+     session actually wrapped (not the day the request doc was
+     drafted, if they differ).
 
 If a session ends mid-stream rather than at a natural stopping point,
 say so explicitly at the top of the handover, same as the main thread's

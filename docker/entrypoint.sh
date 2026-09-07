@@ -109,10 +109,14 @@ fi
 # ordering at first boot, but this covers Postgres restarting independently
 # of the app container later.
 i=0
-until php -r "new PDO('pgsql:host=${DB_HOST};port=${DB_PORT:-5432};dbname=${DB_NAME}', '${DB_USER}', '${DB_PASSWORD}');" 2>/dev/null; do
+pdo_err=""
+until pdo_err=$(php -r "new PDO('pgsql:host=${DB_HOST};port=${DB_PORT:-5432};dbname=${DB_NAME}', '${DB_USER}', '${DB_PASSWORD}');" 2>&1); do
     i=$((i + 1))
-    if [ "$i" -ge 30 ]; then
-        echo "entrypoint: database never became reachable after 30s, giving up" >&2
+    if [ "$i" -ge 60 ]; then
+        echo "entrypoint: database never became reachable after 60s, giving up" >&2
+        echo "entrypoint: last PDO error: ${pdo_err}" >&2
+        echo "entrypoint: DB_HOST=${DB_HOST} DB_PORT=${DB_PORT:-5432} DB_NAME=${DB_NAME} DB_USER=${DB_USER}" >&2
+        getent hosts "${DB_HOST}" >&2 2>&1 || echo "entrypoint: getent hosts ${DB_HOST} failed" >&2
         exit 1
     fi
     sleep 1
