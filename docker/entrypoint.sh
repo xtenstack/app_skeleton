@@ -28,6 +28,9 @@ return [
     'mail' => [
         'resend_api_key' => '${RESEND_API_KEY}',
     ],
+    'search' => [
+        'brave_api_key' => '${BRAVE_API_KEY}',
+    ],
     'database' => [
         'host'     => '${DB_HOST}',
         'port'     => (int) '${DB_PORT:-5432}',
