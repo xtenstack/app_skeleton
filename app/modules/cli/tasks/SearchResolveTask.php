@@ -294,7 +294,11 @@ class SearchResolveTask extends \Phalcon\Cli\Task
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        return ($code === 200 && $body) ? $body : null;
+        // curl_exec() returns string|bool (false on failure) with
+        // RETURNTRANSFER set — narrow explicitly rather than relying on
+        // $body's truthiness, which Psalm can't infer down to the
+        // declared ?string return type on its own.
+        return ($code === 200 && is_string($body) && $body !== '') ? $body : null;
     }
 
     private function isValidAbnChecksum(string $abn): bool
@@ -307,6 +311,14 @@ class SearchResolveTask extends \Phalcon\Cli\Task
         $sum     = 0;
 
         foreach (str_split($abn) as $i => $digit) {
+            // strlen($abn) !== 11 already returned above, so $i is always
+            // 0-10 in practice — Psalm can't infer that from str_split()'s
+            // own return type, so this stays an explicit bounds check
+            // rather than an unchecked offset.
+            if (!isset($weights[$i])) {
+                return false;
+            }
+
             $value = (int) $digit - ($i === 0 ? 1 : 0);
             $sum  += $value * $weights[$i];
         }
