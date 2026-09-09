@@ -1,17 +1,38 @@
-# Isolated marketing-system instance, sharing stack-prod's edge Caddy
-# (app_skeleton_default network) rather than running a second reverse
-# proxy - ports 80/443 are already owned by the primary instance's Caddy
-# container. This app + its db are otherwise fully separate: own
-# containers, own database, own volumes.
+# Local build/test stack for app_skeleton — the same app image this
+# produces is what Internal Prod, every External Client instance, and the
+# dev droplet's own local test stack run (see
+# stack.xten.au/VPS-Two-Droplet-Deploy-Plan.md). Actual prod/client
+# deploys pull a pre-built, tagged image rather than building here — this
+# file is for local iteration and for the dev droplet's pre-prod testing.
+#
+# First-time setup (see docker/entrypoint.sh for why):
+#   mkdir -p data && touch data/encryption_key
+#   cp .env.example .env   # then fill in real values
+#
+# Internal Prod only needs one more thing on top of this file — see
+# docker-compose.prod.yml for why, and RB-05 for the actual deploy
+# command. That file (and its edge_shared external network) must never
+# be folded into this one — restored 2026-09-09 after a bad merge
+# (2fb5a67) replaced this file's own local-dev stack with xten-
+# marketing's instance variant wholesale (different Caddy setup, no
+# port 8080 published, edge_shared as a non-optional external network),
+# which broke every fresh `docker compose up` and CI itself (network
+# edge_shared declared as external, but could not be found) for anyone
+# without that network already created — see docker-compose.prod.yml's
+# own comments for why edge_shared is prod-only by design.
 services:
   app:
     build:
       context: .
+      # Sibling checkout of any private modules repo (see
+      # docs/INTERNAL-MODULES.md) — must exist even if empty
+      # (`mkdir -p ../internal`) so a build with no private
+      # modules configured still works unmodified.
       additional_contexts:
         internal-modules: ../internal
     restart: unless-stopped
     # Container logs default to unbounded — on a long-running droplet
-    # that fills the disk eventually. Capped the same way on both
+    # that fills the disk eventually. Capped the same way on all three
     # services below.
     logging:
       driver: json-file
@@ -19,31 +40,100 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      APP_ENV: ${APP_ENV:-production}
+      APP_ENV: ${APP_ENV:-development}
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
+      DB_NAME: ${DB_NAME:-app_skeleton}
+      DB_USER: ${DB_USER:-app_skeleton}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      # Optional — mail() has no MTA to relay through until these are set
+      # (existing, pre-2026-07-30 behavior: send fails, gets logged, request
+      # still succeeds). Empty defaults rather than a required ${VAR:?...}
+      # since local dev shouldn't need real mail credentials just to run
+      # the stack.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      # Mailer.php's Resend path (see that file — logs and skips sending
+      # rather than erroring when unset) and SearchResolveTask's Brave
+      # lookup — same optional, empty-default treatment as the SMTP vars
+      # above, for the same reason.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
     volumes:
       - ./data/encryption_key:/app/.encryption_key
       - ./data/files:/app/public/files
       - ./data/logs:/app/logs
+      # Sessions (app/config/services.php sets savePath to BASE_PATH .
+      # '/sessions', not PHP's ini-configured session.save_path — the app
+      # uses its own Stream adapter). Every deploy does a full container
+      # recreate (`docker compose up -d --build`), which wipes anything
+      # not bind-mounted. Without this, every deploy silently logs
+      # everyone out and invalidates any in-flight CSRF token, which read
+      # as a recurring, unfixable "session expired" bug rather than what
+      # it actually was: normal redeploys during active testing (found
+      # 2026-08-01, session 10).
       - ./data/sessions:/app/sessions
+      # Ticket attachments — deliberately NOT under public/files (see
+      # migration 013_ticket_attachments.sql and
+      # TicketsController::downloadAttachmentAction): attachments can
+      # contain sensitive content (e.g. a customer's phpinfo() dump), so
+      # they're served through an authenticated action rather than Caddy's
+      # static file_server, and this mount is app-only — no caddy mount.
       - ./data/ticket-attachments:/app/storage/ticket-attachments
+      # Agent Rooms message attachments (xtenstack/agent-rooms-module,
+      # Modules Session 2) — same rationale as ticket-attachments above:
+      # served through an authenticated action, not Caddy's static
+      # file_server, so this is an app-only mount too.
+      - ./data/agent-room-attachments:/app/storage/agent-room-attachments
+      # Same host path docker/backup-db.sh already wrote to (not under
+      # data/) — BackupTask (REQ-077) reuses it so existing backups on
+      # any already-deployed instance stay in one place, not split
+      # across two directories.
       - ./backups:/app/backups
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - default
-      - shared_edge
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      # Default to non-privileged local ports so this doesn't fight
+      # anything already on :80/:443 during local dev. Real deployments
+      # (see .env.example) map to the real ports — Let's Encrypt's
+      # HTTP-01/TLS-ALPN-01 challenges specifically require 80/443 exactly,
+      # automatic HTTPS won't work on any other port.
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    environment:
+      # http:// prefix by default (see docker/Caddyfile) — bare "localhost"
+      # still triggers Caddy's automatic HTTPS + redirect, which breaks
+      # plain-HTTP curl checks (CI, local dev). Real deployments override
+      # this with an actual domain and no scheme prefix.
+      SITE_DOMAIN: ${SITE_DOMAIN:-http://localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Static assets (css/js/img) come straight from the host repo's
+      # public/ — the more specific mount below overrides just the
+      # files/ subpath with the same host dir the app container writes
+      # uploads into, so avatars show up without duplicating that data.
+      # The outer mount can't be :ro — Docker needs to create the inner
+      # mount's mountpoint directory inside it, which fails against an
+      # already-read-only parent mount even though the dir exists on the
+      # host (verified 2026-07-30). Caddy has no reason to write here
+      # regardless, so this isn't a meaningful loosening.
+      - ./public:/app/public
+      - ./data/files:/app/public/files:ro
+      - caddy_data:/data
+    depends_on:
+      - app
 
   db:
     image: postgres:18-alpine
@@ -53,39 +143,30 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # Loopback-only — reachable solely via an SSH-tunneled GUI client
-    # (e.g. TablePlus) from the droplet's own localhost, never the public
-    # internet. POSTGRES_HOST_AUTH_METHOD is `trust` (no exposed host
-    # port when this was set, so a password added no real protection —
-    # see docker-compose git history), so this bind address is the only
-    # thing standing between this database and anyone who can reach port
-    # 5433. Do not change 127.0.0.1 to 0.0.0.0 or drop it entirely.
-    #
-    # Host port is 5433, not Postgres's default 5432 -- 5432 is already
-    # permanently owned by the main production instance's own database
-    # (app_skeleton-db-1, a separate container, separate database
-    # entirely), found the hard way when this one failed to bind
-    # 2026-08-27.
-    ports:
-      - "127.0.0.1:5433:5432"
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME:-app_skeleton}
+      POSTGRES_USER: ${DB_USER:-app_skeleton}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
-      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      # Bound to loopback only — lets the host's own psql/pg_dump (see
+      # docker/backup-db.sh) reach the database directly, without
+      # exposing Postgres beyond the machine itself. Never publish this
+      # without the 127.0.0.1 prefix.
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
     volumes:
+      # Postgres 18's image changed its expected layout — it wants a
+      # single mount at /var/lib/postgresql (manages its own
+      # version-specific subdirectory beneath it, pg_ctlcluster-style),
+      # not the older .../data convention. Verified 2026-07-30: the
+      # container refuses to start at all against the old path, even with
+      # a freshly-created empty volume.
       - db_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app_skeleton}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-networks:
-  default:
-  shared_edge:
-    external: true
-    name: edge_shared
-
 volumes:
   db_data:
+  caddy_data:
