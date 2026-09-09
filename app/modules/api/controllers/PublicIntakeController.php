@@ -79,7 +79,13 @@ class PublicIntakeController extends \Phalcon\Mvc\Controller
             'bind'       => ['token' => $token],
         ]);
 
-        if (!$ticket) {
+        // \Tickets::findFirst() is typed against Phalcon's own
+        // ModelInterface, not the concrete Tickets class — an explicit
+        // instanceof (true in practice; Tickets::findFirst() cannot
+        // return anything else) narrows it back so intake_data/
+        // intake_submitted_at/intake_token below resolve as real
+        // properties, not an interface access.
+        if (!$ticket instanceof \Tickets) {
             // Same response whether the token never existed or was
             // already consumed — never confirm to an untrusted caller
             // which case it was.
