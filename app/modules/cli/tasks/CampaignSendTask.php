@@ -46,8 +46,18 @@ namespace App_skeleton\Modules\Cli\Tasks;
  *    fall back to the existing score-DESC order among themselves
  *    (migration 007, XTMK Session 1 -- added after a dry-run surfaced data
  *    quality that needs a human override, not pure score-based trust).
- *  - never wired into cron -- run by hand (with dry-run first) until
- *    proven safe over real sends.
+ *  - wired into cron as of 2026-09-11 (Travis's explicit call, after
+ *    the Utilities canary's 20 real sends and this task's own ordering
+ *    bug were both reviewed) -- sendAllAction() is what cron_jobs
+ *    actually invokes, once daily, over every currently-'active'
+ *    campaign at its own daily_send_limit. The status='active' gate
+ *    below is what still keeps a freshly-built campaign from sending
+ *    automatically -- CampaignActivateTask is the piece that flips it,
+ *    on each campaign's own scheduled_activation_date, so the staged
+ *    rollout (smallest divisions first) still happens without a human
+ *    re-running SQL every day. sendAction() (single campaign, dry-run
+ *    supported) stays the manual/review path for everything else --
+ *    a new campaign, a re-run, or checking one division out of cycle.
  *  - candidate ordering ends with `abn ASC` specifically so ties (most
  *    of this population has no score at all -- see the ANZSIC campaign
  *    docs) resolve the same way every time a query runs. Without it,
@@ -63,6 +73,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
     public function mainAction(): void
     {
         echo 'Usage: ./run campaign-send send <campaign_code> [dry-run] [limit]' . PHP_EOL;
+        echo '       ./run campaign-send send-all   -- every active campaign, its own daily_send_limit each (cron entry point)' . PHP_EOL;
     }
 
     public function sendAction($campaignCode = null, $mode = null, $limitArg = null): void
@@ -73,8 +84,49 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             return;
         }
 
-        $dryRun = ($mode === 'dry-run');
-        $db     = $this->db;
+        $this->sendOneCampaign($campaignCode, $mode === 'dry-run', $limitArg !== null ? (int) $limitArg : null);
+    }
+
+    /**
+     * Cron entry point (CampaignActivateTask's counterpart on the
+     * activation side) -- no dry-run, no limit override, every
+     * currently-'active' campaign gets exactly one pass at its own
+     * daily_send_limit. Real send failures inside one campaign don't
+     * stop the loop -- sendOneCampaign() already handles its own
+     * per-recipient failures the same way (logs, moves on), so a bad
+     * template or a Resend outage on one campaign shouldn't also skip
+     * every campaign after it in the loop.
+     */
+    public function sendAllAction(): void
+    {
+        $codes = array_column(
+            $this->db->fetchAll(
+                "SELECT campaign_code FROM abn_lookup.campaigns WHERE status = 'active' ORDER BY campaign_code",
+                \Phalcon\Db\Enum::FETCH_ASSOC
+            ),
+            'campaign_code'
+        );
+
+        if (!$codes) {
+            echo 'No active campaigns.' . PHP_EOL;
+
+            return;
+        }
+
+        foreach ($codes as $code) {
+            echo "=== {$code} ===" . PHP_EOL;
+
+            try {
+                $this->sendOneCampaign($code, false, null);
+            } catch (\Throwable $e) {
+                echo "  ERROR in {$code}: {$e->getMessage()} -- continuing to next campaign" . PHP_EOL;
+            }
+        }
+    }
+
+    private function sendOneCampaign(string $campaignCode, bool $dryRun, ?int $limitOverride): void
+    {
+        $db = $this->db;
 
         $campaign = $db->fetchOne(
             'SELECT campaign_code, title, status, mail_template_id, daily_send_limit
@@ -108,7 +160,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             ['id' => $campaign['mail_template_id']]
         );
 
-        $limit = $limitArg !== null ? (int) $limitArg : (int) $campaign['daily_send_limit'];
+        $limit = $limitOverride ?? (int) $campaign['daily_send_limit'];
 
         $candidates = $db->fetchAll(
             "SELECT abn, main_ent_name, first_paragraph, best_contact_kind, best_contact_value, best_contact_person_name
