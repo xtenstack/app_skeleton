@@ -37,8 +37,19 @@ class Mailer extends Injectable
      * to guard against — a scanner prefetching links in the body never
      * triggers this header at all, only a real click on the mail
      * client's own button does.
+     *
+     * Return value is `string|bool`, not a plain bool, so a caller that
+     * wants to correlate a later bounce/complaint webhook back to this
+     * exact send (WebhookController::resendAction()) has Resend's own
+     * message ID to key on — campaign_sends.provider_message_id, added
+     * alongside this. `false` on a real API failure; `true` (no ID) on
+     * the two shortcut paths below where nothing was actually sent to
+     * Resend at all, so there is no real message ID to return. Both
+     * still read as truthy for the existing `$sent ? 'sent' : 'failed'`
+     * call site — only `is_string($sent)` callers need to care about
+     * the difference.
      */
-    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null): bool
+    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null): string|bool
     {
         // Ticket #19: real signup/password-reset flows exercised by
         // PHPUnit's RbacTest (and Playwright's fixtures) use this
@@ -109,6 +120,18 @@ class Mailer extends Injectable
             return false;
         }
 
-        return true;
+        $decoded = json_decode((string) $response, true);
+        $id      = is_array($decoded) ? ($decoded['id'] ?? null) : null;
+
+        if (!is_string($id) || $id === '') {
+            // Resend returned 200 but not the shape we expect -- still a
+            // real send (don't report failure for something that likely
+            // went out), just nothing to correlate a bounce against later.
+            error_log("Mailer: Resend API returned 200 but no message id sending '{$subject}' to {$to} — body: {$response}");
+
+            return true;
+        }
+
+        return $id;
     }
 }

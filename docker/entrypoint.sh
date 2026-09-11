@@ -26,7 +26,8 @@ cat > /app/app/config/config.local.php <<PHP
 <?php
 return [
     'mail' => [
-        'resend_api_key' => '${RESEND_API_KEY}',
+        'resend_api_key'        => '${RESEND_API_KEY}',
+        'resend_webhook_secret' => '${RESEND_WEBHOOK_SECRET:-}',
     ],
     'search' => [
         'brave_api_key' => '${BRAVE_API_KEY}',

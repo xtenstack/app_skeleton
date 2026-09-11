@@ -208,12 +208,21 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             $mailer->setDI($this->getDI());
             $sent = $mailer->send($email, $subject, $body, $unsubscribeUrl);
 
+            // Mailer::send() returns the Resend message id (string) on a
+            // real send, plain `true` on the two shortcut paths where
+            // nothing was actually sent to Resend (.invalid test
+            // addresses, missing API key), `false` on a real failure.
+            // Stored so WebhookController::resendAction() can correlate
+            // a later bounce/complaint event back to this exact row.
+            $providerMessageId = is_string($sent) ? $sent : null;
+
             $db->execute(
-                'UPDATE abn_lookup.campaign_sends SET status = :status, sent_at = :sent_at WHERE unsubscribe_token = :token',
+                'UPDATE abn_lookup.campaign_sends SET status = :status, sent_at = :sent_at, provider_message_id = :provider_message_id WHERE unsubscribe_token = :token',
                 [
-                    'status'  => $sent ? 'sent' : 'failed',
-                    'sent_at' => $sent ? date('Y-m-d H:i:s') : null,
-                    'token'   => $token,
+                    'status'              => $sent ? 'sent' : 'failed',
+                    'sent_at'             => $sent ? date('Y-m-d H:i:s') : null,
+                    'provider_message_id' => $providerMessageId,
+                    'token'               => $token,
                 ]
             );
 
