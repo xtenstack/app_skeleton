@@ -23,6 +23,7 @@
               <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Email', 'email', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
               <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Name', 'first_name', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
               <th>Role</th>
+              <th>Operator Code</th>
               <th>Active</th>
               <th></th>
             </tr>
@@ -33,6 +34,7 @@
               <td><?= $this->escaper->escapeHtml($user->email) ?></td>
               <td><?= $this->escaper->escapeHtml(trim($user->first_name . ' ' . $user->last_name)) ?></td>
               <td><?= $this->escaper->escapeHtml($user->Roles ? $user->Roles->name : '—') ?></td>
+              <td><?= $user->operator_code ? $this->escaper->escapeHtml($user->operator_code) : '—' ?></td>
               <td><?= $user->is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>' ?></td>
               <td class="text-right">
                 <a href="<?= $this->url->get('backend/users/edit/' . $user->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
@@ -48,7 +50,7 @@
 <?php endforeach; ?>
 <?php if (!count($users)): ?>
             <tr>
-              <td colspan="5" class="text-center text-muted">No users yet.</td>
+              <td colspan="6" class="text-center text-muted">No users yet.</td>
             </tr>
 <?php endif; ?>
           </tbody>

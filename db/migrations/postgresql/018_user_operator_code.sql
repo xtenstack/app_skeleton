@@ -1,0 +1,15 @@
+-- Generic operator code field on users, per Travis (2026-09-12): Charter
+-- Agent sales operator codes (CA-01..CA-10, per DE-26-onboard-a-charter-
+-- agent-v1.0-FINAL.md Step 5 and Lead-to-Close-Process's operator_codes
+-- registry) don't get their own dedicated table/column -- they're just a
+-- value in this generic field, manually prefixed by whoever assigns it
+-- (CA- today, other operator-code schemes later without a schema
+-- change). Nullable and unvalidated by design: most users never get one.
+--
+-- Mirrors xten-marketing's own 017_user_operator_code.sql -- added here
+-- too since xten-marketing and app_skeleton are two separate live
+-- deployments of the same codebase (own databases, currently on
+-- diverged branches -- see PR #13) that are expected to merge into one
+-- system eventually; this field needs to exist on both sides of that
+-- merge, not just the one where Charter Agents are onboarded first.
+ALTER TABLE users ADD COLUMN operator_code TEXT;
