@@ -84,7 +84,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             return;
         }
 
-        $this->sendOneCampaign($campaignCode, $mode === 'dry-run', $limitArg !== null ? (int) $limitArg : null);
+        $this->sendOneCampaign($campaignCode, $mode === 'dry-run', $limitArg !== null ? (int) $limitArg : null, true);
     }
 
     /**
@@ -117,14 +117,30 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             echo "=== {$code} ===" . PHP_EOL;
 
             try {
-                $this->sendOneCampaign($code, false, null);
+                // Not verbose -- see sendOneCampaign()'s docblock note.
+                // cron_run_log.output is one text column per run; a
+                // per-recipient line for every send, times ~768/day once
+                // the full rollout is active, would make that column
+                // unusably large within days. A summary count is what
+                // the cron log is actually for -- the per-recipient
+                // detail still exists, in campaign_sends, queryable per
+                // campaign from its own admin screen.
+                $this->sendOneCampaign($code, false, null, false);
             } catch (\Throwable $e) {
                 echo "  ERROR in {$code}: {$e->getMessage()} -- continuing to next campaign" . PHP_EOL;
             }
         }
     }
 
-    private function sendOneCampaign(string $campaignCode, bool $dryRun, ?int $limitOverride): void
+    /**
+     * $verbose controls whether every recipient gets its own echo line
+     * ("SENT to X <email>", "WOULD SEND to X: <full body>", "SKIP X --
+     * unsubscribed") or just a one-line summary count at the end. The
+     * manual/dry-run path (sendAction()) always wants the detail -- it's
+     * a human reviewing one campaign. sendAllAction() (the cron path)
+     * wants the summary -- see its own call site for why.
+     */
+    private function sendOneCampaign(string $campaignCode, bool $dryRun, ?int $limitOverride, bool $verbose): void
     {
         $db = $this->db;
 
@@ -188,7 +204,13 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             return;
         }
 
-        echo count($candidates) . ($dryRun ? ' candidate(s) [dry-run, nothing will send]:' : ' to send:') . PHP_EOL;
+        if ($verbose) {
+            echo count($candidates) . ($dryRun ? ' candidate(s) [dry-run, nothing will send]:' : ' to send:') . PHP_EOL;
+        }
+
+        $sentCount = 0;
+        $failedCount = 0;
+        $skippedCount = 0;
 
         foreach ($candidates as $row) {
             $email = $row['best_contact_value'];
@@ -200,7 +222,11 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             );
 
             if ($unsubscribed) {
-                echo "  SKIP {$row['main_ent_name']} <{$email}> -- unsubscribed" . PHP_EOL;
+                $skippedCount++;
+
+                if ($verbose) {
+                    echo "  SKIP {$row['main_ent_name']} <{$email}> -- unsubscribed" . PHP_EOL;
+                }
 
                 continue;
             }
@@ -239,15 +265,17 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             );
 
             if ($dryRun) {
-                echo "  WOULD SEND to {$row['main_ent_name']} <{$email}>:" . PHP_EOL;
-                echo "    Subject: {$subject}" . PHP_EOL;
-                echo '    ---' . PHP_EOL;
+                if ($verbose) {
+                    echo "  WOULD SEND to {$row['main_ent_name']} <{$email}>:" . PHP_EOL;
+                    echo "    Subject: {$subject}" . PHP_EOL;
+                    echo '    ---' . PHP_EOL;
 
-                foreach (explode("\n", $body) as $line) {
-                    echo "    {$line}" . PHP_EOL;
+                    foreach (explode("\n", $body) as $line) {
+                        echo "    {$line}" . PHP_EOL;
+                    }
+
+                    echo '    ---' . PHP_EOL;
                 }
-
-                echo '    ---' . PHP_EOL;
 
                 continue;
             }
@@ -293,9 +321,19 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                      WHERE campaign_code = :campaign_code AND abn = :abn",
                     ['now' => date('Y-m-d H:i:s'), 'campaign_code' => $campaignCode, 'abn' => $row['abn']]
                 );
+
+                $sentCount++;
+            } else {
+                $failedCount++;
             }
 
-            echo '  ' . ($sent ? 'SENT' : 'FAILED') . " to {$row['main_ent_name']} <{$email}>" . PHP_EOL;
+            if ($verbose) {
+                echo '  ' . ($sent ? 'SENT' : 'FAILED') . " to {$row['main_ent_name']} <{$email}>" . PHP_EOL;
+            }
+        }
+
+        if (!$verbose) {
+            echo "{$campaignCode}: {$sentCount} sent, {$failedCount} failed, {$skippedCount} skipped (unsubscribed)" . PHP_EOL;
         }
     }
 }
