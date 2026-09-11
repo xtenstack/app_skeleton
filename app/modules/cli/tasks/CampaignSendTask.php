@@ -48,6 +48,15 @@ namespace App_skeleton\Modules\Cli\Tasks;
  *    quality that needs a human override, not pure score-based trust).
  *  - never wired into cron -- run by hand (with dry-run first) until
  *    proven safe over real sends.
+ *  - candidate ordering ends with `abn ASC` specifically so ties (most
+ *    of this population has no score at all -- see the ANZSIC campaign
+ *    docs) resolve the same way every time a query runs. Without it,
+ *    Postgres is free to return a different arbitrary subset of a tied
+ *    group on each execution -- confirmed live 2026-09-11: a dry-run
+ *    previewed 5 candidates, the real send moments later sent to 5
+ *    entirely different ones from the same tied pool. Silently broke
+ *    the "dry-run first, review, then send" safety practice this whole
+ *    task is built around.
  */
 class CampaignSendTask extends \Phalcon\Cli\Task
 {
@@ -115,7 +124,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                    WHERE cs.campaign_code = :code2 AND cs.abn = v_campaign_prospects.abn
                      AND cs.status IN ('pending', 'sent')
                )
-             ORDER BY (priority IS NULL) ASC, priority ASC, score DESC NULLS LAST
+             ORDER BY (priority IS NULL) ASC, priority ASC, score DESC NULLS LAST, abn ASC
              LIMIT :lim",
             \Phalcon\Db\Enum::FETCH_ASSOC,
             ['code' => $campaignCode, 'code2' => $campaignCode, 'lim' => $limit]
