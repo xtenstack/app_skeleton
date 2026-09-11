@@ -146,9 +146,20 @@ class CampaignSendTask extends \Phalcon\Cli\Task
 
             $name    = $row['best_contact_person_name'] ?: 'there';
             $subject = $template['subject'];
-            $body    = str_replace(
-                ['{{name}}', '{{first_paragraph}}'],
-                [$name, trim($row['first_paragraph'])],
+
+            // Generated before $body so {{unsubscribe_url}} (part of the
+            // compliant footer, MAA-20260908-008 item 2) can be merged in
+            // the same pass as {{name}}/{{first_paragraph}} — including in
+            // dry-run mode, so the preview matches what would actually
+            // send. Only persisted to campaign_sends below, in the real
+            // (non-dry-run) path — a dry-run token is never written down
+            // anywhere, purely a preview value.
+            $token          = bin2hex(random_bytes(24));
+            $unsubscribeUrl = 'https://xtmk.xten.au/marketing/unsubscribe/submit?token=' . $token;
+
+            $body = str_replace(
+                ['{{name}}', '{{first_paragraph}}', '{{business}}', '{{unsubscribe_url}}'],
+                [$name, trim($row['first_paragraph']), $row['main_ent_name'], $unsubscribeUrl],
                 $template['body']
             );
 
@@ -166,8 +177,6 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                 continue;
             }
 
-            $token = bin2hex(random_bytes(24));
-
             $db->execute(
                 'INSERT INTO abn_lookup.campaign_sends (campaign_code, abn, contact_email, mail_template_id, unsubscribe_token, status)
                  VALUES (:campaign_code, :abn, :email, :template_id, :token, :status)',
@@ -180,8 +189,6 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                     'status'        => 'pending',
                 ]
             );
-
-            $unsubscribeUrl = 'https://xtmk.xten.au/marketing/unsubscribe/submit?token=' . $token;
 
             $mailer = new \App_skeleton\Mailer();
             $mailer->setDI($this->getDI());
