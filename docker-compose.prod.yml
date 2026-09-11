@@ -22,15 +22,24 @@
 # The actual shared Caddy container (reading xten-marketing's static
 # assets via the /opt/xten-marketing/public bind mount, proxying
 # xtmk.xten.au to xten-marketing-app-1 over edge_shared) is defined in
-# app_skeleton's own docker-compose.prod.yml, not here -- this project
-# never runs its own caddy service (confirmed: only
-# app_skeleton-caddy-1 exists, no xten-marketing-caddy-1). A `caddy:`
-# stanza used to be duplicated here with no image/build of its own,
-# which made `docker compose -f ... -f docker-compose.prod.yml up
-# --build` fail outright ("service caddy has neither an image nor a
-# build context") -- removed 2026-09-07.
+# app_skeleton's own docker-compose.yml, not here -- this project never
+# runs a second caddy service (confirmed: only app_skeleton-caddy-1
+# exists, no xten-marketing-caddy-1). Caddy still needs to be layered in
+# here to pick up the extra network: an override service block only
+# needs the fields it's adding (Compose merges onto the base file's
+# `image`), so this does NOT redeclare `image`/`build` the way the prior
+# stanza did (removed 2026-09-07 because it broke `--build` outright --
+# "service caddy has neither an image nor a build context"). Without
+# this, Caddy is never joined to edge_shared at all and can't resolve
+# xten-marketing-app-1 by name -- found 2026-09-11 as the cause of
+# xtmk.xten.au 404/502ing entirely (SERVFAIL on the container's internal
+# DNS lookup).
 services:
   app:
+    networks:
+      - default
+      - edge_shared
+  caddy:
     networks:
       - default
       - edge_shared
