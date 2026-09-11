@@ -157,9 +157,23 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             $token          = bin2hex(random_bytes(24));
             $unsubscribeUrl = 'https://xtmk.xten.au/marketing/unsubscribe/submit?token=' . $token;
 
+            // {{product_name}} drives the ANZSIC dual-wording design
+            // (MAA-20260911-004): the shared body is identical between a
+            // campaign's HC- and DRA- wording, this merge field is the one
+            // thing that differs. Derived from the campaign_code prefix
+            // rather than a new campaigns column -- the prefix is already
+            // the authoritative wording marker every other part of this
+            // design keys off (mail_templates.subject, population
+            // partitioning, the 3-month swap).
+            $productName = match (true) {
+                str_starts_with($campaignCode, 'HC-')  => 'Health Check',
+                str_starts_with($campaignCode, 'DRA-') => 'Data Restore Audit',
+                default                                 => '',
+            };
+
             $body = str_replace(
-                ['{{name}}', '{{first_paragraph}}', '{{business}}', '{{unsubscribe_url}}'],
-                [$name, trim($row['first_paragraph']), $row['main_ent_name'], $unsubscribeUrl],
+                ['{{name}}', '{{first_paragraph}}', '{{business}}', '{{product_name}}', '{{unsubscribe_url}}'],
+                [$name, trim($row['first_paragraph']), $row['main_ent_name'], $productName, $unsubscribeUrl],
                 $template['body']
             );
 
