@@ -231,6 +231,28 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                 continue;
             }
 
+            // REQ-223, Charter Sec 6.5 "No Cannibalisation" -- XTen's
+            // formal commitment to never let an automated send compete
+            // with an active Charter Agent lead reservation. Checked
+            // per-row immediately before send, same as the unsubscribe
+            // check above, not once at the top of the run -- a
+            // reservation claimed mid-run must still block this send.
+            $reserved = $db->fetchOne(
+                "SELECT 1 FROM abn_lookup.lead_reservations WHERE abn = :abn AND status = 'active'",
+                \Phalcon\Db\Enum::FETCH_ASSOC,
+                ['abn' => $row['abn']]
+            );
+
+            if ($reserved) {
+                $skippedCount++;
+
+                if ($verbose) {
+                    echo "  SKIP {$row['main_ent_name']} <{$email}> -- reserved by a Charter Agent" . PHP_EOL;
+                }
+
+                continue;
+            }
+
             $name    = $row['best_contact_person_name'] ?: 'there';
             $subject = $template['subject'];
 

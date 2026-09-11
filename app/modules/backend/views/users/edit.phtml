@@ -37,6 +37,11 @@
             </select>
           </div>
           <div class="form-group">
+            <label for="operator_code">Operator Code</label>
+            <input type="text" class="form-control" id="operator_code" name="operator_code" value="<?= $this->escaper->escapeHtml((string) $user->operator_code) ?>" placeholder="e.g. CA-01">
+            <small class="form-text text-muted">Optional. Prefix manually per scheme -- e.g. CA- for Charter Agents.</small>
+          </div>
+          <div class="form-group">
             <label for="password">New password</label>
             <input type="password" class="form-control" id="password" name="password" minlength="8" placeholder="Leave blank to keep current password">
           </div>
