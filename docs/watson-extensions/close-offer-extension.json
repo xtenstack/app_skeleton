@@ -1,0 +1,125 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "XTen Watson §7.3 Offer Close (Watson Extension)",
+    "description": "Custom extension for watsonx Assistant to close any published, unmodified-price/term offer under Communications Policy §7.3 — Data Restore Audit, Standard/Priority Support, Care & Hosting, or the Deploy Module $850 floor. Creates the Dolibarr Third Party + Project + validated Invoice, deliberately kept separate from Tim's own Python close logic (cost-attribution decision, MAA-20260908-010) and generic across every offer rather than DRA-specific. Deploy Complete and custom-scoped Deploy Modules are NOT covered — those are always quoted per spec and routed to a human (Lead-to-Close-Process.md §4).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://stack-internal.xten.au/api"
+    }
+  ],
+  "paths": {
+    "/watson/close-offer": {
+      "post": {
+        "operationId": "closeOffer",
+        "summary": "Close a published §7.3 offer (creates the Dolibarr Third Party/Project/Invoice)",
+        "description": "Use only when the visitor has accepted an offer exactly as published — no discount, no altered scope, no custom SLA/terms. If price_aud is supplied it must match the offer's own published price; a mismatch is rejected (422), not silently accepted, since §7.3 does not cover bespoke terms. This call does not create the support REQ — call createTicket (the sibling ticket-creation extension) for that, before or after this call.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "offer_code",
+                  "customer_name",
+                  "customer_email"
+                ],
+                "properties": {
+                  "offer_code": {
+                    "type": "string",
+                    "enum": [
+                      "DRA",
+                      "SS",
+                      "PS",
+                      "CH",
+                      "DM_FLOOR"
+                    ],
+                    "description": "DRA = Data Restore Audit ($450). SS = Standard Support, monthly ($95). PS = Priority Support, monthly ($240). CH = Care & Hosting, monthly ($150). DM_FLOOR = Deploy Module, minimum scope, unmodified ($850)."
+                  },
+                  "customer_name": {
+                    "type": "string",
+                    "description": "Customer or business name, for the Dolibarr Third Party record"
+                  },
+                  "customer_email": {
+                    "type": "string",
+                    "description": "Customer email — becomes the Third Party's primary contact"
+                  },
+                  "price_aud": {
+                    "type": "number",
+                    "description": "Optional cross-check — if given, must equal the offer_code's own published price exactly, or the call is rejected."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Third Party + Project + validated Invoice created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "offer_code": {
+                      "type": "string"
+                    },
+                    "offer_name": {
+                      "type": "string"
+                    },
+                    "price_aud": {
+                      "type": "number"
+                    },
+                    "dolibarr": {
+                      "type": "object",
+                      "properties": {
+                        "thirdparty_id": {
+                          "type": "integer"
+                        },
+                        "project_id": {
+                          "type": "integer"
+                        },
+                        "invoice_id": {
+                          "type": "integer"
+                        },
+                        "invoice_ref": {
+                          "type": "string"
+                        },
+                        "payment_url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown offer_code, missing field, or price_aud mismatch"
+          },
+          "502": {
+            "description": "Dolibarr call failed — needs manual follow-up, do not retry blindly"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Watson-scoped API key (WATSON operator), provisioned via CreateAgentTask — same key used by the ticket-creation extension"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ]
+}
