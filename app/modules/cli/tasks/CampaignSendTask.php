@@ -46,14 +46,34 @@ namespace App_skeleton\Modules\Cli\Tasks;
  *    fall back to the existing score-DESC order among themselves
  *    (migration 007, XTMK Session 1 -- added after a dry-run surfaced data
  *    quality that needs a human override, not pure score-based trust).
- *  - never wired into cron -- run by hand (with dry-run first) until
- *    proven safe over real sends.
+ *  - wired into cron as of 2026-09-11 (Travis's explicit call, after
+ *    the Utilities canary's 20 real sends and this task's own ordering
+ *    bug were both reviewed) -- sendAllAction() is what cron_jobs
+ *    actually invokes, once daily, over every currently-'active'
+ *    campaign at its own daily_send_limit. The status='active' gate
+ *    below is what still keeps a freshly-built campaign from sending
+ *    automatically -- CampaignActivateTask is the piece that flips it,
+ *    on each campaign's own scheduled_activation_date, so the staged
+ *    rollout (smallest divisions first) still happens without a human
+ *    re-running SQL every day. sendAction() (single campaign, dry-run
+ *    supported) stays the manual/review path for everything else --
+ *    a new campaign, a re-run, or checking one division out of cycle.
+ *  - candidate ordering ends with `abn ASC` specifically so ties (most
+ *    of this population has no score at all -- see the ANZSIC campaign
+ *    docs) resolve the same way every time a query runs. Without it,
+ *    Postgres is free to return a different arbitrary subset of a tied
+ *    group on each execution -- confirmed live 2026-09-11: a dry-run
+ *    previewed 5 candidates, the real send moments later sent to 5
+ *    entirely different ones from the same tied pool. Silently broke
+ *    the "dry-run first, review, then send" safety practice this whole
+ *    task is built around.
  */
 class CampaignSendTask extends \Phalcon\Cli\Task
 {
     public function mainAction(): void
     {
         echo 'Usage: ./run campaign-send send <campaign_code> [dry-run] [limit]' . PHP_EOL;
+        echo '       ./run campaign-send send-all   -- every active campaign, its own daily_send_limit each (cron entry point)' . PHP_EOL;
     }
 
     public function sendAction($campaignCode = null, $mode = null, $limitArg = null): void
@@ -64,8 +84,65 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             return;
         }
 
-        $dryRun = ($mode === 'dry-run');
-        $db     = $this->db;
+        $this->sendOneCampaign($campaignCode, $mode === 'dry-run', $limitArg !== null ? (int) $limitArg : null, true);
+    }
+
+    /**
+     * Cron entry point (CampaignActivateTask's counterpart on the
+     * activation side) -- no dry-run, no limit override, every
+     * currently-'active' campaign gets exactly one pass at its own
+     * daily_send_limit. Real send failures inside one campaign don't
+     * stop the loop -- sendOneCampaign() already handles its own
+     * per-recipient failures the same way (logs, moves on), so a bad
+     * template or a Resend outage on one campaign shouldn't also skip
+     * every campaign after it in the loop.
+     */
+    public function sendAllAction(): void
+    {
+        $codes = array_column(
+            $this->db->fetchAll(
+                "SELECT campaign_code FROM abn_lookup.campaigns WHERE status = 'active' ORDER BY campaign_code",
+                \Phalcon\Db\Enum::FETCH_ASSOC
+            ),
+            'campaign_code'
+        );
+
+        if (!$codes) {
+            echo 'No active campaigns.' . PHP_EOL;
+
+            return;
+        }
+
+        foreach ($codes as $code) {
+            echo "=== {$code} ===" . PHP_EOL;
+
+            try {
+                // Not verbose -- see sendOneCampaign()'s docblock note.
+                // cron_run_log.output is one text column per run; a
+                // per-recipient line for every send, times ~768/day once
+                // the full rollout is active, would make that column
+                // unusably large within days. A summary count is what
+                // the cron log is actually for -- the per-recipient
+                // detail still exists, in campaign_sends, queryable per
+                // campaign from its own admin screen.
+                $this->sendOneCampaign($code, false, null, false);
+            } catch (\Throwable $e) {
+                echo "  ERROR in {$code}: {$e->getMessage()} -- continuing to next campaign" . PHP_EOL;
+            }
+        }
+    }
+
+    /**
+     * $verbose controls whether every recipient gets its own echo line
+     * ("SENT to X <email>", "WOULD SEND to X: <full body>", "SKIP X --
+     * unsubscribed") or just a one-line summary count at the end. The
+     * manual/dry-run path (sendAction()) always wants the detail -- it's
+     * a human reviewing one campaign. sendAllAction() (the cron path)
+     * wants the summary -- see its own call site for why.
+     */
+    private function sendOneCampaign(string $campaignCode, bool $dryRun, ?int $limitOverride, bool $verbose): void
+    {
+        $db = $this->db;
 
         $campaign = $db->fetchOne(
             'SELECT campaign_code, title, status, mail_template_id, daily_send_limit
@@ -99,7 +176,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             ['id' => $campaign['mail_template_id']]
         );
 
-        $limit = $limitArg !== null ? (int) $limitArg : (int) $campaign['daily_send_limit'];
+        $limit = $limitOverride ?? (int) $campaign['daily_send_limit'];
 
         $candidates = $db->fetchAll(
             "SELECT abn, main_ent_name, first_paragraph, best_contact_kind, best_contact_value, best_contact_person_name
@@ -115,7 +192,7 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                    WHERE cs.campaign_code = :code2 AND cs.abn = v_campaign_prospects.abn
                      AND cs.status IN ('pending', 'sent')
                )
-             ORDER BY (priority IS NULL) ASC, priority ASC, score DESC NULLS LAST
+             ORDER BY (priority IS NULL) ASC, priority ASC, score DESC NULLS LAST, abn ASC
              LIMIT :lim",
             \Phalcon\Db\Enum::FETCH_ASSOC,
             ['code' => $campaignCode, 'code2' => $campaignCode, 'lim' => $limit]
@@ -127,7 +204,13 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             return;
         }
 
-        echo count($candidates) . ($dryRun ? ' candidate(s) [dry-run, nothing will send]:' : ' to send:') . PHP_EOL;
+        if ($verbose) {
+            echo count($candidates) . ($dryRun ? ' candidate(s) [dry-run, nothing will send]:' : ' to send:') . PHP_EOL;
+        }
+
+        $sentCount = 0;
+        $failedCount = 0;
+        $skippedCount = 0;
 
         foreach ($candidates as $row) {
             $email = $row['best_contact_value'];
@@ -139,34 +222,63 @@ class CampaignSendTask extends \Phalcon\Cli\Task
             );
 
             if ($unsubscribed) {
-                echo "  SKIP {$row['main_ent_name']} <{$email}> -- unsubscribed" . PHP_EOL;
+                $skippedCount++;
+
+                if ($verbose) {
+                    echo "  SKIP {$row['main_ent_name']} <{$email}> -- unsubscribed" . PHP_EOL;
+                }
 
                 continue;
             }
 
             $name    = $row['best_contact_person_name'] ?: 'there';
             $subject = $template['subject'];
-            $body    = str_replace(
-                ['{{name}}', '{{first_paragraph}}'],
-                [$name, trim($row['first_paragraph'])],
+
+            // Generated before $body so {{unsubscribe_url}} (part of the
+            // compliant footer, MAA-20260908-008 item 2) can be merged in
+            // the same pass as {{name}}/{{first_paragraph}} — including in
+            // dry-run mode, so the preview matches what would actually
+            // send. Only persisted to campaign_sends below, in the real
+            // (non-dry-run) path — a dry-run token is never written down
+            // anywhere, purely a preview value.
+            $token          = bin2hex(random_bytes(24));
+            $unsubscribeUrl = 'https://xtmk.xten.au/marketing/unsubscribe/submit?token=' . $token;
+
+            // {{product_name}} drives the ANZSIC dual-wording design
+            // (MAA-20260911-004): the shared body is identical between a
+            // campaign's HC- and DRA- wording, this merge field is the one
+            // thing that differs. Derived from the campaign_code prefix
+            // rather than a new campaigns column -- the prefix is already
+            // the authoritative wording marker every other part of this
+            // design keys off (mail_templates.subject, population
+            // partitioning, the 3-month swap).
+            $productName = match (true) {
+                str_starts_with($campaignCode, 'HC-')  => 'Health Check',
+                str_starts_with($campaignCode, 'DRA-') => 'Data Restore Audit',
+                default                                 => '',
+            };
+
+            $body = str_replace(
+                ['{{name}}', '{{first_paragraph}}', '{{business}}', '{{product_name}}', '{{unsubscribe_url}}'],
+                [$name, trim($row['first_paragraph']), $row['main_ent_name'], $productName, $unsubscribeUrl],
                 $template['body']
             );
 
             if ($dryRun) {
-                echo "  WOULD SEND to {$row['main_ent_name']} <{$email}>:" . PHP_EOL;
-                echo "    Subject: {$subject}" . PHP_EOL;
-                echo '    ---' . PHP_EOL;
+                if ($verbose) {
+                    echo "  WOULD SEND to {$row['main_ent_name']} <{$email}>:" . PHP_EOL;
+                    echo "    Subject: {$subject}" . PHP_EOL;
+                    echo '    ---' . PHP_EOL;
 
-                foreach (explode("\n", $body) as $line) {
-                    echo "    {$line}" . PHP_EOL;
+                    foreach (explode("\n", $body) as $line) {
+                        echo "    {$line}" . PHP_EOL;
+                    }
+
+                    echo '    ---' . PHP_EOL;
                 }
-
-                echo '    ---' . PHP_EOL;
 
                 continue;
             }
-
-            $token = bin2hex(random_bytes(24));
 
             $db->execute(
                 'INSERT INTO abn_lookup.campaign_sends (campaign_code, abn, contact_email, mail_template_id, unsubscribe_token, status)
@@ -181,18 +293,25 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                 ]
             );
 
-            $unsubscribeUrl = 'https://xtmk.xten.au/marketing/unsubscribe/submit?token=' . $token;
-
             $mailer = new \App_skeleton\Mailer();
             $mailer->setDI($this->getDI());
             $sent = $mailer->send($email, $subject, $body, $unsubscribeUrl);
 
+            // Mailer::send() returns the Resend message id (string) on a
+            // real send, plain `true` on the two shortcut paths where
+            // nothing was actually sent to Resend (.invalid test
+            // addresses, missing API key), `false` on a real failure.
+            // Stored so WebhookController::resendAction() can correlate
+            // a later bounce/complaint event back to this exact row.
+            $providerMessageId = is_string($sent) ? $sent : null;
+
             $db->execute(
-                'UPDATE abn_lookup.campaign_sends SET status = :status, sent_at = :sent_at WHERE unsubscribe_token = :token',
+                'UPDATE abn_lookup.campaign_sends SET status = :status, sent_at = :sent_at, provider_message_id = :provider_message_id WHERE unsubscribe_token = :token',
                 [
-                    'status'  => $sent ? 'sent' : 'failed',
-                    'sent_at' => $sent ? date('Y-m-d H:i:s') : null,
-                    'token'   => $token,
+                    'status'              => $sent ? 'sent' : 'failed',
+                    'sent_at'             => $sent ? date('Y-m-d H:i:s') : null,
+                    'provider_message_id' => $providerMessageId,
+                    'token'               => $token,
                 ]
             );
 
@@ -202,9 +321,19 @@ class CampaignSendTask extends \Phalcon\Cli\Task
                      WHERE campaign_code = :campaign_code AND abn = :abn",
                     ['now' => date('Y-m-d H:i:s'), 'campaign_code' => $campaignCode, 'abn' => $row['abn']]
                 );
+
+                $sentCount++;
+            } else {
+                $failedCount++;
             }
 
-            echo '  ' . ($sent ? 'SENT' : 'FAILED') . " to {$row['main_ent_name']} <{$email}>" . PHP_EOL;
+            if ($verbose) {
+                echo '  ' . ($sent ? 'SENT' : 'FAILED') . " to {$row['main_ent_name']} <{$email}>" . PHP_EOL;
+            }
+        }
+
+        if (!$verbose) {
+            echo "{$campaignCode}: {$sentCount} sent, {$failedCount} failed, {$skippedCount} skipped (unsubscribed)" . PHP_EOL;
         }
     }
 }

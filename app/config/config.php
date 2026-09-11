@@ -31,9 +31,15 @@ $base = [
      * stack-prod. Set mail.resend_api_key in config.local.php per
      * environment (same mechanism as the DB password above); Mailer.php
      * logs and no-ops rather than failing the request if it's empty.
+     * resend_webhook_secret is the whsec_... signing secret Resend hands
+     * back when the bounce/complaint webhook endpoint is created
+     * (WebhookController::resendAction()) — empty means that controller
+     * refuses all webhook traffic rather than trusting an unsigned
+     * request.
      */
     'mail' => [
-        'resend_api_key' => '',
+        'resend_api_key'       => '',
+        'resend_webhook_secret' => '',
     ],
 
     'application' => [

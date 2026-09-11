@@ -56,10 +56,12 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       # Mailer.php's Resend path (see that file — logs and skips sending
-      # rather than erroring when unset) and SearchResolveTask's Brave
-      # lookup — same optional, empty-default treatment as the SMTP vars
-      # above, for the same reason.
+      # rather than erroring when unset), the Resend webhook's signing
+      # secret (WebhookController), and SearchResolveTask's Brave lookup
+      # — same optional, empty-default treatment as the SMTP vars above,
+      # for the same reason.
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
       DOLIBARR_WATSON_TOKEN: ${DOLIBARR_WATSON_TOKEN:-}
     volumes:
