@@ -49,7 +49,11 @@ class CreateAgentTask extends \Phalcon\Cli\Task
 
         $user = \Users::findFirst(['conditions' => 'email = :email:', 'bind' => ['email' => $email]]);
 
-        if ($user) {
+        // \Users::findFirst() is typed against Phalcon's own ModelInterface,
+        // not the concrete Users class — narrow explicitly so ->id/->role_id
+        // below resolve as real properties, not an interface access (same
+        // pattern already used in PublicIntakeController).
+        if ($user instanceof \Users) {
             echo "User already exists: id={$user->id}, role_id={$user->role_id}" . PHP_EOL;
         } else {
             $user             = new \Users();
