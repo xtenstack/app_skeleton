@@ -86,9 +86,13 @@ graph TD
 3. **Intent Counterexample Training:**
    - Trained explicit counterexamples in the Action skill workspace for non-relational storage (NAS, S3, Active Directory) and varied payment terms.
    - Ensured booking requests trigger the automated $450 DRA close (`action_dra`), while general and out-of-scope inquiries cleanly drop into `anything_else` for support ticket logging.
-4. **Live Release Published:**
-   - Created Release `1` on Watson Assistant Plus and attached the Action Skill (`snapshot: "1"`) to the `live` environment (`ba6134b9-7eb5-4d8c-8f87-a59538301718`).
-   - Web chat integration ID `c84336d4-b26e-49a7-8935-9fc1a74a3d65` verified active and serving initial configuration.
+4. **Dedicated Welcome System Action Added:**
+   - Added system `welcome` action (`condition: {"expression": "welcome"}`) to cleanly greet website visitors on widget launch with: *"Welcome to XTen! I can assist with our Data Restore Audit (DRA), answer questions, or connect you directly with our engineering team. How can I help you today?"*
+   - Prevents empty initial web-chat inputs from falling through to the human escalation support prompt.
+5. **Live Releases Published:**
+   - Release `1` initially published for DRA + Fallback baseline.
+   - Release `2` published and attached to the `live` environment (`ba6134b9-7eb5-4d8c-8f87-a59538301718`) incorporating the Welcome Greeting action.
+   - Web chat integration ID `c84336d4-b26e-49a7-8935-9fc1a74a3d65` verified active and serving Release 2.
 
 ---
 
