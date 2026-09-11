@@ -90,6 +90,20 @@ class TicketsController extends ControllerBase
         $ticket->source_ref       = isset($body['source_ref']) ? (string) $body['source_ref'] : null;
         $ticket->retest_agent_key = isset($body['retest_agent_key']) ? (string) $body['retest_agent_key'] : null;
 
+        // Opt-in only (REQ-197): a plain bug/issue ticket has no business
+        // getting a public-form write-back token. Set only when the
+        // caller explicitly asks — currently the SSA close/complete
+        // pipeline, wiring a customer-facing intake form to this REQ.
+        // Random, not derived from the ticket id, so a raw sequential id
+        // in a URL can never be enough to write into someone else's
+        // ticket — see PublicIntakeController's docblock.
+        $intakeToken = null;
+
+        if (!empty($body['generate_intake_token'])) {
+            $intakeToken        = bin2hex(random_bytes(32));
+            $ticket->intake_token = $intakeToken;
+        }
+
         // Never from client-supplied fields — always the authenticated
         // caller, so nobody can spoof someone else's identity as reporter.
         $ticket->reporter_user_id    = $this->principal['user_id'];
@@ -109,7 +123,16 @@ class TicketsController extends ControllerBase
 
         $this->response->setStatusCode(201, 'Created');
 
-        return $this->response->setJsonContent(['ticket' => $this->serialize($ticket)]);
+        $payload = ['ticket' => $this->serialize($ticket)];
+
+        // Only ever returned here, at creation — never via serialize(),
+        // same staff-only-field convention as notes/project (012/015).
+        // The caller must capture it now; there is no read-it-back path.
+        if ($intakeToken !== null) {
+            $payload['intake_token'] = $intakeToken;
+        }
+
+        return $this->response->setJsonContent($payload);
     }
 
     public function viewAction($id)

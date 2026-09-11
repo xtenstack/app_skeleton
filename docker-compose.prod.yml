@@ -22,18 +22,44 @@
 # The actual shared Caddy container (reading xten-marketing's static
 # assets via the /opt/xten-marketing/public bind mount, proxying
 # xtmk.xten.au to xten-marketing-app-1 over edge_shared) is defined in
-# app_skeleton's own docker-compose.prod.yml, not here -- this project
-# never runs its own caddy service (confirmed: only
-# app_skeleton-caddy-1 exists, no xten-marketing-caddy-1). A `caddy:`
-# stanza used to be duplicated here with no image/build of its own,
-# which made `docker compose -f ... -f docker-compose.prod.yml up
-# --build` fail outright ("service caddy has neither an image nor a
-# build context") -- removed 2026-09-07.
+# app_skeleton's own docker-compose.yml, not here -- this project never
+# runs a second caddy service (confirmed: only app_skeleton-caddy-1
+# exists, no xten-marketing-caddy-1). Caddy still needs to be layered in
+# here to pick up the extra network and the marketing-site bind mount:
+# an override service block only needs the fields it's adding (Compose
+# merges onto the base file's `image`), so this does NOT redeclare
+# `image`/`build` the way the prior stanza did (removed 2026-09-07
+# because it broke `--build` outright -- "service caddy has neither an
+# image nor a build context").
+#
+# Two separate bugs found and fixed here 2026-09-11, both root causes of
+# xtmk.xten.au being completely unreachable (404/502 on every request,
+# including login):
+#   1. Without `edge_shared` here, Caddy was never joined to that
+#      network at all and couldn't resolve xten-marketing-app-1 by name
+#      (SERVFAIL on the container's internal DNS lookup).
+#   2. The Caddyfile's `xtmk.xten.au` block serves from `root *
+#      /marketing-public`, but nothing ever bind-mounted that path into
+#      the Caddy container -- it didn't exist on disk there at all.
+#      Requests with a literal `.php` extension (e.g. /webtools.php)
+#      still reached PHP-FPM directly since that matcher is a path glob,
+#      not a file-existence check, but every extension-less URL
+#      (`/`, `/backend/session`, ...) failed Caddy's own try_files
+#      lookup for `index.php` under the missing root and fell through to
+#      a clean Caddy-native 404 -- indistinguishable from the DNS
+#      failure without checking for PHP response headers, which were
+#      absent.
 services:
   app:
     networks:
       - default
       - edge_shared
+  caddy:
+    networks:
+      - default
+      - edge_shared
+    volumes:
+      - /opt/xten-marketing/public:/marketing-public:ro
 
 networks:
   default:

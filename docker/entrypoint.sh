@@ -32,6 +32,10 @@ return [
     'search' => [
         'brave_api_key' => '${BRAVE_API_KEY}',
     ],
+    'dolibarr' => [
+        'base_url'  => '${DOLIBARR_BASE_URL:-https://accts.xten.au/dolibarr}',
+        'api_token' => '${DOLIBARR_WATSON_TOKEN}',
+    ],
     'database' => [
         'host'     => '${DB_HOST}',
         'port'     => (int) '${DB_PORT:-5432}',
