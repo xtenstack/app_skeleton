@@ -32,6 +32,9 @@ class Tickets extends \Phalcon\Mvc\Model
     public $notes;
     public $project;
     public $source_ref;
+    public $intake_token;
+    public $intake_data;
+    public $intake_submitted_at;
     public $reporter_user_id;
     public $reporter_api_key_id;
     public $assigned_to_user_id;
