@@ -1,0 +1,76 @@
+openapi: 3.0.0
+info:
+  title: XTen Stack-Internal Ticket Creation (Watson Extension)
+  description: >
+    Custom extension for watsonx Assistant to create a real Stack-Internal-Prod
+    REQ (Tickets API) when a web-chat conversation needs one — a support
+    question, an unassisted DRA/Standard/Priority/Care & Hosting close, or an
+    escalation. Same endpoint Tim (the SSA) uses, authenticated with a
+    separate, Watson-scoped API key (never Tim's own key or the IBM platform
+    key) so build/support actions stay attributable separately from sales
+    actions — see MAA-20260908-010.
+  version: "1.0.0"
+servers:
+  - url: https://stack-internal.xten.au/api
+paths:
+  /tickets/create:
+    post:
+      operationId: createTicket
+      summary: Create a Stack-Internal-Prod ticket (REQ)
+      description: >
+        Creates a ticket. Use ticket_type=support for a customer enquiry or
+        escalation raised via the web-chat widget. severity should reflect
+        RB-18/SLA urgency (low/normal/high/critical) — an unassisted product
+        close should be "high" to match how Tim's own closes are triaged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  description: Short summary, e.g. "Watson DRA enquiry — Jane Smith"
+                description:
+                  type: string
+                  description: Full context — what the visitor asked, any details already captured
+                severity:
+                  type: string
+                  enum: [low, normal, high, critical]
+                  default: normal
+                ticket_type:
+                  type: string
+                  enum: [bug, issue, feature, support]
+                  default: bug
+                source_ref:
+                  type: string
+                  description: Free-text reference, e.g. "watson:<conversation_id>"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      title:
+                        type: string
+                      status:
+                        type: string
+        "422":
+          description: Validation error (e.g. missing title)
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: Watson-scoped API key (WATSON operator), provisioned via CreateAgentTask
+security:
+  - ApiKeyAuth: []
