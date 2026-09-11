@@ -48,6 +48,16 @@ class Users extends Phalcon\Mvc\Model
     public $last_name;
 
     /**
+     * Generic operator code (e.g. Charter Agent sales operator codes,
+     * CA-01..CA-10 -- manually prefixed by whoever assigns it, not
+     * validated/generated here, since this field is meant to cover
+     * future operator-code schemes too, not just Charter Agents).
+     *
+     * @var string|null
+     */
+    public $operator_code;
+
+    /**
      *
      * @var integer
      */

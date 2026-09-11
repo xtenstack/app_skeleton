@@ -13,7 +13,7 @@ class UsersController extends ControllerBase
         $list = \App_skeleton\ListView::paginate(
             $this->request,
             \Users::class,
-            ['email', 'first_name', 'last_name'],
+            ['email', 'first_name', 'last_name', 'operator_code'],
             ['email' => 'email', 'first_name' => 'first_name', 'last_name' => 'last_name', 'created' => 'id'],
             [],
             [],
@@ -65,6 +65,7 @@ class UsersController extends ControllerBase
         $user->first_name    = (string) $this->request->getPost('first_name');
         $user->last_name     = (string) $this->request->getPost('last_name');
         $user->role_id       = (int) $this->request->getPost('role_id', 'int');
+        $user->operator_code = (string) $this->request->getPost('operator_code') ?: null;
         $user->is_active     = $this->request->getPost('is_active') ? 1 : 0;
         $user->password_hash = password_hash($password, PASSWORD_DEFAULT);
 
@@ -96,11 +97,12 @@ class UsersController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
         }
 
-        $user->email      = (string) $this->request->getPost('email', 'email');
-        $user->first_name = (string) $this->request->getPost('first_name');
-        $user->last_name  = (string) $this->request->getPost('last_name');
-        $user->role_id    = (int) $this->request->getPost('role_id', 'int');
-        $user->is_active  = $this->request->getPost('is_active') ? 1 : 0;
+        $user->email          = (string) $this->request->getPost('email', 'email');
+        $user->first_name     = (string) $this->request->getPost('first_name');
+        $user->last_name      = (string) $this->request->getPost('last_name');
+        $user->role_id        = (int) $this->request->getPost('role_id', 'int');
+        $user->operator_code  = (string) $this->request->getPost('operator_code') ?: null;
+        $user->is_active      = $this->request->getPost('is_active') ? 1 : 0;
 
         $password = (string) $this->request->getPost('password');
 
