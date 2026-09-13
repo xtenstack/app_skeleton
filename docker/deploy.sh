@@ -17,7 +17,12 @@
 # hardcode either path, or running it from the wrong instance silently
 # deploys the other one.
 set -e
-cd "$(dirname "$0")/.."
+# readlink -f (not just dirname "$0") -- a convenience symlink at the
+# repo root (deploy.sh -> docker/deploy.sh) is one directory shallower
+# than this file's own real location, so resolving the *link target*
+# first is required for `cd ../..` math to land in the same place
+# however this was invoked.
+cd "$(dirname "$(readlink -f "$0")")/.."
 git pull origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build app
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm app php run migrate run
