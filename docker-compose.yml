@@ -46,6 +46,17 @@ services:
       DB_NAME: ${DB_NAME:-app_skeleton}
       DB_USER: ${DB_USER:-app_skeleton}
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # directory-module's own second DB connection (dbAbnLookup, see its
+      # Module.php) — reaches the real abn_lookup registry living in the
+      # xten-marketing stack's database, not this one. Empty defaults here
+      # (not a required ${VAR:?...}): only instances with directory-module
+      # enabled need these set; the module itself throws loudly if it runs
+      # with them missing rather than silently falling back to this DB.
+      ABN_DB_HOST: ${ABN_DB_HOST:-}
+      ABN_DB_PORT: ${ABN_DB_PORT:-5432}
+      ABN_DB_NAME: ${ABN_DB_NAME:-}
+      ABN_DB_USER: ${ABN_DB_USER:-}
+      ABN_DB_PASSWORD: ${ABN_DB_PASSWORD:-}
       # Optional — mail() has no MTA to relay through until these are set
       # (existing, pre-2026-07-30 behavior: send fails, gets logged, request
       # still succeeds). Empty defaults rather than a required ${VAR:?...}
