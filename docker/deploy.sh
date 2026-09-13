@@ -25,7 +25,13 @@ set -e
 cd "$(dirname "$(readlink -f "$0")")/.."
 git pull origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build app
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm app php run migrate run
+# Best-effort, not fatal: fails on the xten-marketing instance (its db
+# config doesn't resolve the same way through this task) and `set -e`
+# was letting that abort the whole deploy before `up -d` ever ran --
+# worse than the deploy it was meant to make safer. A migration failure
+# still needs a human look, just not at the cost of blocking the
+# container recreation this script exists for.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm app php run migrate run || echo "WARNING: migrations failed or are not applicable to this instance -- continuing anyway, check manually"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 sleep 3
 echo "--- edge_shared membership ---"
