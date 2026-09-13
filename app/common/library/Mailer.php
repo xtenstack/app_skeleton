@@ -16,10 +16,15 @@ use Phalcon\Di\Injectable;
  * blocked. No SMTP relay, Resend's own or mail.xten.au's, is a viable
  * transport from this infrastructure regardless of credentials.
  *
- * Config: `mail.resend_api_key` in config.local.php (mirrors how DB
- * credentials are supplied — see app/config/config.php). Falls back to
- * logging and returning true if unset, same "don't block the request
- * over a mail failure" posture the old mail()-based version had.
+ * Credential source: `external_connections` (name='resend'), the
+ * standard store every module/library is meant to use — see
+ * MODULE-SPEC.md "External Credentials". Falls back to
+ * `mail.resend_api_key` in config.local.php (the pre-2026-09-13 path)
+ * only if no active 'resend' row exists yet, so an instance that
+ * hasn't migrated its key into ExternalConnections doesn't silently
+ * stop sending mail. Falls back further to logging and returning true
+ * if neither is set, same "don't block the request over a mail
+ * failure" posture the old mail()-based version had.
  */
 class Mailer extends Injectable
 {
@@ -64,10 +69,11 @@ class Mailer extends Injectable
             return true;
         }
 
-        $apiKey = $this->config->mail->resend_api_key ?? '';
+        $connection = \ExternalConnections::findActiveByName('resend');
+        $apiKey     = $connection ? ($connection->revealCredential() ?? '') : ($this->config->mail->resend_api_key ?? '');
 
         if ($apiKey === '') {
-            error_log("Mailer: RESEND_API_KEY not configured -- '{$subject}' to {$to} not sent. Set mail.resend_api_key in config.local.php.");
+            error_log("Mailer: no Resend API key configured (checked external_connections 'resend' and mail.resend_api_key) -- '{$subject}' to {$to} not sent.");
 
             return true;
         }

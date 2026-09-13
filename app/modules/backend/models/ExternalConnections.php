@@ -56,4 +56,22 @@ class ExternalConnections extends \Phalcon\Mvc\Model
     {
         return $this->credential ? Crypto::decrypt($this->credential) : null;
     }
+
+    /**
+     * The standard lookup every module/library is meant to use for a
+     * third-party credential (see MODULE-SPEC.md "External Credentials")
+     * — case-insensitive on `name` (migration 019 enforces uniqueness on
+     * that), and only ever returns an active row. Returns null rather
+     * than throwing when nothing's configured yet — every caller of this
+     * already has to handle "not configured" gracefully (matches
+     * Mailer's own pre-existing not-configured posture), not a state
+     * worth a hard failure over.
+     */
+    public static function findActiveByName(string $name): ?self
+    {
+        return self::findFirst([
+            'conditions' => 'LOWER(name) = :name: AND is_active = 1',
+            'bind'       => ['name' => strtolower($name)],
+        ]);
+    }
 }

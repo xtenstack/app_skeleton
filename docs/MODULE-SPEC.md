@@ -177,6 +177,37 @@ for one module to react to another module's state changes — direct
 reads/writes into another module's tables are out of scope regardless
 of `dependsOn` (see Isolation, below).
 
+## External Credentials
+
+A module that needs to call a third-party API (an email/SMS provider,
+an AI model API, a payment processor, anything outside this instance)
+looks the credential up from `external_connections`
+(`App_skeleton\ExternalConnections::findActiveByName('provider-name')`,
+lowercase, matches case-insensitively) — it does **not** invent its own
+encrypted column, plaintext config field, or bespoke env var for this.
+`revealCredential()` decrypts it (via `App_skeleton\Crypto`) for one
+call only; never cache or log the plaintext value.
+
+This is the one sanctioned exception to Isolation's "no shared state
+with another module's schema" rule below — `external_connections` is a
+shared table by design, the same way `module_registry` is, not an
+implicit coupling. A module still owns and manages its own *rows* in it
+(create/edit through the admin UI or a migration-time seed) — it just
+doesn't own a private copy of the table.
+
+If nothing's configured yet, `findActiveByName()` returns `null` —
+handle that the same way `Mailer` does (log and no-op, or fall back to
+config for one deprecation window if migrating an existing credential
+off an older storage path), never a hard failure over a missing
+integration.
+
+Adopted 2026-09-13 after `Mailer`'s own Resend key was found still
+living in `config.local.php` despite `external_connections` already
+existing exactly for this — every AutoClaudeDev module plan going
+forward should assume this table, not propose its own credential
+storage (the AI-SSA application module's `sidecar_auth_pass text not
+null (store as-is)` is the gap that prompted writing this down).
+
 ## Isolation
 
 - Everything hangs off `user_id`.
