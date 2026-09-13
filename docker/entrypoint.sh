@@ -43,6 +43,20 @@ return [
         'username' => '${DB_USER}',
         'password' => '${DB_PASSWORD}',
     ],
+    // directory-module's second connection (dbAbnLookup, see its
+    // Module.php) -- empty here means unset, matching every other
+    // module-specific config block; the module itself decides whether an
+    // empty value is fatal. getenv() doesn't reach PHP-FPM workers at
+    // request time (confirmed 2026-09-13 -- same reason every other
+    // secret above is rendered into this file instead of read live), so
+    // this is the only way a module gets container env vars at all.
+    'abn_database' => [
+        'host'     => '${ABN_DB_HOST:-}',
+        'port'     => (int) '${ABN_DB_PORT:-5432}',
+        'dbname'   => '${ABN_DB_NAME:-}',
+        'username' => '${ABN_DB_USER:-}',
+        'password' => '${ABN_DB_PASSWORD:-}',
+    ],
 ];
 PHP
 
