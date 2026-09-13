@@ -49,6 +49,20 @@
 #      a clean Caddy-native 404 -- indistinguishable from the DNS
 #      failure without checking for PHP response headers, which were
 #      absent.
+#
+# `db` joined edge_shared too (2026-09-13) so app_skeleton's
+# directory-module can reach the real 20.4M-row abn_lookup registry
+# living in this stack's database — the module previously had no network
+# path to it at all and was running against an empty local schema.
+# Applied live first via `docker network connect edge_shared
+# xten-marketing-db-1` (no restart, no downtime risk to live campaigns),
+# this entry just makes that membership survive a future `up`/rebuild.
+# Postgres itself becomes reachable by container name from anything on
+# edge_shared once this applies -- the actual access boundary is the
+# scoped read-only `directory_module_ro` role (SELECT-only on the
+# abn_lookup schema, see docs/autoclaudedev/Directory-Module-Plan.md),
+# not network isolation, matching how app_skeleton-db-1's own port bind
+# already treats the network as untrusted and the role as the real gate.
 services:
   app:
     networks:
@@ -60,6 +74,10 @@ services:
       - edge_shared
     volumes:
       - /opt/xten-marketing/public:/marketing-public:ro
+  db:
+    networks:
+      - default
+      - edge_shared
 
 networks:
   default:
