@@ -20,6 +20,16 @@ class BackupTask extends \Phalcon\Cli\Task
 {
     private const RETENTION_DAYS = 14;
 
+    // Current backups run ~150MB, driven by legitimate/growing operational
+    // data (leads, contacts, corelist_staging, peppol_participants) — this
+    // isn't a tight bound, it's a tripwire: the excluded national-reference
+    // datasets (gnaf.* + abn_lookup.abns/trading_names/asic_*) are multiple
+    // GB each, so a future schema change that adds a new large reference
+    // table without adding it to $excludeTableData would blow well past this
+    // long before it became the multi-GB problem REQ-206 already happened
+    // once (2026-09-13).
+    private const SIZE_WARNING_BYTES = 750 * 1024 * 1024;
+
     public function mainAction(): void
     {
         echo 'Usage: ./run backup run' . PHP_EOL;
@@ -121,6 +131,16 @@ class BackupTask extends \Phalcon\Cli\Task
         $this->pruneOldBackups($backupDir, $db->dbname);
 
         echo sprintf('wrote %s (%s)', basename($dumpFile), $this->formatBytes((int) $size)) . PHP_EOL;
+
+        if ($size > self::SIZE_WARNING_BYTES) {
+            echo sprintf(
+                'WARNING: backup is %s, more than %s larger than the ~150MB this normally runs — '
+                . 'check whether a new large table needs adding to $excludeTableData before this '
+                . 'becomes another REQ-206.',
+                $this->formatBytes((int) $size),
+                $this->formatBytes(self::SIZE_WARNING_BYTES)
+            ) . PHP_EOL;
+        }
     }
 
     private function pruneOldBackups(string $backupDir, string $dbName): void
