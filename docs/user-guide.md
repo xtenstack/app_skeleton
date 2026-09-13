@@ -5,9 +5,87 @@ understand what's already there before extending it. See also
 [README.md](../README.md) for what this project is and how to run it,
 and [INSTALL.md](INSTALL.md) for getting a fresh instance up.
 
+- [What ships in the base product](#what-ships-in-the-base-product) — the
+  screens and subsystems you get before installing a single module.
 - [Modules](#modules) — what a "module" means in this codebase, which
   ones ship with the base product, and how to build your own.
 - [Cron](#cron) — how scheduled/background jobs work and how to add one.
+
+## What ships in the base product
+
+Everything below is always present — no module to install, no setting to
+turn on. Each is a real screen in the backend admin UI unless noted.
+
+**Accounts and sign-in.** Login, self-service signup, and password reset
+(`SessionController`, `SignupController`, `PasswordController`). Signup
+issues an emailed verification token; password reset issues a
+single-use, time-limited one. **Account** is the signed-in user's own
+"my profile" screen — deliberately separate from the admin-only user
+editor, so a member editing their own details can never reach fields
+only staff should set.
+
+**Users and roles.** `UsersController` manages every other user's
+profile, role assignment, and active/inactive state; `RolesController`
+manages the roles themselves. Access control is whole-controller
+(`$allowedRoles` on a controller class), not per-action or per-record —
+a deliberate v1 limit, documented in MODULE-SPEC.md's RBAC section.
+
+**Tickets.** A full customer-support ticketing system: severity and type
+triage, assignment, consolidation of duplicates, attachments, QA review,
+and a retest loop. It also has a JSON API surface and a token-gated
+public intake form, so an external system (or an agent) can raise a
+ticket and a customer can complete an intake without an account. Note
+this ships *built-in* rather than as an optional module — see the
+Modules section below for why.
+
+**API keys.** Credentials *other* systems use to call this one. Each key
+belongs to a user, is stored as a one-way hash (shown exactly once, at
+creation), and resolves to that user's own role on every request — so an
+API caller can never exceed the permissions of the account that issued
+the key. Revocable at any time.
+
+**External connections.** The opposite direction: credentials *this*
+system uses to call third-party APIs (an email provider, an AI model API,
+a payment processor). The secret is encrypted at rest and only decrypted
+server-side at the moment of use. This is the sanctioned place for any
+outbound credential — a module needing one looks it up here rather than
+inventing its own storage (see MODULE-SPEC.md's "External Credentials").
+
+**Audit log.** An append-only record of who changed what and when —
+model-level insert/update/delete, plus logins, failed logins, lockouts,
+logouts, and manual cron runs. Entries are reversible where the change
+was a data edit, and old entries are archived on a schedule by a cron job
+rather than deleted.
+
+**Error log.** A browsable view of uncaught application exceptions,
+captured at the dispatcher level. Lightweight self-hosted error
+monitoring — no alerting, grouping, or deduplication; it tells you what
+broke and when, and that's the whole scope.
+
+**System log.** Direct read access to the application's own log files
+from the admin UI (capped per read, admin-only), for when something isn't
+captured as a structured error and you'd otherwise be SSH-ing into the
+box to `tail` a file.
+
+**Settings.** Site-wide configuration a non-developer should be able to
+change: site name and tagline, outbound mail from/reply-to addresses,
+default theme palette and light/dark mode, debug mode, and the cron
+execution mode. Stored in the database, not a config file, so changing
+one doesn't require a deploy.
+
+**Configuration.** The module management screen — lists every discovered
+module package with its tier, version, and enabled state, and toggles
+them per-instance. The CLI equivalent is `./run modules sync|list|enable|disable`.
+
+**Items.** A small, complete CRUD resource kept in the base product as a
+worked reference — list, create, edit, and soft delete on one plain
+entity. It's the minimal end-to-end example; `TicketsController` is the
+fuller one to read once you need the richer list-view conventions (bulk
+operations, filtering) that Items deliberately doesn't demonstrate.
+
+**Cron and backups.** Scheduled background jobs, including a nightly
+database backup, all driven by a single OS-level crontab entry — see
+[Cron](#cron) below for the full picture.
 
 ## Modules
 
