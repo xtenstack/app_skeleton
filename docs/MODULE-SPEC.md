@@ -79,6 +79,7 @@ uses internally, and the two do not need to match.
 | `icon` **(planned)** | No | Path to a square SVG/PNG shipped in the package. Engine will apply a default icon when absent so a module can never render icon-less on the dashboard or nav. |
 | `license` **(planned)** | Paid modules only | `{ "model": "per-instance", "keyRequired": true }` — declares licensing; `keyRequired: false` for free modules. See the design brief's licensing sections for the check-in/enforcement mechanics this ties into. |
 | `dependsOn` **(planned)** | No | Array of other modules' `key`s this module requires to already be installed and enabled (e.g. `["ACC"]`). Engine will refuse to enable a module until every declared dependency is enabled. Data flow between dependent modules happens over the event bus (below), never direct table access — `dependsOn` only gates *whether* a module can run. |
+| Bundling | N/A — real | Not a manifest field at all — a module bundles another by naming it in its own `composer.json` `require` (every module already is a real Composer package). `ModuleManager::enableModule()` (used by both `./run modules enable <key>` and the admin Configuration page — never write `module_registry.enabled` directly) reads the enabling module's own `composer.json` and also enables any other discovered module it requires. One direction only: enabling `ai-ssa-application` enables its `ai-ssa-chat`/`ai-ssa-phone`/`ai-ssa-email` plugins too; disabling it does **not** cascade-disable them, since a plugin stays fully usable standalone even after the module that first brought it in is turned off. Adopted 2026-09-13 for the AI-SSA product family. |
 
 Only `key` and `tier` are actually validated as required fields today
 (`ModuleManager::REQUIRED_FIELDS`) — a manifest missing anything else
@@ -238,6 +239,24 @@ admin modal rather than disabling the module outright. Catalogue modules
 ship under a short proprietary EULA; bespoke client-delivered modules
 ship MIT once delivered — see the design brief's licensing sections for
 the full reasoning.
+
+**Bundle licensing** (agreed 2026-09-13, not yet code — there is no
+check-in engine yet to hook this into): a module that's *bundled* by
+another (its Composer package named in the bundling module's own
+`require` — see "Bundling" in the `module.json` table above) shares
+that module's license key rather than needing its own. Concretely, once
+the check-in engine exists: the bundled module's `license` entry is
+`{ "sharesKeyWith": "<bundling module's key>" }` instead of its own
+`model`/`keyRequired` pair, and the check-in engine validates against
+the named module's key/check-in state, not a separate one of its own.
+`ai-ssa-application` is the first real case: `ai-ssa-chat`/`ai-ssa-phone`/
+`ai-ssa-email` each declare `sharesKeyWith: "ai-ssa"` (the application
+module's own `key`) so a client who bought the bundle doesn't need four
+separate license keys for one product. A plugin installed standalone,
+without the application module present, would need its own real
+`model`/`keyRequired` license entry instead — that case isn't decided
+yet (no standalone AI-SSA plugin has shipped to a real client to force
+the decision).
 
 ## What's still genuinely open
 
