@@ -137,7 +137,7 @@ class BackupTask extends \Phalcon\Cli\Task
                 'WARNING: backup is %s, more than %s larger than the ~150MB this normally runs — '
                 . 'check whether a new large table needs adding to $excludeTableData before this '
                 . 'becomes another REQ-206.',
-                $this->formatBytes((int) $size),
+                $this->formatBytes($size),
                 $this->formatBytes(self::SIZE_WARNING_BYTES)
             ) . PHP_EOL;
         }
