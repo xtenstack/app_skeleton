@@ -32,7 +32,15 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml build app
 # still needs a human look, just not at the cost of blocking the
 # container recreation this script exists for.
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm app php run migrate run || echo "WARNING: migrations failed or are not applicable to this instance -- continuing anyway, check manually"
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Scoped to app+db, NOT a blanket `up -d` (every service in both compose
+# files) -- confirmed live 2026-09-13: xten-marketing's own `caddy`
+# service had never actually been started in prod (app_skeleton-caddy-1
+# is the one real shared Caddy, already on :80/:443 -- see
+# docker-compose.prod.yml's own comment on that project). A blanket
+# `up -d` there created a second caddy that couldn't bind the port,
+# crash-looped, and took xtmk.xten.au down via the same DNS-disruption
+# pattern as the edge_shared drops this script exists to prevent.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d app db
 sleep 3
 echo "--- edge_shared membership ---"
 docker network inspect edge_shared --format '{{range .Containers}}{{.Name}} {{end}}'
