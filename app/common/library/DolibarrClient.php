@@ -30,6 +30,14 @@ class DolibarrClient extends Injectable
 {
     private const DRA_CATEGORY_ID = 2; // "DRA" invoice-scoped category, Travis 2026-09-09
 
+    // Watson's own Dolibarr user id (login watson.ssa) — single rep, both
+    // Third Party and Invoice. Watson handles a §7.3 close start to finish
+    // itself; per Travis, an SSA that owns the whole flow needs no
+    // secondary/different agent wired in for any part of it (2026-09-13).
+    // Found unwired on every one of Watson's real production closes so far
+    // (thirdparties 13-15) before this fix.
+    private const WATSON_USER_ID = 10;
+
     private string $baseUrl;
     private string $apiToken;
 
@@ -48,9 +56,14 @@ class DolibarrClient extends Injectable
      * Creates a fresh Third Party + Project + validated Invoice for a
      * closed, published-price/term offer, tags the invoice with the DRA
      * category (per-invoice, not scoped to only the DRA product — Travis
-     * asked this be applied "where possible", 2026-09-09), and writes the
-     * Dolibarr-generated payment link into the invoice's public note
-     * (the manual workaround XA-05 §A.4 documents, automated here the
+     * asked this be applied "where possible", 2026-09-09), wires Watson as
+     * primary_representative on both the Third Party and the Invoice plus
+     * the invoice's SALESREPFOLL contact (added 2026-09-13 — found live in
+     * Dolibarr that Watson's real closes had none of this; per Travis, an
+     * SSA handling a close start to finish needs no secondary agent, so
+     * it's Watson's own user id throughout, same shape as Tim's), and
+     * writes the Dolibarr-generated payment link into the invoice's public
+     * note (the manual workaround XA-05 §A.4 documents, automated here the
      * same way ssa-agent's fulfillment.py already does it for Tim).
      *
      * Returns null on any failure — best-effort, logged, never thrown;
@@ -75,11 +88,21 @@ class DolibarrClient extends Injectable
             'country_id'   => 28, // Australia
             'code_client'  => 'CU-WATSON-' . $now,
             'note_private' => "Created by Watson web-chat close action, " . date('Y-m-d', $now) . " — real customer, not a role-play test.",
+            'array_options' => [
+                'options_primary_representative' => (string) self::WATSON_USER_ID,
+            ],
         ]);
 
         if ($thirdpartyId === null) {
             return null;
         }
+
+        // Best-effort native representative link, same as ssa-agent's
+        // fulfillment.py — the POST succeeds against this Dolibarr
+        // instance but its own GET .../representatives verification
+        // endpoint 404s regardless (checked live, 2026-09-13), so this
+        // is never allowed to block the close on its own.
+        $this->requestRaw('POST', "/thirdparties/{$thirdpartyId}/representative/" . self::WATSON_USER_ID, []);
 
         $projectId = $this->request('POST', '/projects', [
             'socid'      => $thirdpartyId,
@@ -104,11 +127,19 @@ class DolibarrClient extends Injectable
                 'subprice'     => $priceAud,
                 'product_type' => 1,
             ]],
+            'array_options' => [
+                'options_primary_representative' => (string) self::WATSON_USER_ID,
+            ],
         ]);
 
         if ($invoiceId === null) {
             return null;
         }
+
+        // Internal sales-rep-follow-up contact (verified live, 2026-09-13:
+        // POST succeeds, read back correctly via GET .../contacts) — same
+        // mechanism ssa-agent's fulfillment.py uses for Tim.
+        $this->requestRaw('POST', "/invoices/{$invoiceId}/contact/" . self::WATSON_USER_ID . '/SALESREPFOLL', ['source' => 'internal']);
 
         // validate returns the full invoice object (not just an id, unlike
         // create) — called once via requestRaw() directly, not through
@@ -123,7 +154,12 @@ class DolibarrClient extends Injectable
         $invoiceRef = (string) ($invoice['ref'] ?? '');
         $paymentUrl = $invoice['online_payment_url'] ?? null;
 
-        $updateBody = ['categories' => [self::DRA_CATEGORY_ID]];
+        $updateBody = [
+            'categories'    => [self::DRA_CATEGORY_ID],
+            'array_options' => [
+                'options_primary_representative' => (string) self::WATSON_USER_ID,
+            ],
+        ];
 
         if ($paymentUrl !== null) {
             $updateBody['note_public'] = "Pay online: {$paymentUrl}";
