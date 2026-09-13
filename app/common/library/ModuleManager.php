@@ -177,6 +177,99 @@ class ModuleManager extends Injectable
     }
 
     /**
+     * Other discovered modules that $key's own composer.json 'require'
+     * section names as dependencies -- the sanctioned "bundle" signal
+     * (Travis, 2026-09-13: "the application is supposed to be using the
+     * plugins, i.e. install application mod, and it automatically
+     * installs chat, phone, email"). Deliberately not a separate
+     * module.json field: every module is already a real Composer
+     * package, so the dependency is expressed exactly once, in the one
+     * place Composer itself already reads it. Reads the installed
+     * package's own composer.json directly (InstalledVersions doesn't
+     * expose a package's own requires) rather than adding a second API
+     * surface for the same data.
+     */
+    public function bundledModuleKeys(string $key): array
+    {
+        $manifest = $this->discover()[$key] ?? null;
+
+        if ($manifest === null) {
+            return [];
+        }
+
+        $composerPath = $manifest['installPath'] . '/composer.json';
+
+        if (!is_file($composerPath)) {
+            return [];
+        }
+
+        $composer = json_decode((string) file_get_contents($composerPath), true);
+        $requires = is_array($composer['require'] ?? null) ? array_keys($composer['require']) : [];
+
+        $bundled = [];
+
+        foreach ($this->discover() as $otherKey => $otherManifest) {
+            if ($otherKey !== $key && in_array($otherManifest['packageName'], $requires, true)) {
+                $bundled[] = $otherKey;
+            }
+        }
+
+        return $bundled;
+    }
+
+    /**
+     * The one sanctioned path to enable a module — also enables whatever
+     * it bundles (bundledModuleKeys()), so ModulesTask (CLI) and
+     * ConfigurationController (web) both get this behavior from one
+     * place rather than one of them risking a bypass by writing
+     * module_registry.enabled directly. Deliberately does NOT cascade
+     * the other direction: disabling the application module doesn't
+     * disable its plugins, since a plugin is meant to keep working
+     * standalone even after the module that originally brought it in is
+     * turned off.
+     *
+     * @return string[] Every module_key actually flipped to enabled
+     *                   (the requested one first, then any bundled ones)
+     *                   — callers use this to report what happened.
+     *                   A key not yet registered (needs 'modules sync'
+     *                   first) is silently skipped, not an error, same
+     *                   as the pre-existing single-module enable did.
+     */
+    public function enableModule(string $key): array
+    {
+        $changed = [];
+
+        if ($this->setModuleEnabled($key)) {
+            $changed[] = $key;
+        }
+
+        foreach ($this->bundledModuleKeys($key) as $bundledKey) {
+            if ($this->setModuleEnabled($bundledKey)) {
+                $changed[] = $bundledKey;
+            }
+        }
+
+        return $changed;
+    }
+
+    private function setModuleEnabled(string $key): bool
+    {
+        $row = \ModuleRegistry::findFirst([
+            'conditions' => 'module_key = :key:',
+            'bind'       => ['key' => $key],
+        ]);
+
+        if (!$row) {
+            return false;
+        }
+
+        $row->enabled    = true;
+        $row->updated_at = date('Y-m-d H:i:s');
+
+        return (bool) $row->save();
+    }
+
+    /**
      * module_key values with enabled=true in module_registry. Returns []
      * rather than throwing if the table doesn't exist yet, so discovery
      * stays safe on a fresh install before migrations have run.

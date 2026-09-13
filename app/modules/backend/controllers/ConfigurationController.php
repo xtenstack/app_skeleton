@@ -76,21 +76,29 @@ class ConfigurationController extends ControllerBase
         return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
     }
 
+    /**
+     * Also enables whatever $key bundles via its own composer.json
+     * 'require' (see ModuleManager::enableModule()) — e.g. enabling
+     * ai-ssa-application brings its Chat/Phone/Email plugins online
+     * too, not just itself.
+     */
     public function enableAction($key = null)
     {
-        $this->setEnabled($key, true);
+        $changed = $key ? $this->moduleManager->enableModule($key) : [];
+
+        if (!$changed) {
+            $this->flash->error("Module '{$key}' is not registered.");
+        } elseif (count($changed) === 1) {
+            $this->flash->success($changed[0] . ' enabled.');
+        } else {
+            $bundled = array_slice($changed, 1);
+            $this->flash->success($key . ' enabled, along with bundled module(s): ' . implode(', ', $bundled) . '.');
+        }
 
         return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
     }
 
     public function disableAction($key = null)
-    {
-        $this->setEnabled($key, false);
-
-        return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
-    }
-
-    private function setEnabled(?string $key, bool $enabled): void
     {
         $module = $key ? \ModuleRegistry::findFirst([
             'conditions' => 'module_key = :key:',
@@ -100,16 +108,18 @@ class ConfigurationController extends ControllerBase
         if (!$module) {
             $this->flash->error("Module '{$key}' is not registered.");
 
-            return;
+            return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
         }
 
-        $module->enabled    = $enabled;
+        $module->enabled    = false;
         $module->updated_at = date('Y-m-d H:i:s');
 
         if ($module->save()) {
-            $this->flash->success($module->module_key . ' ' . ($enabled ? 'enabled' : 'disabled') . '.');
+            $this->flash->success($module->module_key . ' disabled.');
         } else {
             $this->flash->error('Failed to update ' . $module->module_key . ': ' . implode(', ', $module->getMessages()));
         }
+
+        return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
     }
 }

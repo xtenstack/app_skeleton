@@ -80,20 +80,37 @@ class ModulesTask extends \Phalcon\Cli\Task
         }
     }
 
+    /**
+     * Also enables whatever $key bundles via its own composer.json
+     * 'require' (see ModuleManager::enableModule()) — installing
+     * ai-ssa-application, for example, brings its Chat/Phone/Email
+     * plugins online too, not just itself.
+     */
     public function enableAction($key = null): void
     {
-        $this->setEnabled($key, true);
+        if (!$key) {
+            echo 'Usage: ./run modules enable <key>' . PHP_EOL;
+
+            return;
+        }
+
+        $changed = $this->moduleManager->enableModule($key);
+
+        if (!$changed) {
+            echo "  '{$key}' is not registered — run './run modules sync' first." . PHP_EOL;
+
+            return;
+        }
+
+        foreach ($changed as $enabledKey) {
+            echo '  ' . $enabledKey . ': enabled' . ($enabledKey === $key ? '' : ' (bundled with ' . $key . ')') . PHP_EOL;
+        }
     }
 
     public function disableAction($key = null): void
     {
-        $this->setEnabled($key, false);
-    }
-
-    private function setEnabled(?string $key, bool $enabled): void
-    {
         if (!$key) {
-            echo 'Usage: ./run modules ' . ($enabled ? 'enable' : 'disable') . ' <key>' . PHP_EOL;
+            echo 'Usage: ./run modules disable <key>' . PHP_EOL;
 
             return;
         }
@@ -109,11 +126,11 @@ class ModulesTask extends \Phalcon\Cli\Task
             return;
         }
 
-        $row->enabled    = $enabled;
+        $row->enabled    = false;
         $row->updated_at = date('Y-m-d H:i:s');
 
         if ($row->save()) {
-            echo "  {$key}: " . ($enabled ? 'enabled' : 'disabled') . PHP_EOL;
+            echo "  {$key}: disabled" . PHP_EOL;
         } else {
             echo "  FAILED to update {$key}: " . implode(', ', $row->getMessages()) . PHP_EOL;
         }
