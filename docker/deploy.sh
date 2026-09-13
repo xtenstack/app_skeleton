@@ -10,8 +10,14 @@
 # happened at least 3 times, including twice from Claude sessions that
 # forgot the second -f flag. This script exists so "deploy" always means
 # running this, not remembering a flag.
+#
+# This same script/repo checks out at both /opt/app_skeleton and
+# /opt/xten-marketing on stack-prod (two instances of one codebase) —
+# resolve the repo root relative to this script's own location, never
+# hardcode either path, or running it from the wrong instance silently
+# deploys the other one.
 set -e
-cd /opt/app_skeleton
+cd "$(dirname "$0")/.."
 git pull origin main
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build app
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm app php run migrate run
