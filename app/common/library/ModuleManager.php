@@ -259,7 +259,13 @@ class ModuleManager extends Injectable
             'bind'       => ['key' => $key],
         ]);
 
-        if (!$row) {
+        // instanceof rather than a bare falsy check: findFirst()'s declared
+        // return type is ModelInterface|Row|null, and an interface has no
+        // properties to write to (Psalm NoInterfaceProperties). The older
+        // ConfigurationController does the same thing and is only green
+        // because it sits in psalm-baseline.xml — narrow properly here
+        // rather than growing that baseline.
+        if (!$row instanceof \ModuleRegistry) {
             return false;
         }
 
