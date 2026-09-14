@@ -41,7 +41,14 @@ services:
         max-file: "3"
     environment:
       APP_ENV: ${APP_ENV:-development}
-      DB_HOST: db
+      # Per-instance override (set DB_HOST=<project>-db-1 in .env on prod).
+      # Both prod instances put `db` on the shared edge_shared network, and
+      # Compose gives every service its service-name alias on every network,
+      # so a bare `db` there resolves to either instance's Postgres -- a
+      # recreated xten-marketing app hit app_skeleton's db on 2026-09-14.
+      # Container names are unique across projects; `db` stays the default
+      # for dev/CI.
+      DB_HOST: ${DB_HOST:-db}
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-app_skeleton}
       DB_USER: ${DB_USER:-app_skeleton}
