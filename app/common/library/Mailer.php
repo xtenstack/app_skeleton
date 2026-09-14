@@ -53,8 +53,13 @@ class Mailer extends Injectable
      * still read as truthy for the existing `$sent ? 'sent' : 'failed'`
      * call site — only `is_string($sent)` callers need to care about
      * the difference.
+     *
+     * $isHtml sends $body as Resend's `html` part, with a tag-stripped
+     * `text` fallback alongside it. Default false keeps every existing
+     * caller (signup, password reset, the plain-text campaign templates)
+     * sending exactly what it sent before.
      */
-    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null): string|bool
+    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null, bool $isHtml = false): string|bool
     {
         // Ticket #19: real signup/password-reset flows exercised by
         // PHPUnit's RbacTest (and Playwright's fixtures) use this
@@ -85,8 +90,12 @@ class Mailer extends Injectable
             'from'    => $from,
             'to'      => [$to],
             'subject' => $subject,
-            'text'    => $body,
+            'text'    => $isHtml ? self::htmlToText($body) : $body,
         ];
+
+        if ($isHtml) {
+            $payload['html'] = $body;
+        }
 
         // Deliberately separate from `from` — lets outgoing mail be sent
         // via a dedicated transactional domain/service while replies still
@@ -139,5 +148,22 @@ class Mailer extends Injectable
         }
 
         return $id;
+    }
+
+    /**
+     * Plain-text fallback for an HTML body: drops <head>/<style>/<script>
+     * blocks, turns block-level closes and <br> into line breaks, keeps a
+     * link's URL next to its text, then strips the remaining tags.
+     */
+    public static function htmlToText(string $html): string
+    {
+        $text = preg_replace('#<(head|style|script)\b[^>]*>.*?</\1>#is', '', $html) ?? $html;
+        $text = preg_replace('#<a\b[^>]*href="([^"]+)"[^>]*>(.*?)</a>#is', '$2 ($1)', $text) ?? $text;
+        $text = preg_replace('#<br\s*/?>|</(p|div|tr|h[1-6]|li)>#i', "\n", $text) ?? $text;
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace("/[ \t]+/", ' ', $text) ?? $text;
+        $text = preg_replace("/ *\n */", "\n", $text) ?? $text;
+
+        return trim(preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
     }
 }
