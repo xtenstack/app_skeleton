@@ -74,15 +74,34 @@ class DolibarrClient extends Injectable
      *
      * @return array{thirdparty_id:int,project_id:int,order_id:int,order_ref:string,invoice_id:null,invoice_ref:null,payment_url:?string}|null
      */
-    public function createClose(string $customerName, string $customerIdentifier, string $offerName, float $priceAud): ?array
-    {
+    public function createClose(
+        string $customerName,
+        string $customerIdentifier,
+        string $offerName,
+        float $priceAud,
+        ?int $productId = null,
+        string $recurring = 'none',
+        ?int $categoryId = null,
+        ?int $existingThirdpartyId = null,
+        ?int $existingProjectId = null
+    ): ?array {
         if (!$this->isConfigured()) {
             error_log('DolibarrClient: DOLIBARR_WATSON_TOKEN not configured — cannot create close records');
 
             return null;
         }
 
-        $now = time();
+        $now        = time();
+        $categoryId = $categoryId ?? self::DRA_CATEGORY_ID;
+        $recurring  = in_array($recurring, ['m', 'y'], true) ? $recurring : 'none';
+
+        // 2026-09-15 (room 2f3 #144/#145): Watson closes the Directory/People/
+        // video catalogue too. A second product in one purchase (one-off video
+        // production next to a monthly bundle) is its own order under the same
+        // third party + project — never a second line on the first order.
+        if ($existingThirdpartyId !== null && $existingProjectId !== null) {
+            return $this->createOrder($existingThirdpartyId, $existingProjectId, $customerName, $customerIdentifier, $offerName, $priceAud, $productId, $recurring, $categoryId, $now);
+        }
 
         $thirdpartyId = $this->request('POST', '/thirdparties', [
             'name'         => "[WATSON] {$customerName} / {$customerIdentifier}",
@@ -118,6 +137,12 @@ class DolibarrClient extends Injectable
             return null;
         }
 
+        return $this->createOrder($thirdpartyId, $projectId, $customerName, $customerIdentifier, $offerName, $priceAud, $productId, $recurring, $categoryId, $now);
+    }
+
+    /** One validated sales order (+ SALESREPFOLL, + payment link) under an existing third party/project. */
+    private function createOrder(int $thirdpartyId, int $projectId, string $customerName, string $customerIdentifier, string $offerName, float $priceAud, ?int $productId, string $recurring, int $categoryId, int $now): ?array
+    {
         // Order-first (Travis, 2026-09-15): the document raised before
         // payment is a sales order, not an invoice, so an abandoned checkout
         // never reaches the ledger. Dolibarr's payment page converts a paid
@@ -131,17 +156,20 @@ class DolibarrClient extends Injectable
             'fk_project'   => $projectId,
             'date'         => $now,
             'note_private' => sprintf(
-                '[XTEN-ORDER source=watson offer="%s" recurring=none frequency=1 category=%d rep=%d]',
+                '[XTEN-ORDER source=watson offer="%s" recurring=%s frequency=1 category=%d rep=%d]',
                 str_replace('"', "'", $offerName),
-                self::DRA_CATEGORY_ID,
+                $recurring,
+                $categoryId,
                 self::WATSON_USER_ID
             ),
-            'lines'        => [[
+            'lines'        => [array_filter([
                 'desc'         => "{$offerName} — {$customerName} <{$customerIdentifier}>",
                 'qty'          => 1,
                 'subprice'     => $priceAud,
                 'product_type' => 1,
-            ]],
+                'tva_tx'       => 0, // 0% GST statutory policy for XTen
+                'fk_product'   => $productId,
+            ], static fn ($v) => $v !== null)],
             'array_options' => [
                 'options_primary_representative' => (string) self::WATSON_USER_ID,
             ],
