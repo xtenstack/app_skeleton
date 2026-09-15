@@ -21,7 +21,11 @@ class ListView
      * @param string[] $searchable columns ILIKE-matched against the 'q' query param
      * @param array<string,string> $sortable sort key => real column; first entry is the default
      * @param string[] $conditions pre-built SQL conditions to AND in
-     * @param array<string,mixed> $bind bind params matching $conditions
+     * @param array<string,mixed> $bind bind params matching $conditions (and $searchOr)
+     * @param string[] $searchOr extra trusted PHQL fragments ORed into the
+     *        search clause when 'q' is set — for matches that aren't a plain
+     *        column ILIKE (e.g. "abn IN ({contact_abns:array})" resolved by
+     *        the caller from a related table). Their binds go in $bind.
      * @return array{results: \Phalcon\Mvc\Model\ResultsetInterface, q: string, sort: string, dir: string, page: int, totalPages: int, total: int, perPage: int, preserve: array<string,string>}
      */
     public static function paginate(
@@ -32,17 +36,22 @@ class ListView
         array $conditions = [],
         array $bind = [],
         int $perPage = 25,
-        string $defaultDir = 'desc'
+        string $defaultDir = 'desc',
+        array $searchOr = []
     ): array {
         $q = trim((string) $request->getQuery('q', 'string', ''));
 
-        if ($q !== '' && $searchable) {
+        if ($q !== '' && ($searchable || $searchOr)) {
             $orParts = [];
 
             foreach ($searchable as $i => $column) {
                 $key            = 'search_' . $i;
                 $orParts[]      = $column . ' ILIKE :' . $key . ':';
                 $bind[$key]     = '%' . $q . '%';
+            }
+
+            foreach ($searchOr as $fragment) {
+                $orParts[] = $fragment;
             }
 
             $conditions[] = '(' . implode(' OR ', $orParts) . ')';
