@@ -9,7 +9,9 @@ use Phalcon\Di\Injectable;
 /**
  * Dolibarr REST API client for Watson's generic §7.3 close action
  * (MAA-20260908-010) — confirm scope/price/date → create Third Party +
- * Project + validated Invoice → return the payment link. Built PHP-side
+ * Project + validated sales Order → return the payment link (order-first
+ * since 2026-09-15: Dolibarr creates the invoice itself when the order is
+ * paid; ssa-agent's order_sync finishes it). Built PHP-side
  * (not shared with Tim's Python close logic) per the spec's own
  * cost-attribution decision: Watson's costs (a lightweight Dolibarr API
  * call) and Tim's costs (voice/LLM-heavy call handling) stay on separate
@@ -53,7 +55,7 @@ class DolibarrClient extends Injectable
     }
 
     /**
-     * Creates a fresh Third Party + Project + validated Invoice for a
+     * Creates a fresh Third Party + Project + validated sales Order for a
      * closed, published-price/term offer, tags the invoice with the DRA
      * category (per-invoice, not scoped to only the DRA product — Travis
      * asked this be applied "where possible", 2026-09-09), wires Watson as
@@ -70,7 +72,7 @@ class DolibarrClient extends Injectable
      * the caller must not let a Dolibarr outage block the customer-facing
      * confirmation that already happened.
      *
-     * @return array{thirdparty_id:int,project_id:int,invoice_id:int,invoice_ref:string,payment_url:?string}|null
+     * @return array{thirdparty_id:int,project_id:int,order_id:int,order_ref:string,invoice_id:null,invoice_ref:null,payment_url:?string}|null
      */
     public function createClose(string $customerName, string $customerIdentifier, string $offerName, float $priceAud): ?array
     {
@@ -116,12 +118,25 @@ class DolibarrClient extends Injectable
             return null;
         }
 
-        $invoiceId = $this->request('POST', '/invoices', [
-            'socid'       => $thirdpartyId,
-            'fk_project'  => $projectId,
-            'type'        => 0,
-            'date'        => $now,
-            'lines'       => [[
+        // Order-first (Travis, 2026-09-15): the document raised before
+        // payment is a sales order, not an invoice, so an abandoned checkout
+        // never reaches the ledger. Dolibarr's payment page converts a paid
+        // order into a paid invoice; ssa-agent's order_sync then finishes
+        // that invoice (category, rep contact, recurring template) using the
+        // [XTEN-ORDER ...] marker below — the same marker format
+        // directory-module's DolibarrClient and ssa-agent/fulfillment.py
+        // write, keep the three in step.
+        $orderId = $this->request('POST', '/orders', [
+            'socid'        => $thirdpartyId,
+            'fk_project'   => $projectId,
+            'date'         => $now,
+            'note_private' => sprintf(
+                '[XTEN-ORDER source=watson offer="%s" recurring=none frequency=1 category=%d rep=%d]',
+                str_replace('"', "'", $offerName),
+                self::DRA_CATEGORY_ID,
+                self::WATSON_USER_ID
+            ),
+            'lines'        => [[
                 'desc'         => "{$offerName} — {$customerName} <{$customerIdentifier}>",
                 'qty'          => 1,
                 'subprice'     => $priceAud,
@@ -132,46 +147,32 @@ class DolibarrClient extends Injectable
             ],
         ]);
 
-        if ($invoiceId === null) {
+        if ($orderId === null) {
             return null;
         }
 
-        // Internal sales-rep-follow-up contact (verified live, 2026-09-13:
-        // POST succeeds, read back correctly via GET .../contacts) — same
-        // mechanism ssa-agent's fulfillment.py uses for Tim.
-        $this->requestRaw('POST', "/invoices/{$invoiceId}/contact/" . self::WATSON_USER_ID . '/SALESREPFOLL', ['source' => 'internal']);
+        // Internal sales-rep-follow-up contact on the order (same mechanism
+        // as before, now on the order; order_sync repeats it on the invoice).
+        $this->requestRaw('POST', "/orders/{$orderId}/contact/" . self::WATSON_USER_ID . '/SALESREPFOLL', ['source' => 'internal']);
 
-        // validate returns the full invoice object (not just an id, unlike
-        // create) — called once via requestRaw() directly, not through
-        // request()'s int-or-null wrapper, since re-validating an
-        // already-validated invoice would fail on a second call.
-        $invoice = $this->requestRaw('POST', "/invoices/{$invoiceId}/validate", []);
+        // validate returns the full order object including
+        // online_payment_url (source=order) — same asymmetry as invoices.
+        $order = $this->requestRaw('POST', "/orders/{$orderId}/validate", []);
 
-        if (!is_array($invoice)) {
+        if (!is_array($order)) {
             return null;
         }
 
-        $invoiceRef = (string) ($invoice['ref'] ?? '');
-        $paymentUrl = $invoice['online_payment_url'] ?? null;
-
-        $updateBody = [
-            'categories'    => [self::DRA_CATEGORY_ID],
-            'array_options' => [
-                'options_primary_representative' => (string) self::WATSON_USER_ID,
-            ],
-        ];
-
-        if ($paymentUrl !== null) {
-            $updateBody['note_public'] = "Pay online: {$paymentUrl}";
-        }
-
-        $this->requestRaw('PUT', "/invoices/{$invoiceId}", $updateBody);
+        $orderRef   = (string) ($order['ref'] ?? '');
+        $paymentUrl = $order['online_payment_url'] ?? null;
 
         return [
             'thirdparty_id' => $thirdpartyId,
             'project_id'    => $projectId,
-            'invoice_id'    => $invoiceId,
-            'invoice_ref'   => $invoiceRef,
+            'order_id'      => $orderId,
+            'order_ref'     => $orderRef,
+            'invoice_id'    => null,
+            'invoice_ref'   => null,
             'payment_url'   => $paymentUrl,
         ];
     }
