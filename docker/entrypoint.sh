@@ -31,6 +31,8 @@ return [
     ],
     'search' => [
         'brave_api_key' => '${BRAVE_API_KEY}',
+        'gemini_api_key' => '${GEMINI_API_KEY:-}',
+        'gemini_model'   => '${GEMINI_SEARCH_MODEL:-gemini-3.6-flash}',
     ],
     'dolibarr' => [
         'base_url'  => '${DOLIBARR_BASE_URL:-https://accts.xten.au/dolibarr}',
