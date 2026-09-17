@@ -83,6 +83,11 @@ services:
       BRAVE_API_KEY: ${BRAVE_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_SEARCH_MODEL: ${GEMINI_SEARCH_MODEL:-}
+      # marketing-module's CampaignVerifyTask (pre-flight mailbox
+      # verification, MAA-20260917-002). All blank = the task does nothing.
+      EMAIL_VERIFY_PROVIDER: ${EMAIL_VERIFY_PROVIDER:-}
+      MILLIONVERIFIER_API_KEY: ${MILLIONVERIFIER_API_KEY:-}
+      DEBOUNCE_API_KEY: ${DEBOUNCE_API_KEY:-}
       DOLIBARR_WATSON_TOKEN: ${DOLIBARR_WATSON_TOKEN:-}
     volumes:
       - ./data/encryption_key:/app/.encryption_key
