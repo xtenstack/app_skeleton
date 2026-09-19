@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App_skeleton;
 
+use Phalcon\Di\DiInterface;
 use Phalcon\Di\Injectable;
 
 /**
@@ -88,7 +89,10 @@ class ModuleManager extends Injectable
      * Application- and plugin-tier modules that are both discovered and
      * enabled in module_registry, in the ['key' => ['className' => ...]]
      * shape Phalcon\Mvc\Application::registerModules() expects. Both
-     * tiers get a real route namespace — see ROUTABLE_TIERS.
+     * tiers get a real route namespace — see ROUTABLE_TIERS — unless the
+     * module is headless (hasGenericRoutes()), which app/config/routes.php
+     * reads back from the extra 'routes' key (Phalcon keeps unknown keys
+     * and hands them back from getModules()).
      */
     public function registeredPhalconModules(): array
     {
@@ -100,10 +104,87 @@ class ModuleManager extends Injectable
                 continue;
             }
 
-            $modules[$key] = ['className' => $manifest['className']];
+            $modules[$key] = [
+                'className' => $manifest['className'],
+                'routes'    => $this->hasGenericRoutes($manifest),
+            ];
         }
 
         return $modules;
+    }
+
+    /**
+     * Whether a module gets the generic /<key>/:controller/:action routes.
+     * A headless (service-only) plugin has no controllers and registers no
+     * 'view', so those routes used to dispatch into it and crash with
+     * "Service 'view' is not registered" — a 500 on a URL that should
+     * simply not exist. Explicit "routes": true|false in module.json
+     * wins; when the field is absent, a module with no controllers
+     * directory is treated as headless, so forgetting the flag fails
+     * safe (404) rather than loud (500).
+     */
+    public function hasGenericRoutes(array $manifest): bool
+    {
+        if (array_key_exists('routes', $manifest)) {
+            return $manifest['routes'] !== false;
+        }
+
+        $installPath = $manifest['installPath'] ?? null;
+
+        if (!is_string($installPath)) {
+            return true;
+        }
+
+        foreach (['src/controllers', 'src/Controllers', 'controllers', 'Controllers'] as $dir) {
+            if (is_dir($installPath . '/' . $dir)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Runs every enabled module's optional registerSharedServices($di),
+     * on every web and CLI request, before dispatch. Phalcon itself only
+     * calls a module's registerServices() for the ONE module a request is
+     * dispatched to, so anything registered there (a service another
+     * module is meant to consume, an eventsBus listener) does not exist
+     * during any other module's requests. registerServices() stays the
+     * place for per-module things like 'view'; this hook is for what the
+     * rest of the app must be able to see.
+     *
+     * One module's broken hook is logged and skipped rather than taking
+     * every request on the instance down with it, same tolerance as
+     * discovery itself.
+     *
+     * @return string[] keys of the modules whose hook ran
+     */
+    public function registerSharedServices(DiInterface $di): array
+    {
+        $enabled = $this->enabledModuleKeys();
+        $ran     = [];
+
+        foreach ($this->discover() as $key => $manifest) {
+            if (!in_array($manifest['tier'], self::ROUTABLE_TIERS, true) || !in_array($key, $enabled, true)) {
+                continue;
+            }
+
+            $className = $manifest['className'] ?? null;
+
+            if (!is_string($className) || !method_exists($className, 'registerSharedServices')) {
+                continue;
+            }
+
+            try {
+                (new $className())->registerSharedServices($di);
+                $ran[] = $key;
+            } catch (\Throwable $e) {
+                error_log("ModuleManager: {$key}'s registerSharedServices() failed, skipping: " . $e->getMessage());
+            }
+        }
+
+        return $ran;
     }
 
     /**
@@ -279,8 +360,10 @@ class ModuleManager extends Injectable
      * module_key values with enabled=true in module_registry. Returns []
      * rather than throwing if the table doesn't exist yet, so discovery
      * stays safe on a fresh install before migrations have run.
+     * Protected, not private, so tests can stub enable state without a
+     * database (tests/Unit/ModuleServicesAndRoutesTest.php).
      */
-    private function enabledModuleKeys(): array
+    protected function enabledModuleKeys(): array
     {
         try {
             $rows = \ModuleRegistry::find(['conditions' => 'enabled = true']);

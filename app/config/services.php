@@ -187,7 +187,9 @@ $di->setShared('moduleManager', function () {
  * coupling (e.g. 'payment:completed', 'user:created') — modelled on how
  * the audit listener below is attached to the models manager, but for
  * app-level events rather than model lifecycle ones. Modules attach their
- * own listeners inside their own Module::registerServices($di). Event
+ * own listeners inside their own Module::registerSharedServices($di) —
+ * not registerServices(), which only runs while that module is itself
+ * handling the request (docs/MODULE-SPEC.md, Shared services). Event
  * names are colon-namespaced ('type:event'), matching the db:beforeQuery /
  * db:afterQuery convention already used for the db service above and
  * Phalcon's own EventsManager wildcard-attach semantics.

@@ -55,6 +55,19 @@ $console->registerModules([
 ]);
 
 /**
+ * Enabled modules' shared services, so a CLI task (cron jobs especially)
+ * can consume another module's service exactly as a web request can —
+ * see ModuleManager::registerSharedServices(). Tolerant for the same
+ * reason bootstrap_web.php is: `./run migrate run` on a fresh install
+ * runs before module_registry exists.
+ */
+try {
+    $di->getShared('moduleManager')->registerSharedServices($di);
+} catch (\Throwable $e) {
+    // no module's shared services this run
+}
+
+/**
  * Setup the arguments to use the 'cli' module
  */
 $arguments = ['module' => 'cli'];

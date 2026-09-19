@@ -108,7 +108,7 @@ class DolibarrClient extends Injectable
             'client'       => 1,
             'country_id'   => 28, // Australia
             'code_client'  => 'CU-WATSON-' . $now,
-            'note_private' => "Created by Watson web-chat close action, " . date('Y-m-d', $now) . " — real customer, not a role-play test.",
+            'note_private' => 'Created by Watson web-chat close action, ' . date('Y-m-d', $now) . ' — real customer, not a role-play test.',
             'array_options' => [
                 'options_primary_representative' => (string) self::WATSON_USER_ID,
             ],
@@ -254,7 +254,7 @@ class DolibarrClient extends Injectable
         curl_close($ch);
 
         if ($httpCode < 200 || $httpCode >= 300) {
-            error_log("DolibarrClient: {$method} {$path} failed — HTTP {$httpCode}" . ($curlError !== '' ? " (curl: {$curlError})" : '') . ($response ? " body: " . substr((string) $response, 0, 300) : ''));
+            error_log("DolibarrClient: {$method} {$path} failed — HTTP {$httpCode}" . ($curlError !== '' ? " (curl: {$curlError})" : '') . ($response ? ' body: ' . substr((string) $response, 0, 300) : ''));
 
             return null;
         }
