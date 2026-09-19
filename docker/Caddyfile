@@ -64,3 +64,24 @@ xtmk.xten.au {
     header @static Cache-Control "public, max-age=3600"
     file_server
 }
+
+# games.xten.au (xten-au/games, minigames) -- third app on Internal
+# Prod's shared front door, same pattern as xtmk.xten.au above: its own
+# compose project at /opt/games (app + db only, no caddy of its own),
+# reached by container name over edge_shared, static files read from the
+# /opt/games/public bind mount declared in docker-compose.prod.yml.
+games.xten.au {
+    root * /games-public
+    encode gzip
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+    }
+    php_fastcgi games-app-1:9000 {
+        root /app/public
+    }
+    @static path /assets/* /favicon/*
+    header @static Cache-Control "public, max-age=3600"
+    file_server
+}

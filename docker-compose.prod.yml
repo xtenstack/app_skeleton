@@ -74,6 +74,10 @@ services:
       - edge_shared
     volumes:
       - /opt/xten-marketing/public:/marketing-public:ro
+      # games.xten.au (xten-au/games at /opt/games) -- see its block in
+      # docker/Caddyfile. Same reason as the mount above: without it every
+      # extension-less URL 404s inside Caddy before reaching PHP-FPM.
+      - /opt/games/public:/games-public:ro
   db:
     networks:
       - default
