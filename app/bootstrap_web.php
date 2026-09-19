@@ -140,6 +140,17 @@ try {
     $application->registerModules($builtInModules + $discoveredModules);
 
     /**
+     * Services every module must be able to see, whichever module ends up
+     * handling this request — see ModuleManager::registerSharedServices().
+     * Same fresh-install/unreachable-DB tolerance as the discovery above.
+     */
+    try {
+        $di->getShared('moduleManager')->registerSharedServices($di);
+    } catch (\Throwable $e) {
+        // no module's shared services this request; built-ins still work
+    }
+
+    /**
      * Include routes
      */
     require APP_PATH . '/config/routes.php';

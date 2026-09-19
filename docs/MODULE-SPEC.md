@@ -75,6 +75,7 @@ uses internally, and the two do not need to match.
 | `surface` | No (defaults to `'backend'` in `mergedMenu()`) | `"backend"`, `"frontend"`, or `"both"` — which nav surface(s) the module's menu contribution applies to. |
 | `menu` | No | Relative path (from the module's install root) to a PHP file returning an array in the same `{label, icon, controller, url, roles}` shape the built-in `menu.php` uses. No menu items → omit this field entirely, not an empty file. |
 | `code` | No | Short display code (e.g. `"reqs"`); not currently read by the engine, informational/reserved. |
+| `routes` | No | `false` for a headless (service-only) module with no controllers or views: the engine then adds none of the generic `/<key>/...` routes, so those URLs 404 like any other unknown path instead of dispatching into a module that cannot render. Defaults to `true`, except that a module with no `src/controllers` (or `controllers`) directory is treated as headless even without the flag. A `registerRoutes()` method is still honoured either way. See Headless modules, below. |
 | `migrations` | No | Relative path to the module's own `migrations/<adapter>/` tree, applied by the migration runner. |
 | `icon` **(planned)** | No | Path to a square SVG/PNG shipped in the package. Engine will apply a default icon when absent so a module can never render icon-less on the dashboard or nav. |
 | `license` **(planned)** | Paid modules only | `{ "model": "per-instance", "keyRequired": true }` — declares licensing; `keyRequired: false` for free modules. See the design brief's licensing sections for the check-in/enforcement mechanics this ties into. |
@@ -111,8 +112,50 @@ class Module implements ModuleDefinitionInterface
 
     // Optional — see Routes below.
     public function registerRoutes(Router $router) { /* ... */ }
+
+    // Optional — see Shared services below.
+    public function registerSharedServices(DiInterface $di): void { /* ... */ }
 }
 ```
+
+## Shared services
+
+Phalcon calls `registerServices()` **only for the one module a request is
+dispatched to**. Anything a module registers there does not exist while
+any other module is handling a request. That is right for per-module
+things (its `view`), and wrong for anything the rest of the app is meant
+to use.
+
+A module that offers a service to other modules, or attaches `eventsBus`
+listeners that must fire whichever module is handling the request,
+defines:
+
+```php
+public function registerSharedServices(DiInterface $di): void
+{
+    $di->setShared('yourService', fn () => new YourService($di->getShared('db')));
+}
+```
+
+`ModuleManager::registerSharedServices()` calls it for every **enabled**
+module on every web request and every CLI run (so cron tasks see the same
+services), before dispatch. Rules:
+
+- Register lazily (`setShared` with a closure). The hook runs on every
+  request, so it must do no work beyond registration: no queries, no I/O.
+- Use a service name unique to the module. Do not override core services.
+- A hook that throws is logged and skipped; the rest of the instance
+  keeps working, but that module's services will be missing.
+- Consumers must not assume the service exists, since the module may be
+  disabled or not installed: check `$di->has('yourService')`.
+
+## Headless modules
+
+A service-only plugin (no controllers, views or menu) sets
+`"routes": false` in `module.json`, registers what it offers in
+`registerSharedServices()`, and leaves `registerServices()` empty. It is
+still enabled, migrated and licensed like any other module; it just has
+no URL space of its own.
 
 ## Routes
 
@@ -173,7 +216,10 @@ own controllers do.
 
 Shared `eventsBus` service (Phalcon `EventsManager`, colon-namespaced
 events like `payment:completed`, `user:created`). Attach listeners in
-`Module::registerServices($di)`. This is the *only* sanctioned channel
+`Module::registerSharedServices($di)` (see Shared services above — a
+listener attached in `registerServices()` only exists while that module
+itself is handling the request, so it would miss every event fired from
+another module). This is the *only* sanctioned channel
 for one module to react to another module's state changes — direct
 reads/writes into another module's tables are out of scope regardless
 of `dependsOn` (see Isolation, below).

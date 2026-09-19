@@ -14,6 +14,21 @@ $router->add('/', [
 ]);
 
 foreach ($application->getModules() as $key => $module) {
+    /**
+     * Headless (service-only) plugins get no generic routes — see
+     * ModuleManager::hasGenericRoutes(). Their URLs then fall through to
+     * the router's defaults and 404 like any other unknown path. Built-in
+     * modules carry no 'routes' key and are always routed. A headless
+     * module's own registerRoutes() below is still honoured.
+     */
+    if (($module['routes'] ?? true) === false) {
+        if (method_exists($module['className'], 'registerRoutes')) {
+            (new $module['className']())->registerRoutes($router);
+        }
+
+        continue;
+    }
+
     $namespace = preg_replace('/Module$/', 'Controllers', $module['className']);
 
     $router->add('/'.$key.'/:params', [
