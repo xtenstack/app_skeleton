@@ -85,3 +85,41 @@ games.xten.au {
     header @static Cache-Control "public, max-age=3600"
     file_server
 }
+
+# xwar.xten.au (xten-au/xwar) -- same pattern as games.xten.au above: own compose project at
+# /opt/xwar (app + db only), reached over edge_shared, static files
+# from the /opt/xwar/public bind mount in docker-compose.prod.yml.
+xwar.xten.au {
+    root * /xwar-public
+    encode gzip
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+    }
+    php_fastcgi xwar-app-1:9000 {
+        root /app/public
+    }
+    @static path /assets/* /favicon/*
+    header @static Cache-Control "public, max-age=3600"
+    file_server
+}
+
+# game.xten.au + its alias play.xten.au (xten-au/game, gaming platform) -- same pattern as games.xten.au above: own compose project at
+# /opt/game (app + db only), reached over edge_shared, static files
+# from the /opt/game/public bind mount in docker-compose.prod.yml.
+game.xten.au, play.xten.au {
+    root * /game-public
+    encode gzip
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+    }
+    php_fastcgi game-app-1:9000 {
+        root /app/public
+    }
+    @static path /assets/* /favicon/*
+    header @static Cache-Control "public, max-age=3600"
+    file_server
+}

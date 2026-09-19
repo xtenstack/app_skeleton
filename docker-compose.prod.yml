@@ -78,6 +78,9 @@ services:
       # docker/Caddyfile. Same reason as the mount above: without it every
       # extension-less URL 404s inside Caddy before reaching PHP-FPM.
       - /opt/games/public:/games-public:ro
+      # xwar.xten.au and game.xten.au/play.xten.au -- same again.
+      - /opt/xwar/public:/xwar-public:ro
+      - /opt/game/public:/game-public:ro
   db:
     networks:
       - default
