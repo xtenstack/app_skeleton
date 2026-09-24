@@ -59,6 +59,21 @@ final class HttpClient
         return $this->request('POST', $path, json_encode($data), array_merge(['Content-Type: application/json'], $headers));
     }
 
+    /**
+     * A GET carrying extra headers (e.g. ['X-Api-Key: ' . $token]) — the
+     * api module's read actions (index/view/match) are reachable via GET
+     * but still require an authenticated principal, unlike post()/postJson()
+     * which only ever needed the cookie-jar session path until REQ-225's
+     * api-key-authenticated GET requests came along.
+     *
+     * @param string[] $headers
+     * @return array{status: int, body: string}
+     */
+    public function getWithHeaders(string $path, array $headers = []): array
+    {
+        return $this->request('GET', $path, null, $headers);
+    }
+
     /** @param string[] $extraHeaders */
     private function request(string $method, string $path, ?string $body = null, array $extraHeaders = []): array
     {

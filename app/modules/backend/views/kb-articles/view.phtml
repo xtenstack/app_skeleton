@@ -1,0 +1,68 @@
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>
+      <?= $this->escaper->escapeHtml($article->title) ?>
+      <span class="badge badge-<?= $article->status === 'published' ? 'success' : 'secondary' ?>"><?= $this->escaper->escapeHtml(\KbArticles::STATUSES[$article->status] ?? $article->status) ?></span>
+      <span class="badge badge-<?= $article->visibility === 'public' ? 'info' : 'secondary' ?>"><?= $this->escaper->escapeHtml(\KbArticles::VISIBILITIES[$article->visibility] ?? $article->visibility) ?></span>
+    </h1>
+    <div>
+      <a href="<?= $this->url->get('backend/kb-articles/edit/' . $article->id) ?>" class="btn btn-outline-secondary">Edit</a>
+      <form method="post" action="<?= $this->url->get('backend/kb-articles/delete/' . $article->id) ?>" class="d-inline" onsubmit="return confirm('Delete this article?')">
+        <button type="submit" class="btn btn-outline-danger">Delete</button>
+      </form>
+      <a href="<?= $this->url->get('backend/kb-articles') ?>" class="btn btn-outline-secondary">Back</a>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-8">
+    <div class="card mb-3">
+      <div class="card-header">Content</div>
+      <div class="card-body">
+        <p class="text-muted"><?= $this->escaper->escapeHtml((string) $article->summary) ?></p>
+        <hr>
+        <div class="kb-article-body"><?= $bodyHtml ?></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card mb-3">
+      <div class="card-header">Details</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5">Enquiry type</dt>
+          <dd class="col-7"><?= $this->escaper->escapeHtml($article->EnquiryType ? $article->EnquiryType->name : '—') ?></dd>
+          <dt class="col-5">Product ref</dt>
+          <dd class="col-7"><?= $this->escaper->escapeHtml($article->product_ref ?: '—') ?></dd>
+          <dt class="col-5">Created by</dt>
+          <dd class="col-7"><?= $this->escaper->escapeHtml($article->CreatedBy ? $article->CreatedBy->email : '—') ?></dd>
+          <dt class="col-5">Updated by</dt>
+          <dd class="col-7"><?= $this->escaper->escapeHtml($article->UpdatedBy ? $article->UpdatedBy->email : '—') ?></dd>
+          <dt class="col-5">Created</dt>
+          <dd class="col-7"><?= $this->escaper->escapeHtml($article->created_at) ?></dd>
+<?php if ($article->published_at): ?>
+          <dt class="col-5">Published</dt>
+          <dd class="col-7"><?= $this->escaper->escapeHtml($article->published_at) ?></dd>
+<?php endif; ?>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Status</div>
+      <div class="card-body d-flex" style="gap: .5rem;">
+<?php if ($article->status !== 'published'): ?>
+        <form method="post" action="<?= $this->url->get('backend/kb-articles/publish/' . $article->id) ?>" onsubmit="return confirm('Publish this article? It becomes visible via the API/match endpoint immediately, and via the public FAQ endpoint if visibility is Public.')">
+          <button type="submit" class="btn btn-primary">Publish</button>
+        </form>
+<?php else: ?>
+        <form method="post" action="<?= $this->url->get('backend/kb-articles/unpublish/' . $article->id) ?>">
+          <button type="submit" class="btn btn-outline-secondary">Move back to draft</button>
+        </form>
+<?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>

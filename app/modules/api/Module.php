@@ -66,5 +66,17 @@ class Module implements ModuleDefinitionInterface
             'controller' => 'public-intake',
             'action'     => 'dataRestoreAudit',
         ])->via(['POST', 'OPTIONS']);
+
+        // REQ-225: public FAQ feed — same registerRoutes() extension point,
+        // same reasoning as the intake route above (a clean public URL the
+        // generic /api/:controller/:action shape can't itself express as
+        // "no auth required", since every other controller in this module
+        // goes through ControllerBase's principal requirement).
+        $router->add('/api/public-kb/faq', [
+            'namespace'  => 'App_skeleton\Modules\Api\Controllers',
+            'module'     => 'api',
+            'controller' => 'public-kb',
+            'action'     => 'faq',
+        ])->via(['GET', 'OPTIONS']);
     }
 }

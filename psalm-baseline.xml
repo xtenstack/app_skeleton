@@ -138,6 +138,23 @@
       <code><![CDATA[$di]]></code>
     </ParamNameMismatch>
   </file>
+  <file src="app/modules/api/controllers/KbArticlesController.php">
+    <InvalidArgument>
+      <code><![CDATA[$articles]]></code>
+    </InvalidArgument>
+    <NoInterfaceProperties>
+      <code><![CDATA[$type->id]]></code>
+      <code><![CDATA[$type->id]]></code>
+    </NoInterfaceProperties>
+  </file>
+  <file src="app/modules/api/controllers/PublicKbController.php">
+    <InvalidArgument>
+      <code><![CDATA[$articles]]></code>
+    </InvalidArgument>
+    <NoInterfaceProperties>
+      <code><![CDATA[$type->id]]></code>
+    </NoInterfaceProperties>
+  </file>
   <file src="app/modules/api/controllers/TicketsController.php">
     <InvalidArgument>
       <code><![CDATA[$tickets]]></code>

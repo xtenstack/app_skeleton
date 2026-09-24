@@ -35,6 +35,15 @@
             <textarea class="form-control" id="description" name="description" rows="5"><?= $this->escaper->escapeHtml((string) $ticket->description) ?></textarea>
           </div>
           <div class="form-group">
+            <label for="kb_enquiry_type_id">Enquiry type <span class="text-muted">(KB taxonomy — human-set at triage, used by KB matching)</span></label>
+            <select class="form-control" id="kb_enquiry_type_id" name="kb_enquiry_type_id">
+              <option value="">— none —</option>
+<?php foreach ($enquiryTypes as $enquiryType): ?>
+              <option value="<?= $enquiryType->id ?>" <?= (int) $ticket->kb_enquiry_type_id === (int) $enquiryType->id ? 'selected' : '' ?>><?= $this->escaper->escapeHtml($enquiryType->name) ?></option>
+<?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
             <label for="notes">Internal notes <span class="text-muted">(staff only, not visible via the API)</span></label>
             <textarea class="form-control" id="notes" name="notes" rows="4"><?= $this->escaper->escapeHtml((string) $ticket->notes) ?></textarea>
           </div>

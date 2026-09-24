@@ -1,0 +1,26 @@
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>New enquiry type</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/kb-enquiry-types/create') ?>">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" class="form-control" id="name" name="name" value="<?= $this->escaper->escapeHtml((string) $enquiryType->name) ?>" required>
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3"><?= $this->escaper->escapeHtml((string) $enquiryType->description) ?></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <a href="<?= $this->url->get('backend/kb-enquiry-types') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
