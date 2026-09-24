@@ -85,7 +85,7 @@ class CronRunner extends Injectable
         $output = trim(ob_get_clean());
         $ranAt  = date('Y-m-d H:i:s');
 
-        $job->last_run_at = $ranAt;
+        $job->last_run_at = $this->nextAnchor($job, $ranAt);
         $job->last_status = $status;
         $job->last_output = $output;
         $job->save();
@@ -99,6 +99,43 @@ class CronRunner extends Injectable
         $log->save();
 
         return ['job' => $job->name, 'status' => $status, 'output' => $output];
+    }
+
+    /**
+     * What last_run_at should hold after this run, so that isDue() keeps
+     * the job on its schedule instead of letting it slide.
+     *
+     * isDue() fires when now >= last_run_at + frequency. Storing the
+     * finish time here means a job that takes 40 minutes is due 40
+     * minutes later every day: the marketing Send job drifted from
+     * 21:00 AWST to 00:14 in five days (re-seeded by hand 22 Sep) and
+     * had crept back to 22:51 by 24 Sep, on course to skip a calendar
+     * day. Anchoring to the time the job was *due* keeps a daily job
+     * at the same clock time regardless of how long it runs.
+     *
+     * If the job had fallen more than one whole period behind (host
+     * down, job disabled for a while), re-anchor on the actual run time
+     * instead so it does not fire again immediately to "catch up".
+     */
+    private function nextAnchor(\CronJobs $job, string $ranAt): string
+    {
+        if (!$job->last_run_at) {
+            return $ranAt;
+        }
+
+        $due = strtotime($job->frequency, strtotime($job->last_run_at));
+
+        if ($due === false) {
+            return $ranAt;
+        }
+
+        $following = strtotime($job->frequency, $due);
+
+        if ($following === false || strtotime($ranAt) >= $following) {
+            return $ranAt;
+        }
+
+        return date('Y-m-d H:i:s', $due);
     }
 
     private function studly(string $value): string
