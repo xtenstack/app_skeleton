@@ -35,8 +35,8 @@ jobs:
         # which is exactly the "composer.lock regression" fix commits kept
         # re-applying by hand.
         run: |
-          if grep -q "xtenstack/requirements-module\|\.\./internal" composer.lock; then
-            echo "::error::composer.lock references the private ../internal path repo (xtenstack/requirements-module)." >&2
+          if grep -q "xtenstack/requirements-module\|\.\./internal\|\.\./plugins" composer.lock; then
+            echo "::error::composer.lock references a sibling path repo (../internal or ../plugins)." >&2
             echo "This means composer.lock was regenerated on a machine with composer.local.json present and committed as-is." >&2
             echo "Fix: remove composer.local.json (or run 'composer update' without it) and regenerate composer.lock before committing." >&2
             exit 1
@@ -51,7 +51,8 @@ jobs:
           # docker-compose.yml's internal-modules build context needs this
           # sibling directory to exist even empty (see docs/INTERNAL-MODULES.md)
           # — CI has no private module checkout, same as a public clone.
-          mkdir -p ../internal
+          # Likewise the plugin-modules context (../plugins).
+          mkdir -p ../internal ../plugins
 
       - name: Build and start the real stack
         run: docker compose up -d --build

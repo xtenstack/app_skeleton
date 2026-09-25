@@ -31,13 +31,18 @@
 # /internal (matching /app's own parent) before `composer install`
 # runs. The `internal-modules` build context is declared in
 # docker-compose.yml; it must exist on the host even if empty so a build
-# with no private modules configured still works unmodified.
+# with no private modules configured still works unmodified. The
+# `plugin-modules` context is the same mechanism for the public
+# XTenDeploy/plugins monorepo (`../plugins/*` path repositories, landing
+# at /plugins) — a private repo of several packages in one tree can't be
+# a `vcs` Composer repository, so it needs a build context too.
 FROM composer:2 AS vendor
 
 WORKDIR /app
 
 COPY composer.json composer.lock composer.local.jso[n] ./
 COPY --from=internal-modules . /internal
+COPY --from=plugin-modules . /plugins
 
 # composer.lock (committed, public) deliberately does NOT include any
 # private/internal module — a plain `install` from it is what keeps a
