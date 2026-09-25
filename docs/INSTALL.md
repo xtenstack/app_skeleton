@@ -57,6 +57,13 @@ the Composer path above from that directory. There's no separate
 
 ## MySQL or SQLite instead of Postgres
 
+> **Update (Sep 2026): SQLite now works for the base skeleton.**
+> `db/migrations/sqlite/` holds a port of every base migration, and
+> `./run migrate run` handles SQLite. For a step-by-step shared-hosting
+> install, see [RUNBOOK-SHARED-HOST-SQLITE.md](RUNBOOK-SHARED-HOST-SQLITE.md).
+> Optional modules still ship Postgres migrations only. MySQL is
+> unchanged: what follows still applies to it.
+
 Postgres is the only fully-supported adapter today — this is the
 honest state of things, not a "should just work" claim. Two separate
 pieces need to exist before either of the other two adapters is
