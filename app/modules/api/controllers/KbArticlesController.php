@@ -98,11 +98,21 @@ class KbArticlesController extends ControllerBase
      * published-only, for every caller (an unfinished article is never a
      * qualified answer to suggest, human or agent).
      *
-     * Ranking is intentionally simple (title match counts more than
-     * summary, more than body) and uses LOWER()/LIKE rather than
-     * Postgres's ILIKE — the portable equivalent CODING-STANDARDS.md's
-     * "Database portability" section asks new code to prefer, unlike
-     * ListView's existing (grandfathered) ILIKE-based search.
+     * How it actually works: the type filter is the only thing done in
+     * SQL. Every published article of that type is loaded and the keyword
+     * ranking happens in PHP (case-insensitive substring, title match
+     * counts 3, summary 2, body 1 per term) — no LIKE/ILIKE, so nothing
+     * database-specific, and at current volume (tens of articles per
+     * type, not thousands) that's cheaper than pretending the DB can rank.
+     * Revisit if a type ever holds enough articles for the load to matter.
+     *
+     * When q is given but no term hits anything, the type's published
+     * articles are returned anyway, newest-updated first, with
+     * keyword_match=false in the response — the caller asked "what do we
+     * have for this enquiry type?" with the customer's own wording as a
+     * hint; an empty answer because the wording didn't overlap would be
+     * a worse suggestion than the type's articles unranked. keyword_match
+     * tells an agent whether the ordering means anything.
      */
     public function matchAction()
     {
@@ -123,7 +133,7 @@ class KbArticlesController extends ControllerBase
         $candidates = \KbArticles::find([
             'conditions' => 'enquiry_type_id = :enquiry_type_id: AND status = :status:',
             'bind'       => ['enquiry_type_id' => (int) $type->id, 'status' => 'published'],
-            'order'      => 'id DESC',
+            'order'      => 'updated_at DESC, id DESC',
         ]);
 
         $q     = trim((string) $this->request->getQuery('q', 'string', ''));
@@ -153,9 +163,9 @@ class KbArticlesController extends ControllerBase
                     }
                 }
 
-                // No term matched anything at all — not a match, keyword
-                // filtering out irrelevant results being the entire point
-                // of supplying q in the first place.
+                // No term matched this article — leave it out of the
+                // keyword-ranked set (it may still come back via the
+                // fallback below if nothing at all matched).
                 if ($score === 0) {
                     continue;
                 }
@@ -164,12 +174,28 @@ class KbArticlesController extends ControllerBase
             $ranked[] = ['score' => $score, 'article' => $article];
         }
 
-        usort($ranked, fn ($a, $b) => $b['score'] <=> $a['score'] ?: (int) $b['article']->id <=> (int) $a['article']->id);
+        $keywordMatch = !$terms || $ranked !== [];
+
+        if (!$keywordMatch) {
+            // Fallback: the type's published articles, already ordered
+            // updated_at DESC by the query above (see docblock).
+            foreach ($candidates as $article) {
+                $ranked[] = ['score' => 0, 'article' => $article];
+            }
+        }
+
+        // Stable: score first, then most recently updated (the query's own
+        // order) — so the fallback keeps its updated_at ordering, and ties
+        // in a keyword-ranked set resolve the same way.
+        usort($ranked, fn ($a, $b) => $b['score'] <=> $a['score']
+            ?: strcmp((string) $b['article']->updated_at, (string) $a['article']->updated_at)
+            ?: (int) $b['article']->id <=> (int) $a['article']->id);
 
         $ranked = array_slice($ranked, 0, 10);
 
         return $this->response->setJsonContent([
-            'articles' => array_map(fn ($r) => $this->serialize($r['article']), $ranked),
+            'articles'      => array_map(fn ($r) => $this->serialize($r['article']), $ranked),
+            'keyword_match' => $keywordMatch,
         ]);
     }
 

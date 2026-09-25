@@ -65,3 +65,29 @@ document.addEventListener('click', function (event) {
 
   window.location.href = el.getAttribute('data-action') + '?' + qs;
 });
+
+// Confirm dialogs for destructive/side-effecting controls, driven by a
+// data-confirm="message" attribute instead of inline onclick/onsubmit
+// handlers (which script-src 'self' silently blocks — the dialog just
+// never appeared, and the action went straight through). Delegated on
+// document so any view can opt in without per-page wiring. Clicks cover
+// links and buttons (including formaction submit buttons inside a
+// bulk form); submit covers whole <form data-confirm> elements. Cancel
+// prevents the default, so a link/button/form with no JS at all still
+// works — it just doesn't ask first.
+document.addEventListener('click', function (event) {
+  var el = event.target.closest('a[data-confirm], button[data-confirm], input[type="submit"][data-confirm]');
+  if (!el) return;
+  if (!window.confirm(el.getAttribute('data-confirm'))) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+});
+
+document.addEventListener('submit', function (event) {
+  var form = event.target;
+  if (!form || !form.hasAttribute || !form.hasAttribute('data-confirm')) return;
+  if (!window.confirm(form.getAttribute('data-confirm'))) {
+    event.preventDefault();
+  }
+});

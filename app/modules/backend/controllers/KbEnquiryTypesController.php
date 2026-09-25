@@ -10,7 +10,13 @@ namespace App_skeleton\Modules\Backend\Controllers;
  * depend on (migration 022) rather than a per-article concern. Delete
  * goes through SoftDeletes, unlike RolesController's hard delete, per
  * CLAUDE.md's forbidden-patterns rule and because kb_articles/tickets
- * rows reference a type by id and shouldn't suddenly dangle.
+ * rows reference a type by id and shouldn't suddenly dangle — and for
+ * the same reason a type that is still referenced by any article or
+ * ticket can't be deleted at all (single or bulk): the API resolves
+ * enquiry_type by name through the trait-filtered findFirst(), so a
+ * soft-deleted type would make every article under it silently vanish
+ * from index/match rather than error. Remove or retype the referencing
+ * rows first.
  */
 class KbEnquiryTypesController extends ControllerBase
 {
@@ -137,6 +143,12 @@ class KbEnquiryTypesController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'kb-enquiry-types', 'action' => 'index']);
         }
 
+        if ($enquiryType->isReferenced()) {
+            $this->flash->error($this->inUseMessage($enquiryType));
+
+            return $this->dispatcher->forward(['controller' => 'kb-enquiry-types', 'action' => 'index']);
+        }
+
         if (!$enquiryType->softDelete()) {
             foreach ($enquiryType->getMessages() as $message) {
                 $this->flash->error((string) $message);
@@ -152,7 +164,10 @@ class KbEnquiryTypesController extends ControllerBase
      * "With selected" bulk delete (list-view convention, RB-03) —
      * delete-only, same reasoning as RolesController::bulkAction(): the
      * only other field, description, isn't something that makes sense
-     * applied identically across a batch.
+     * applied identically across a batch. All-or-nothing: if any selected
+     * type is still referenced, nothing is deleted and the error names
+     * each one, rather than deleting the rest and leaving the admin to
+     * work out which ones survived.
      */
     public function bulkAction()
     {
@@ -173,6 +188,20 @@ class KbEnquiryTypesController extends ControllerBase
             'bind'       => ['ids' => $ids],
         ]);
 
+        $inUse = [];
+
+        foreach ($enquiryTypes as $enquiryType) {
+            if ($enquiryType->isReferenced()) {
+                $inUse[] = $this->inUseMessage($enquiryType);
+            }
+        }
+
+        if ($inUse) {
+            $this->flash->error('Nothing was deleted. ' . implode(' ', $inUse));
+
+            return $this->dispatcher->forward(['controller' => 'kb-enquiry-types', 'action' => 'index']);
+        }
+
         $count = 0;
 
         foreach ($enquiryTypes as $enquiryType) {
@@ -184,5 +213,17 @@ class KbEnquiryTypesController extends ControllerBase
         $this->flash->success($count . ' enquiry type(s) deleted');
 
         return $this->dispatcher->forward(['controller' => 'kb-enquiry-types', 'action' => 'index']);
+    }
+
+    private function inUseMessage(\KbEnquiryTypes $enquiryType): string
+    {
+        $counts = $enquiryType->referenceCounts();
+
+        return sprintf(
+            '"%s" is still referenced by %d article(s) and %d ticket(s) and cannot be deleted — retype or delete those first.',
+            $enquiryType->name,
+            $counts['articles'],
+            $counts['tickets']
+        );
     }
 }

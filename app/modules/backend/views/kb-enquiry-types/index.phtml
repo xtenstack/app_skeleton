@@ -15,7 +15,7 @@
 <form method="post" action="<?= $this->url->get('backend/kb-enquiry-types/bulk') ?>" id="kb-enquiry-types-bulk-form">
   <div class="row mb-2">
     <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
-      <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete the selected enquiry type(s)?')">Delete selected</button>
+      <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger" data-confirm="Delete the selected enquiry type(s)?">Delete selected</button>
       <span class="text-muted small" id="bulk-selected-count">0 selected</span>
     </div>
   </div>
@@ -44,7 +44,7 @@
                 <td><?= $this->escaper->escapeHtml($enquiryType->created_at) ?></td>
                 <td class="text-right">
                   <a href="<?= $this->url->get('backend/kb-enquiry-types/edit/' . $enquiryType->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                  <button type="submit" formaction="<?= $this->url->get('backend/kb-enquiry-types/delete/' . $enquiryType->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this enquiry type?')">Delete</button>
+                  <button type="submit" formaction="<?= $this->url->get('backend/kb-enquiry-types/delete/' . $enquiryType->id) ?>" class="btn btn-sm btn-outline-danger" data-confirm="Delete this enquiry type?">Delete</button>
                 </td>
               </tr>
 <?php endforeach; ?>

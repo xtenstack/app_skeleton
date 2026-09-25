@@ -8,17 +8,22 @@
 -- share one taxonomy instead of growing separate ones that would need
 -- reconciling later (plan section 10). Shape follows 011_tickets.sql's
 -- conventions (SERIAL PK, deleted_at, created_at/updated_at, no
--- ON DELETE). name is unique since it's looked up by value the same way
--- Roles::idsByNames() looks up roles by name.
+-- ON DELETE). name is unique among *live* rows since it's looked up by
+-- value the same way Roles::idsByNames() looks up roles by name — a
+-- partial unique index (WHERE deleted_at IS NULL) rather than a table
+-- UNIQUE, so a soft-deleted type doesn't block re-creating one with the
+-- same name later (a plain UNIQUE would still see the trashed row).
 CREATE TABLE kb_enquiry_types (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(50) NOT NULL,
     description TEXT,
     deleted_at  TIMESTAMP,
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (name)
+    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX kb_enquiry_types_name_active_idx
+    ON kb_enquiry_types (name) WHERE deleted_at IS NULL;
 
 -- Seeded here, in the same migration, rather than via SeedTask — this
 -- is the fixed starting taxonomy the plan itself specifies (section 4),

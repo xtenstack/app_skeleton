@@ -35,4 +35,32 @@ class KbEnquiryTypes extends \Phalcon\Mvc\Model
     {
         $this->updated_at = date('Y-m-d H:i:s');
     }
+
+    /**
+     * How many kb_articles / tickets rows point at this type — the guard
+     * KbEnquiryTypesController's delete actions use to refuse removing a
+     * type that's still in use. Counts every referencing row, soft-deleted
+     * ones included (count() isn't trait-filtered): kb_articles.
+     * enquiry_type_id is NOT NULL and a trashed article can be restore()d,
+     * so a soft-deleted reference is still a reference the FK would
+     * otherwise leave dangling.
+     *
+     * @return array{articles: int, tickets: int}
+     */
+    public function referenceCounts(): array
+    {
+        $bind = ['id' => (int) $this->id];
+
+        return [
+            'articles' => (int) \KbArticles::count(['conditions' => 'enquiry_type_id = :id:', 'bind' => $bind]),
+            'tickets'  => (int) \Tickets::count(['conditions' => 'kb_enquiry_type_id = :id:', 'bind' => $bind]),
+        ];
+    }
+
+    public function isReferenced(): bool
+    {
+        $counts = $this->referenceCounts();
+
+        return $counts['articles'] > 0 || $counts['tickets'] > 0;
+    }
 }

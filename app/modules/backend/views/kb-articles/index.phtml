@@ -16,6 +16,26 @@
   </div>
 </div>
 
+<?php
+// Enquiry-type filter: same link-group shape as the status filter above,
+// each link keeping whatever status/search is already active (and vice
+// versa the status links above are deliberately plain — they reset the
+// type, matching Tickets' "All" behaviour). Plain GET links, no JS.
+$typeFilterBase = array_filter(['status' => $currentStatus, 'q' => $listState['q']], fn ($v) => $v !== '' && $v !== null);
+$typeLink       = fn (?int $typeId) => $baseUrl . (($qs = http_build_query($typeFilterBase + ($typeId ? ['enquiry_type_id' => $typeId] : []))) !== '' ? '?' . $qs : '');
+?>
+<div class="row mb-2">
+  <div class="col-12">
+    <span class="text-muted small mr-2">Enquiry type:</span>
+    <div class="btn-group flex-wrap" role="group" aria-label="Filter by enquiry type">
+      <a href="<?= $this->escaper->escapeHtmlAttr($typeLink(null)) ?>" class="btn btn-sm btn-outline-secondary <?= !$enquiryTypeId ? 'active' : '' ?>">All</a>
+<?php foreach ($enquiryTypes as $enquiryType): ?>
+      <a href="<?= $this->escaper->escapeHtmlAttr($typeLink((int) $enquiryType->id)) ?>" class="btn btn-sm btn-outline-secondary <?= (int) $enquiryTypeId === (int) $enquiryType->id ? 'active' : '' ?>"><?= $this->escaper->escapeHtml($enquiryType->name) ?></a>
+<?php endforeach; ?>
+    </div>
+  </div>
+</div>
+
 <div class="row mb-2">
   <div class="col-12">
     <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search title/summary/body…') ?>
@@ -48,7 +68,7 @@
             </select>
           </div>
           <button type="submit" name="bulk_action" value="update" class="btn btn-sm btn-primary btn-block">Apply to selected</button>
-          <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger btn-block" onclick="return confirm('Delete the selected article(s)? This cannot be undone from here.')">Delete selected</button>
+          <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger btn-block" data-confirm="Delete the selected article(s)? This cannot be undone from here.">Delete selected</button>
         </div>
       </div>
       <span class="text-muted small" id="bulk-selected-count">0 selected</span>
@@ -86,7 +106,7 @@
                 <td class="text-right">
                   <a href="<?= $this->url->get('backend/kb-articles/view/' . $article->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
                   <a href="<?= $this->url->get('backend/kb-articles/edit/' . $article->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
-                  <button type="submit" formaction="<?= $this->url->get('backend/kb-articles/delete/' . $article->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete article #<?= $article->id ?>?')">Delete</button>
+                  <button type="submit" formaction="<?= $this->url->get('backend/kb-articles/delete/' . $article->id) ?>" class="btn btn-sm btn-outline-danger" data-confirm="Delete article #<?= $article->id ?>?">Delete</button>
                 </td>
               </tr>
 <?php endforeach; ?>

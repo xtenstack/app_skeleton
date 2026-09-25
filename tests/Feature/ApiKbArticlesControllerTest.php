@@ -276,6 +276,35 @@ final class ApiKbArticlesControllerTest extends TestCase
         $this->assertNotContains((int) $draft->id, $ids, 'match must never return a draft article');
     }
 
+    public function testMatchFallsBackToTypeArticlesWhenNoKeywordHits(): void
+    {
+        $marker    = 'zzfallbackzz' . bin2hex(random_bytes(3));
+        $published = $this->newArticle('published', 'internal', $marker);
+
+        $client = new HttpClient();
+
+        // A q that can't match anything (random token nowhere in any
+        // fixture) must still return the type's published articles,
+        // flagged keyword_match=false, rather than an empty list.
+        $noHit = $client->getWithHeaders(
+            '/api/kb-articles/match?enquiry_type=qualifying-question&q=' . urlencode('qqnohitqq' . bin2hex(random_bytes(6))),
+            ['X-Api-Key: ' . self::$operatorApiKeyRawToken]
+        );
+        $this->assertSame(200, $noHit['status'], $noHit['body']);
+
+        $payload = json_decode($noHit['body'], true);
+        $this->assertFalse($payload['keyword_match'], 'no term hit anything, so keyword_match must be false');
+        $this->assertContains((int) $published->id, array_column($payload['articles'] ?? [], 'id'), 'fallback should still return the type\'s published article');
+
+        // And a real hit reports keyword_match=true.
+        $hit = $client->getWithHeaders(
+            '/api/kb-articles/match?enquiry_type=qualifying-question&q=' . urlencode($marker),
+            ['X-Api-Key: ' . self::$operatorApiKeyRawToken]
+        );
+        $this->assertSame(200, $hit['status'], $hit['body']);
+        $this->assertTrue(json_decode($hit['body'], true)['keyword_match']);
+    }
+
     public function testMatchRequiresAnEnquiryType(): void
     {
         $client   = new HttpClient();
