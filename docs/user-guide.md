@@ -38,6 +38,19 @@ ticket and a customer can complete an intake without an account. Note
 this ships *built-in* rather than as an optional module — see the
 Modules section below for why.
 
+**Knowledge Base.** Articles (`KbArticlesController`, `KbEnquiryTypesController`)
+grouped by a shared, editable enquiry-type taxonomy rather than freetext
+tags — the same taxonomy Tickets can optionally be typed against, so a
+triaged ticket's type can drive a matching KB article via the API's
+`match` action instead of starting from a blank page. Authoring and
+publishing is admin/operator only; the JSON API's `agent` role gets
+read-only access (list/view/match), and there's a separate,
+unauthenticated public FAQ endpoint that only ever serves published,
+public-visibility articles, for the website to pull from directly.
+Article bodies are markdown, rendered server-side (league/commonmark,
+safe mode) wherever the backend displays them as HTML. Ships *built-in*
+for the same reason Tickets does — see the Modules section below.
+
 **API keys.** Credentials *other* systems use to call this one. Each key
 belongs to a user, is stored as a one-way hash (shown exactly once, at
 creation), and resolves to that user's own role on every request — so an

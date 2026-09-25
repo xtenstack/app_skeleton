@@ -1,0 +1,71 @@
+<?php $baseUrl = $this->url->get('backend/kb-enquiry-types'); ?>
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <h1>KB Enquiry Types</h1>
+    <a href="<?= $this->url->get('backend/kb-enquiry-types/new') ?>" class="btn btn-primary">New enquiry type</a>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col-12">
+    <?= \App_skeleton\ListView::searchForm($baseUrl, $listState['q'], $preserveQuery, 'Search name/description…') ?>
+  </div>
+</div>
+
+<form method="post" action="<?= $this->url->get('backend/kb-enquiry-types/bulk') ?>" id="kb-enquiry-types-bulk-form">
+  <div class="row mb-2">
+    <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+      <button type="submit" name="bulk_action" value="delete" class="btn btn-sm btn-outline-danger" data-confirm="Delete the selected enquiry type(s)?">Delete selected</button>
+      <span class="text-muted small" id="bulk-selected-count">0 selected</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th style="width: 2.5rem;"><input type="checkbox" id="bulk-select-all" aria-label="Select all enquiry types"></th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Name', 'name', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th>Description</th>
+                <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Created', 'created', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+<?php foreach ($enquiryTypes as $enquiryType): ?>
+              <tr>
+                <td><input type="checkbox" class="bulk-row-checkbox" name="kb_enquiry_type_ids[]" value="<?= $enquiryType->id ?>" aria-label="Select <?= $this->escaper->escapeHtmlAttr($enquiryType->name) ?>"></td>
+                <td><?= $this->escaper->escapeHtml($enquiryType->name) ?></td>
+                <td><?= $this->escaper->escapeHtml((string) $enquiryType->description) ?></td>
+                <td><?= $this->escaper->escapeHtml($enquiryType->created_at) ?></td>
+                <td class="text-right">
+                  <a href="<?= $this->url->get('backend/kb-enquiry-types/edit/' . $enquiryType->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <button type="submit" formaction="<?= $this->url->get('backend/kb-enquiry-types/delete/' . $enquiryType->id) ?>" class="btn btn-sm btn-outline-danger" data-confirm="Delete this enquiry type?">Delete</button>
+                </td>
+              </tr>
+<?php endforeach; ?>
+<?php if (!count($enquiryTypes)): ?>
+              <tr>
+                <td colspan="5" class="text-center text-muted">No enquiry types yet.</td>
+              </tr>
+<?php endif; ?>
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-2">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <span class="text-muted small"><?= $listState['total'] ?> enquiry type<?= $listState['total'] === 1 ? '' : 's' ?></span>
+      <?= \App_skeleton\ListView::pagination($baseUrl, $listState['page'], $listState['totalPages'], $preserveQuery) ?>
+    </div>
+  </div>
+</form>
+
+<script src="/assets/js/bulk-select.js"></script>

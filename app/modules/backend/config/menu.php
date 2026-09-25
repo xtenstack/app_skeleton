@@ -105,6 +105,21 @@ return [
         'roles'      => \Roles::idsByNames(['admin', 'operator']),
     ],
     [
+        'label'      => 'Knowledge Base',
+        'icon'       => 'fas fa-book',
+        'controller' => 'kb-articles',
+        'url'        => 'backend/kb-articles',
+        'roles'      => \Roles::idsByNames(['admin', 'operator']),
+    ],
+    [
+        'label'      => 'KB Enquiry Types',
+        'icon'       => 'fas fa-tags',
+        'controller' => 'kb-enquiry-types',
+        'url'        => 'backend/kb-enquiry-types',
+        'roles'      => [1],
+        'group'      => 'Settings',
+    ],
+    [
         'label'      => 'Audit Log',
         'icon'       => 'fas fa-clipboard-list',
         'controller' => 'audit-log',

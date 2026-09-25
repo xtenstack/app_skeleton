@@ -7,9 +7,10 @@
     "prefer-stable": true,
     "require": {
         "php": "^8.3",
-        "ext-phalcon": "^5.8",
-        "ext-pdo_pgsql": "*",
         "ext-openssl": "*",
+        "ext-pdo_pgsql": "*",
+        "ext-phalcon": "^5.8",
+        "league/commonmark": "^2.5",
         "wikimedia/composer-merge-plugin": "^2.1"
     },
     "require-dev": {

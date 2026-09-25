@@ -31,6 +31,7 @@ class Tickets extends \Phalcon\Mvc\Model
     public $ticket_type;
     public $notes;
     public $project;
+    public $kb_enquiry_type_id;
     public $source_ref;
     public $intake_token;
     public $intake_data;
@@ -63,6 +64,7 @@ class Tickets extends \Phalcon\Mvc\Model
         $this->belongsTo('qa_reviewed_by', 'Users', 'id', ['alias' => 'QaReviewer']);
         $this->belongsTo('reporter_api_key_id', 'ApiKeys', 'id', ['alias' => 'ReporterApiKey']);
         $this->belongsTo('consolidated_into_ticket_id', 'Tickets', 'id', ['alias' => 'ConsolidatedInto']);
+        $this->belongsTo('kb_enquiry_type_id', 'KbEnquiryTypes', 'id', ['alias' => 'KbEnquiryType']);
         $this->hasMany('id', 'TicketAttachments', 'ticket_id', ['alias' => 'Attachments']);
     }
 

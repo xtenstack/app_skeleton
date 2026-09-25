@@ -182,7 +182,8 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
         }
 
-        $this->view->ticket = $ticket;
+        $this->view->ticket       = $ticket;
+        $this->view->enquiryTypes = \KbEnquiryTypes::find(['order' => 'name']);
     }
 
     public function updateAction($id)
@@ -203,26 +204,29 @@ class TicketsController extends ControllerBase
 
         if ($title === '') {
             $this->flash->error('Title is required');
-            $this->view->ticket = $ticket;
+            $this->view->ticket       = $ticket;
+            $this->view->enquiryTypes = \KbEnquiryTypes::find(['order' => 'name']);
 
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'edit', 'params' => [$id]]);
         }
 
         $ticketType = (string) $this->request->getPost('ticket_type');
 
-        $ticket->title       = $title;
-        $ticket->description = (string) $this->request->getPost('description') ?: null;
-        $ticket->severity    = \Tickets::normalizeSeverity((string) $this->request->getPost('severity')) ?? 'normal';
-        $ticket->ticket_type = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
-        $ticket->notes       = (string) $this->request->getPost('notes') ?: null;
-        $ticket->project     = (string) $this->request->getPost('project') ?: null;
+        $ticket->title              = $title;
+        $ticket->description        = (string) $this->request->getPost('description') ?: null;
+        $ticket->severity           = \Tickets::normalizeSeverity((string) $this->request->getPost('severity')) ?? 'normal';
+        $ticket->ticket_type        = isset(self::TICKET_TYPES[$ticketType]) ? $ticketType : $ticket->ticket_type;
+        $ticket->notes              = (string) $this->request->getPost('notes') ?: null;
+        $ticket->project            = (string) $this->request->getPost('project') ?: null;
+        $ticket->kb_enquiry_type_id = $this->request->getPost('kb_enquiry_type_id', 'int') ?: null;
 
         if (!$ticket->save()) {
             foreach ($ticket->getMessages() as $message) {
                 $this->flash->error((string) $message);
             }
 
-            $this->view->ticket = $ticket;
+            $this->view->ticket       = $ticket;
+            $this->view->enquiryTypes = \KbEnquiryTypes::find(['order' => 'name']);
 
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'edit', 'params' => [$id]]);
         }
