@@ -17,8 +17,8 @@
 # this directory) -- see bin/install.php.
 
 if git diff --cached --name-only | grep -q '^composer\.lock$'; then
-    if git show :composer.lock | grep -q 'xtenstack/requirements-module\|\.\./internal'; then
-        echo "ERROR: composer.lock (staged) references the private ../internal path repo (xtenstack/requirements-module)." >&2
+    if git show :composer.lock | grep -q 'xtenstack/requirements-module\|\.\./internal\|\.\./plugins'; then
+        echo "ERROR: composer.lock (staged) references a sibling path repo (../internal or ../plugins)." >&2
         echo "This means composer.lock was regenerated on a machine with composer.local.json present and staged as-is." >&2
         echo "Fix: remove composer.local.json (or run 'composer update' without it) and regenerate composer.lock before committing." >&2
         exit 1

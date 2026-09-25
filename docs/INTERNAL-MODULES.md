@@ -48,6 +48,33 @@ final image. The tradeoff: local edits to a module in your sibling
 checkout need `composer install` re-run to show up, rather than being
 picked up live.
 
+## Plugin modules (`../plugins`)
+
+The public plugin-module monorepo, [XTenDeploy/plugins](https://github.com/XTenDeploy/plugins)
+(one top-level folder per plugin, e.g. `announcements/`), installs by
+exactly the same mechanism, with its own sibling checkout and its own
+`path` glob in `composer.local.json`:
+
+```json
+{
+    "repositories": [
+        { "type": "path", "url": "../internal/*", "options": { "symlink": false } },
+        { "type": "path", "url": "../plugins/*",  "options": { "symlink": false } }
+    ],
+    "require": {
+        "xtenstack/requirements-module": "*",
+        "xtendeploy/announcements": "*"
+    }
+}
+```
+
+The Docker build copies that checkout in through a second build context,
+`plugin-modules: ../plugins` (docker-compose.yml → `/plugins` in the
+vendor stage), so `../plugins/*` resolves inside the image just as
+`../internal/*` does. Like `../internal`, the directory must exist on the
+build host even if empty (`mkdir -p ../plugins`). It can't be a `vcs`
+Composer repository instead: several packages share one git tree.
+
 ## Setup
 
 ```bash
