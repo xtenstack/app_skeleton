@@ -43,30 +43,11 @@
     file_server
 }
 
-# Internal Prod only — this Caddy instance also fronts xten-marketing's
-# public site, over the edge_shared Docker network (see
-# docker-compose.prod.yml). Inert everywhere else: nothing routes real
-# traffic to this hostname on a dev/CI/client instance, and
-# xten-marketing-app-1 simply won't resolve there, but the block itself
-# is harmless to have loaded.
-xtmk.xten.au {
-    root * /marketing-public
-    encode gzip
-    header {
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
-    }
-    php_fastcgi xten-marketing-app-1:9000 {
-        root /app/public
-    }
-    @static path /assets/* /favicon/*
-    header @static Cache-Control "public, max-age=3600"
-    file_server
-}
+# xtmk.xten.au: merged into this instance 2026-09-25. It is served by the
+# {$SITE_DOMAIN} block above (listed in .env's SITE_DOMAIN), not a block of its own.
 
 # games.xten.au (xten-au/games, minigames) -- third app on Internal
-# Prod's shared front door, same pattern as xtmk.xten.au above: its own
+# Prod's shared front door, the same pattern xtmk.xten.au used before the merge: its own
 # compose project at /opt/games (app + db only, no caddy of its own),
 # reached by container name over edge_shared, static files read from the
 # /opt/games/public bind mount declared in docker-compose.prod.yml.

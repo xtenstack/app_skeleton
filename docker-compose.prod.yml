@@ -1,6 +1,8 @@
 # Internal Prod only — layer this on top of docker-compose.yml:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
+# (Historical, pre-2026-09-25: xtmk.xten.au was a separate stack. It is now
+# served by this instance, via SITE_DOMAIN in .env.)
 # This stack's Caddy also fronts xtmk.xten.au (xten-marketing),
 # reverse-proxying to that sibling stack's app container over the
 # external `edge_shared` Docker network — one shared front door on
@@ -73,7 +75,6 @@ services:
       - default
       - edge_shared
     volumes:
-      - /opt/xten-marketing/public:/marketing-public:ro
       # games.xten.au (xten-au/games at /opt/games) -- see its block in
       # docker/Caddyfile. Same reason as the mount above: without it every
       # extension-less URL 404s inside Caddy before reaching PHP-FPM.
@@ -81,12 +82,25 @@ services:
       # xwar.xten.au and game.xten.au/play.xten.au -- same again.
       - /opt/xwar/public:/xwar-public:ro
       - /opt/game/public:/game-public:ro
+  # xtmk merged into this instance 2026-09-25: this stack's db now runs on
+  # the former xten-marketing database volume (21 GB, including the
+  # abn_lookup + gnaf reference schemas), with prod's own tables restored into
+  # it. The old app_skeleton_db_data volume is kept, untouched, for rollback.
+  # NEVER start xten-marketing's own db service against this volume again:
+  # two Postgres servers on one data directory corrupts it.
+  # db also left edge_shared the same day. directory-module's dbAbnLookup now
+  # reaches the same server on the default network, and nothing else on
+  # edge_shared should resolve a `db` alias here (see the 2026-09-14
+  # alias-collision incident).
   db:
-    networks:
-      - default
-      - edge_shared
+    volumes:
+      - xten-marketing_db_data:/var/lib/postgresql
 
 networks:
   default:
   edge_shared:
+    external: true
+
+volumes:
+  xten-marketing_db_data:
     external: true
