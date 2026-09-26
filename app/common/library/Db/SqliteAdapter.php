@@ -13,11 +13,11 @@ use Phalcon\Db\ResultInterface;
  *
  * On top of the stock Phalcon adapter it does three things:
  *
- * 1. Postgres schemas become ATTACHed databases. Each name in
- *    config.database.schemas (default: abn_lookup, directory) is attached
- *    under the same name from its own file next to the main one
- *    (app.sqlite -> app.abn_lookup.sqlite), so `abn_lookup.abns` in module
- *    SQL resolves with no rewriting at all. SqliteDialect makes Phalcon's
+ * 1. Postgres schemas become ATTACHed databases. Each name listed in
+ *    config.database.schemas (none by default) is attached under the same
+ *    name from its own file next to the main one (schemas => ['sales']:
+ *    app.sqlite -> app.sales.sqlite), so `sales.orders` in module SQL
+ *    resolves with no rewriting at all. SqliteDialect makes Phalcon's
  *    model metadata look in the right attached file. Limits that come
  *    with it: a view or trigger can only reference tables in its own
  *    file, and there are no foreign keys across files.
@@ -28,8 +28,9 @@ use Phalcon\Db\ResultInterface;
  *    regexp()/REGEXP (case-sensitive), iregexp() (for ~*) and
  *    regexp_substr() (for substring(x, 'regex')), plus
  *    pg_try_advisory_lock()/pg_advisory_unlock() backed by flock() on a
- *    lock file next to the database (<db file>.advisory-lock-<key>) (CronRunner's overlap guard), held
- *    until unlocked or the PHP process ends, like a session-level lock.
+ *    lock file next to the database (<db file>.advisory-lock-<key>), used
+ *    by CronRunner's overlap guard. A lock is held until unlocked or the
+ *    PHP process ends, like a Postgres session-level lock.
  *
  * 3. Raw SQL passes through PgSqlTranslator (ILIKE, ::casts, FOR UPDATE,
  *    INTERVAL arithmetic). See that class for exactly what it does and
@@ -40,7 +41,8 @@ use Phalcon\Db\ResultInterface;
  */
 class SqliteAdapter extends \Phalcon\Db\Adapter\Pdo\Sqlite
 {
-    public const DEFAULT_SCHEMAS = ['abn_lookup', 'directory'];
+    /** No schemas are attached unless config.database.schemas lists them. */
+    public const DEFAULT_SCHEMAS = [];
 
     /** @var array<string, string> schema name => file path */
     private array $attachments = [];

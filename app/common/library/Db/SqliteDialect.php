@@ -6,8 +6,8 @@ namespace App_skeleton\Db;
 /**
  * Phalcon's stock SQLite dialect ignores the schema argument on every
  * introspection query (tableExists() reads main's sqlite_master only), so
- * a model with setSchema('directory') fails metadata with "Table
- * 'claimed_profiles' doesn't exist". On SQLite a Postgres schema is an
+ * a model with setSchema('sales') fails metadata with "Table 'orders'
+ * doesn't exist". On SQLite a Postgres schema is an
  * ATTACHed database of the same name (see SqliteAdapter), and SQLite
  * already accepts "schema".sqlite_master and PRAGMA "schema".x(), so all
  * this does is pass the schema through. Used by SqliteAdapter only; the
@@ -21,7 +21,7 @@ class SqliteDialect extends \Phalcon\Db\Dialect\Sqlite
     /**
      * Views count as tables, as they do on Postgres (information_schema.
      * tables lists both), so a model can sit on a view such as
-     * abn_lookup.v_campaign_prospects.
+     * sales.v_open_orders.
      */
     public function tableExists(string $tableName, ?string $schemaName = null): string
     {
