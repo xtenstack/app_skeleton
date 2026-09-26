@@ -108,12 +108,40 @@ class SqliteAdapter extends \Phalcon\Db\Adapter\Pdo\Sqlite
 
     public function query(string $sqlStatement, array $bindParams = [], array $bindTypes = []): ResultInterface|bool
     {
+        [$bindParams, $bindTypes] = self::booleansAsIntegers($bindParams, $bindTypes);
+
         return parent::query(PgSqlTranslator::translate($sqlStatement), $bindParams, $bindTypes);
     }
 
     public function execute(string $sqlStatement, array $bindParams = [], array $bindTypes = []): bool
     {
+        [$bindParams, $bindTypes] = self::booleansAsIntegers($bindParams, $bindTypes);
+
         return parent::execute(PgSqlTranslator::translate($sqlStatement), $bindParams, $bindTypes);
+    }
+
+    /**
+     * pdo_sqlite binds PHP false as '' (an empty string), so a model saving
+     * `$row->enabled = false` stored '' and the next save of that row failed
+     * Phalcon's not-null check ("enabled is required"): `./run modules sync`
+     * on any disabled module. Bind booleans as 1/0 instead, as Postgres
+     * stores them.
+     *
+     * @return array{0: array, 1: array}
+     */
+    private static function booleansAsIntegers(array $bindParams, array $bindTypes): array
+    {
+        foreach ($bindParams as $key => $value) {
+            if (is_bool($value)) {
+                $bindParams[$key] = (int) $value;
+
+                if (($bindTypes[$key] ?? null) === \Phalcon\Db\Column::BIND_PARAM_BOOL) {
+                    $bindTypes[$key] = \Phalcon\Db\Column::BIND_PARAM_INT;
+                }
+            }
+        }
+
+        return [$bindParams, $bindTypes];
     }
 
     /**
