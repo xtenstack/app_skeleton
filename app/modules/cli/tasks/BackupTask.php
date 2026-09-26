@@ -53,6 +53,12 @@ class BackupTask extends \Phalcon\Cli\Task
             return;
         }
 
+        if ($db->adapter === 'Mysql') {
+            $this->runMysql($backupDir);
+
+            return;
+        }
+
         $timestamp = date('Ymd-His');
         $dumpFile  = "{$backupDir}/{$db->dbname}-{$timestamp}.sql.gz";
         $tmpSql    = "{$backupDir}/.{$db->dbname}-{$timestamp}.sql.tmp";
@@ -147,6 +153,169 @@ class BackupTask extends \Phalcon\Cli\Task
                 $this->formatBytes(self::SIZE_WARNING_BYTES)
             ) . PHP_EOL;
         }
+    }
+
+    /**
+     * MySQL/MariaDB installs. Uses mysqldump (or mariadb-dump) when the host
+     * lets PHP run it; many shared hosts disable exec() or don't ship the
+     * client, so otherwise it writes the dump itself in PHP: CREATE TABLE
+     * from SHOW CREATE TABLE, then batched INSERTs, read inside one
+     * consistent-snapshot transaction. Either way the result is a gzipped
+     * .sql file in backups/ that phpMyAdmin or `mysql` can import, with the
+     * same 14-day retention as the Postgres path.
+     */
+    private function runMysql(string $backupDir): void
+    {
+        $db       = $this->config->database;
+        $dumpFile = "{$backupDir}/{$db->dbname}-" . date('Ymd-His') . '.sql.gz';
+        $method   = $this->mysqldumpBinary() !== null ? $this->mysqlDumpWithClient($dumpFile) : false;
+
+        if ($method === false) {
+            $this->mysqlDumpWithPhp($dumpFile);
+            $method = 'php';
+        }
+
+        $this->pruneOldBackups($backupDir, (string) $db->dbname);
+
+        echo sprintf('wrote %s (%s, via %s)', basename($dumpFile), $this->formatBytes((int) filesize($dumpFile)), $method) . PHP_EOL;
+    }
+
+    private function mysqldumpBinary(): ?string
+    {
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+        if (!function_exists('exec') || in_array('exec', $disabled, true)) {
+            return null;
+        }
+
+        foreach (['mysqldump', 'mariadb-dump'] as $binary) {
+            $path = trim((string) @exec('command -v ' . $binary . ' 2>/dev/null'));
+
+            if ($path !== '') {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return string|false the method used, or false to fall back to PHP */
+    private function mysqlDumpWithClient(string $dumpFile)
+    {
+        $db = $this->config->database;
+
+        // Credentials go in a private option file, not on the command line
+        // where other users on a shared host could see them in `ps`.
+        $optionFile = tempnam(sys_get_temp_dir(), 'mysqldump');
+        chmod($optionFile, 0600);
+        $lines = ['[client]', 'user="' . addcslashes((string) $db->username, '"\\') . '"', 'password="' . addcslashes((string) $db->password, '"\\') . '"'];
+
+        if (!empty($db->socket)) {
+            $lines[] = 'socket="' . addcslashes((string) $db->socket, '"\\') . '"';
+        } else {
+            $lines[] = 'host="' . addcslashes((string) $db->host, '"\\') . '"';
+            $port = (int) $db->port === 5432 || empty($db->port) ? 3306 : (int) $db->port;
+            $lines[] = 'port=' . $port;
+        }
+
+        file_put_contents($optionFile, implode("\n", $lines) . "\n");
+
+        // MySQL's client writes a GTID line when the server uses GTIDs, which
+        // a shared host's import would reject (needs SUPER); MariaDB's
+        // client doesn't know the option.
+        $binary  = (string) $this->mysqldumpBinary();
+        $mariadb = stripos((string) @exec(escapeshellarg($binary) . ' --version 2>/dev/null'), 'mariadb') !== false;
+
+        $cmd = sprintf(
+            '%s --defaults-extra-file=%s --single-transaction --no-tablespaces --skip-lock-tables --default-character-set=utf8mb4%s %s 2>&1 | gzip -c > %s; echo "${PIPESTATUS[0]}"',
+            escapeshellarg($binary),
+            escapeshellarg($optionFile),
+            $mariadb ? '' : ' --set-gtid-purged=OFF',
+            escapeshellarg((string) $db->dbname),
+            escapeshellarg($dumpFile)
+        );
+
+        exec('bash -c ' . escapeshellarg($cmd), $output, $exitCode);
+        @unlink($optionFile);
+
+        $status = (int) trim((string) end($output));
+
+        if ($exitCode !== 0 || $status !== 0) {
+            @unlink($dumpFile);
+
+            return false;
+        }
+
+        return 'mysqldump';
+    }
+
+    /**
+     * @psalm-suppress UndefinedConstant PDO::MYSQL_* only exists where
+     *                  pdo_mysql is loaded; this only runs for Mysql.
+     */
+    private function mysqlDumpWithPhp(string $dumpFile): void
+    {
+        $db  = $this->config->database;
+        $dsn = 'mysql:dbname=' . $db->dbname . ';charset=utf8mb4';
+        $dsn .= !empty($db->socket)
+            ? ';unix_socket=' . $db->socket
+            : ';host=' . $db->host . ';port=' . ((int) $db->port === 5432 || empty($db->port) ? 3306 : (int) $db->port);
+
+        // A connection of its own: under `./run cron run` the shared one is
+        // busy with the cron runner's own queries.
+        $pdo = new \PDO($dsn, (string) $db->username, (string) $db->password, [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false,
+        ]);
+        $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci, SESSION time_zone = '+00:00'");
+        $pdo->exec('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        $pdo->exec('START TRANSACTION WITH CONSISTENT SNAPSHOT');
+
+        $out = gzopen($dumpFile, 'wb6');
+        gzwrite($out, "-- Dump of `{$db->dbname}` written by ./run backup run (PHP fallback), " . gmdate('Y-m-d H:i:s') . " UTC\n"
+            . "SET NAMES utf8mb4;\nSET time_zone = '+00:00';\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
+
+        $tables = $pdo->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(\PDO::FETCH_COLUMN, 0);
+
+        foreach ($tables as $table) {
+            $create = $pdo->query('SHOW CREATE TABLE `' . str_replace('`', '``', $table) . '`')->fetch(\PDO::FETCH_NUM)[1];
+            gzwrite($out, 'DROP TABLE IF EXISTS `' . str_replace('`', '``', $table) . "`;\n" . $create . ";\n\n");
+
+            // Generated columns can't be given a value on restore, so list
+            // the real columns explicitly and leave those out.
+            $columnsStmt = $pdo->prepare(
+                "SELECT column_name FROM information_schema.columns
+                  WHERE table_schema = DATABASE() AND table_name = ? AND extra NOT LIKE '%GENERATED%'
+                  ORDER BY ordinal_position"
+            );
+            $columnsStmt->execute([$table]);
+            $columns = $columnsStmt->fetchAll(\PDO::FETCH_COLUMN, 0);
+            $columnsStmt->closeCursor();
+
+            $quoted = implode(', ', array_map(static fn ($c) => '`' . str_replace('`', '``', $c) . '`', $columns));
+            $insert = 'INSERT INTO `' . str_replace('`', '``', $table) . '` (' . $quoted . ') VALUES ';
+            $rows   = $pdo->query('SELECT ' . $quoted . ' FROM `' . str_replace('`', '``', $table) . '`', \PDO::FETCH_NUM);
+            $batch  = [];
+
+            foreach ($rows as $row) {
+                $batch[] = '(' . implode(',', array_map(static fn ($v) => $v === null ? 'NULL' : $pdo->quote((string) $v), $row)) . ')';
+
+                if (count($batch) >= 200) {
+                    gzwrite($out, $insert . implode(",\n", $batch) . ";\n");
+                    $batch = [];
+                }
+            }
+
+            if ($batch) {
+                gzwrite($out, $insert . implode(",\n", $batch) . ";\n");
+            }
+
+            gzwrite($out, "\n");
+        }
+
+        gzwrite($out, "SET FOREIGN_KEY_CHECKS = 1;\n");
+        gzclose($out);
+        $pdo->exec('COMMIT');
     }
 
     /**

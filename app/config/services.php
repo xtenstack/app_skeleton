@@ -87,6 +87,35 @@ $di->setShared('db', function () {
         }
     }
 
+    if ($config->database->adapter === 'Mysql') {
+        // MySQL 8 / MariaDB: utf8mb4 + fixed session settings and the
+        // ILIKE/::cast translator; see App_skeleton\Db\MysqlAdapter.
+        // `socket` connects over a Unix socket instead of host/port (common
+        // on local installs; shared hosts usually use host 'localhost').
+        $class = \App_skeleton\Db\MysqlAdapter::class;
+
+        if (!empty($config->database->socket)) {
+            unset($params['host'], $params['port']);
+            $params['unix_socket'] = $config->database->socket;
+        }
+
+        // The base config's default port is Postgres's; a MySQL
+        // config.local.php that doesn't set one means MySQL's.
+        if (isset($params['port']) && (int) $params['port'] === 5432) {
+            $params['port'] = 3306;
+        }
+
+        if (empty($params['port'])) {
+            unset($params['port']);
+        }
+
+        foreach (['charset', 'collation'] as $key) {
+            if (!empty($config->database->$key)) {
+                $params[$key] = $config->database->$key;
+            }
+        }
+    }
+
     $connection = new $class($params);
 
     $profiler = $this->getShared('dbProfiler');

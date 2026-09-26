@@ -7,7 +7,7 @@ use Phalcon\Db\ResultInterface;
 
 /**
  * The SQLite connection used when config.database.adapter is 'Sqlite'
- * (shared-host demo installs, see docs/RUNBOOK-SHARED-HOST-SQLITE.md).
+ * (shared-host installs, see docs/RUNBOOK-SHARED-HOST.md).
  * services.php only builds this for SQLite; a Postgres install never
  * loads the class, so nothing here can change Postgres behaviour.
  *

@@ -1,0 +1,34 @@
+-- MySQL/MariaDB port of postgresql/001_initial_schema.sql; keep the two in step.
+-- Initial schema: roles, users, items.
+-- Converted from the original SQLite patch (same name) when the project
+-- moved to Postgres for both dev and production.
+
+CREATE TABLE roles (
+    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(50) NOT NULL UNIQUE,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO roles (name) VALUES ('admin'), ('member');
+
+CREATE TABLE users (
+    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    role_id         INTEGER NOT NULL DEFAULT 2,
+    email           VARCHAR(150) NOT NULL UNIQUE,
+    password_hash   VARCHAR(255) NOT NULL,
+    first_name      VARCHAR(100),
+    last_name       VARCHAR(100),
+    is_active       INTEGER NOT NULL DEFAULT 1,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES roles(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE items (
+    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id         INTEGER NOT NULL,
+    title           VARCHAR(150) NOT NULL,
+    description     TEXT,
+    status          VARCHAR(20) NOT NULL DEFAULT 'draft',
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
