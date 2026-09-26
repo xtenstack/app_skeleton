@@ -47,14 +47,22 @@ Composer isn't a MacPorts port. Install it with the official installer
 
 ### 2. Get the code
 
-The skeleton and the two module repos sit side by side in one folder:
+The skeleton and the two module repos sit side by side in one folder.
+`internal` and `plugins` are private, and each belongs to a different GitHub
+account, so switch the `gh` login to the account that owns each repo before
+cloning it (a clone as the wrong account fails with "Repository not found"):
 
 ```bash
 mkdir -p ~/demo-build && cd ~/demo-build
+gh auth switch --user xtenstack
 git clone --branch feat/sqlite-shared-host https://github.com/xtenstack/app_skeleton.git demo-site
 git clone --branch feat/sqlite-modules https://github.com/xtenstack/internal.git internal
+gh auth switch --user XTenDeploy
 git clone --branch feat/sqlite-announcements https://github.com/XTenDeploy/plugins.git plugins
 ```
+
+`gh auth status` lists the accounts you are logged in with. On a machine with
+only one account that can see all three repos, skip the `gh auth switch` lines.
 
 (Once those branches are merged, drop the `--branch` options.) You should
 now have `demo-site`, `internal` and `plugins` in `~/demo-build`.
