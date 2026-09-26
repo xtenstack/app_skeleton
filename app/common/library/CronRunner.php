@@ -40,8 +40,12 @@ class CronRunner extends Injectable
             // stale on a hard crash -- it's tied to this CLI process's own
             // database connection and Postgres releases it automatically
             // the moment that connection closes, crash or not.
+            // MySQL/MariaDB: GET_LOCK() is the same kind of connection-
+            // scoped lock, released on RELEASE_LOCK() or disconnect. Lock
+            // names are server-wide, hence the database-name prefix.
+            $mysql  = $this->db->getType() === 'mysql';
             $locked = (bool) $this->db->fetchOne(
-                'SELECT pg_try_advisory_lock(:id)::int AS locked',
+                $mysql ? "SELECT GET_LOCK(CONCAT(DATABASE(), '.cron_job_', :id), 0) AS locked" : 'SELECT pg_try_advisory_lock(:id)::int AS locked',
                 \Phalcon\Db\Enum::FETCH_ASSOC,
                 ['id' => $job->id]
             )['locked'];
@@ -53,7 +57,10 @@ class CronRunner extends Injectable
             try {
                 $results[] = $this->execute($job);
             } finally {
-                $this->db->execute('SELECT pg_advisory_unlock(:id)', ['id' => $job->id]);
+                $this->db->execute(
+                    $mysql ? "SELECT RELEASE_LOCK(CONCAT(DATABASE(), '.cron_job_', :id))" : 'SELECT pg_advisory_unlock(:id)',
+                    ['id' => $job->id]
+                );
             }
         }
 
