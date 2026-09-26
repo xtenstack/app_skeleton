@@ -1,103 +1,50 @@
-# Runbook: build a SQLite demo on your Mac, upload it to cPanel
+# Runbook: run the skeleton on SQLite on shared hosting
 
-One linear pass, written to be followed on camera. You build and fill the
-whole site on your Mac, check it there, then upload the finished folder
-once. The host never runs Composer or migrations. Each step says what to
-type, what you should see, and what to do if you don't.
+How to build the skeleton (and optionally your own modules) with SQLite as
+the database on your own machine, check it there, then upload the finished
+folder once to an ordinary cPanel-style shared host. The host never runs
+Composer or migrations, and you don't need SSH on it.
 
-Everything below was run end to end on 26 Sep 2026 on macOS (MacPorts PHP
-8.3.33, SQLite 3.53): build, migrate, first admin, demo data, local check,
-zip, unzip into a copy of the host's folder path, check again there.
+Placeholders used below:
 
-Worked example values used throughout:
-
-| | |
+| Placeholder | Meaning |
 |---|---|
-| Mac build folder | `~/demo-build` (any folder works) |
-| Host | `cpanel-013-syd.hostingww.com`, cPanel user `zgqeztaq` |
-| Site folder on the host | `/home/zgqeztaq/demo-sqlite-stack.xten.au` |
-| Domain | `demo-sqlite-stack.xten.au` |
+| `~/build` | a folder on your machine (any path works) |
+| `example.com` | your domain or subdomain |
+| `USER` | your hosting account's username |
+| `/home/USER/example.com` | the site's folder on the host |
 
-The Postgres installs are not affected by any of this. SQLite has its own
-migration folders and its own connection class, which only loads when
+A Postgres install is not affected by any of this: SQLite has its own
+migration folders (`db/migrations/sqlite/`, each module's
+`migrations/sqlite/`) and its own connection class, which only loads when
 `database.adapter` is `Sqlite`.
 
-## Part A: on your Mac
+## What you need
 
-### 1. Prerequisites (MacPorts)
+- **PHP 8.3 or newer** with these extensions, on your machine and on the host:
+  `phalcon` (5.x, sometimes listed as `phalcon5`), `psr` (if your platform
+  packages Phalcon with it), `pdo_sqlite`, `mbstring`, `intl`, `curl`,
+  `openssl`, `zlib`, and the usual built-ins (`ctype`, `json`, `session`).
+  Check with `php -m` locally. On the host, a one-line `phpinfo()` page
+  shows the version and extensions (delete it straight afterwards).
+  Many shared hosts (CloudLinux "Select PHP Version" and similar) pick the
+  PHP version and tick extensions per version, for the whole account. Pick
+  8.3+ and tick the extensions above for it.
+- **Composer**, **git** and the **`sqlite3`** command-line tool on your
+  machine.
+- FTP/SFTP or the host's file manager for the upload.
 
-```bash
-sudo port install php83 php83-phalcon5 php83-psr php83-sqlite php83-mbstring php83-intl php83-curl php83-openssl php83-zip sqlite3
-sudo port select --set php php83
-```
+## Part A: on your machine
 
-Check:
-
-```bash
-php -v
-php -m | grep -iE '^(phalcon|psr|pdo_sqlite|mbstring|intl|curl|openssl|zlib)$'
-```
-
-You should see PHP 8.3.x and all eight names. If `php -v` still shows
-another version, open a new Terminal tab (the `port select` link is picked up
-by new shells). If an extension is missing, `sudo port install php83-<name>`.
-
-Composer isn't a MacPorts port. Install it with the official installer
-(https://getcomposer.org/download/) and check with `composer --version`.
-
-### 2. Get the code
-
-The skeleton and the two module repos sit side by side in one folder.
-`internal` and `plugins` are private, and each belongs to a different GitHub
-account, so switch the `gh` login to the account that owns each repo before
-cloning it (a clone as the wrong account fails with "Repository not found"):
+### 1. Get the code
 
 ```bash
-mkdir -p ~/demo-build && cd ~/demo-build
-gh auth switch --user xtenstack
-git clone --branch feat/sqlite-shared-host https://github.com/xtenstack/app_skeleton.git demo-site
-git clone --branch feat/sqlite-modules https://github.com/xtenstack/internal.git internal
-gh auth switch --user XTenDeploy
-git clone --branch feat/sqlite-announcements https://github.com/XTenDeploy/plugins.git plugins
+mkdir -p ~/build && cd ~/build
+git clone https://github.com/xtenstack/app_skeleton.git site
+cd site
 ```
 
-`gh auth status` lists the accounts you are logged in with. On a machine with
-only one account that can see all three repos, skip the `gh auth switch` lines.
-
-(Once those branches are merged, drop the `--branch` options.) You should
-now have `demo-site`, `internal` and `plugins` in `~/demo-build`.
-
-### 3. Tell it which modules to install
-
-```bash
-cd ~/demo-build/demo-site
-```
-
-Create `composer.local.json` in `demo-site`:
-
-```json
-{
-    "repositories": [
-        { "type": "path", "url": "../internal/*", "options": { "symlink": false } },
-        { "type": "path", "url": "../plugins/*",  "options": { "symlink": false } }
-    ],
-    "require": {
-        "xtendeploy/announcements": "*",
-        "xtenstack/agent-rooms-module": "*",
-        "xtenstack/requirements-module": "*",
-        "xtenstack/licensing-module": "*",
-        "xtenstack/kpi-module": "*",
-        "xtenstack/directory-module": "*",
-        "xtenstack/marketing-module": "*"
-    }
-}
-```
-
-`"symlink": false` matters: Composer copies each module into `vendor/`
-instead of linking to `../internal`. A link would point at a folder that
-won't exist on the host.
-
-### 4. Point it at SQLite
+### 2. Point it at SQLite
 
 Create `app/config/config.local.php`:
 
@@ -111,350 +58,333 @@ return [
 ];
 ```
 
-That's the whole config. Use `BASE_PATH`, never a path like
-`/Users/you/...`: `BASE_PATH` is worked out at runtime from wherever the
-folder is, so the same file works on the Mac and on the host. The
-directory and marketing modules also use two more database files,
-`db/app.abn_lookup.sqlite` and `db/app.directory.sqlite`. Their paths come
-from `dbname` automatically, so they move with it. Don't list them.
+Use `BASE_PATH`, never an absolute path like `/home/you/...` or
+`C:\...`. `BASE_PATH` is worked out at runtime from wherever the folder
+is, so the same file works on your machine and on the host. Leave the mail
+settings out for now (see step 14).
 
-Leave `mail.resend_api_key` out: the demo sends no mail.
+If you're adding modules, do that now (see "Adding modules" below), before
+installing.
 
-### 5. Install the code
-
-```bash
-composer update --no-dev --optimize-autoloader 'xtendeploy/*' 'xtenstack/*'
-```
-
-Composer first prints `Pattern "xtendeploy/*" listed for update does not
-match any locked packages.` (and the same for `xtenstack/*`). That's expected
-on a fresh clone: the skeleton's lock file doesn't list the modules yet, and
-the merge plugin adds them in its second pass. Ignore it.
-
-You should then see Composer install the framework's dependencies and seven
-`xtenstack/...`/`xtendeploy/...` packages, then the skeleton's own install
-script: `app_skeleton: applying migrations...`, `seeding defaults...`,
-`syncing module registry...`, `install complete.` (possibly twice). That script creates the
-empty database files from step 4's config. It runs even with
-`--no-scripts`, because the plugin that merges `composer.local.json` runs a
-second install pass, so don't bother adding it. Check:
+### 3. Install
 
 ```bash
-ls vendor/xtenstack vendor/xtendeploy
+composer install --no-dev --optimize-autoloader
 ```
 
-That should list six module folders and `announcements`. They must be real
-folders, not links (`ls -l` shows no `->`).
+Composer installs the dependencies, then runs the skeleton's install script
+(`bin/install.php`): `applying migrations...`, `seeding defaults...`,
+`syncing module registry...`, `install complete.` With step 2's config in
+place, that already creates `db/app.sqlite`.
 
-Composer also rewrites `composer.lock` with the modules in it. That's fine
-for this build folder; just never commit it.
+### 4. Build the database
 
-### 6. Build the database (migrations)
+Run the same steps explicitly. Each one only does what isn't done yet:
 
 ```bash
 ./run migrate run
 ./run seed run
 ./run modules sync
-for m in announcements agent_rooms requirements licensing kpi directory marketing; do ./run modules enable $m; done
-./run unspsc import
 ```
 
-Each command only does what isn't done yet, so it's safe that Composer's
-install script already ran the first three. What you should see:
+Expect `No pending migrations.` (or `Migrations complete (22 applied).` if
+the install script didn't run), `Seeding complete.` and `Sync complete.`.
+If you added modules, enable each one: `./run modules enable <key>`.
 
-- `No pending migrations.` (Composer's script applied all 92: 22 base + 70
-  module. On a folder where it didn't run, you see `Migrations complete
-  (92 applied).`)
-- `Seeding complete.`
-- seven `updated:` (or `discovered:`) lines, then `Sync complete.`
-- seven `...: enabled` lines
-- `Import completed successfully! Total records processed: 23873` (the public
-  UNSPSC code list the directory module uses, about 10 seconds)
+### 5. Create the first admin
 
-`ls db` shows `app.sqlite`, `app.abn_lookup.sqlite` and
-`app.directory.sqlite`.
+No admin is seeded, on purpose. This step has three parts, in this order.
+The last one does nothing unless the first one has happened.
 
-Add the hourly job that keeps the marketing search up to date (on Postgres
-this is a materialized view; on SQLite a task rebuilds a table):
-
-```bash
-sqlite3 db/app.sqlite "INSERT INTO cron_jobs (name, task, task_action, frequency, enabled) VALUES ('Marketing: refresh prospect search', 'prospect-search', 'refresh', '+1 hour', 1);"
-```
-
-### 7. Create the first admin
-
-Start the local server (leave it running in its own Terminal tab):
+Start the local server in its own terminal tab and leave it running:
 
 ```bash
 php -S localhost:8091 -t public bin/dev-router.php
 ```
 
-Open http://localhost:8091/backend/signup and sign up with the email and
-password you'll use on the live demo. Then make that account an admin and
-mark it verified (no admin is seeded, on purpose):
+**5a. Sign up in the browser.** Open http://localhost:8091/backend/signup,
+fill in the email and password you'll use on the live site, and submit.
+
+**5b. Check the account exists, and copy its email exactly:**
+
+```bash
+sqlite3 db/app.sqlite "SELECT email, role_id FROM users;"
+```
+
+You must see one row with your email. No rows means the signup didn't go
+through: do 5a again. Check the email carefully. A typo at signup means the
+next command matches nothing and silently does nothing.
+
+**5c. Make it an admin and mark it verified**, with the email exactly as
+5b showed it:
 
 ```bash
 sqlite3 db/app.sqlite "UPDATE users SET role_id=(SELECT id FROM roles WHERE name='admin'), email_verified_at=CURRENT_TIMESTAMP WHERE email='you@example.com';"
+sqlite3 db/app.sqlite "SELECT email, role_id FROM users;"
 ```
 
-`sqlite3 db/app.sqlite "SELECT email, role_id FROM users;"` should show
-your email with role `1`.
+The row must now show the admin role (`1`). If not, the email didn't
+match: copy it from the SELECT output and run the UPDATE again.
 
-### 8. Add the demo data
+### 6. Check it locally
 
-This is a separate step and it runs after step 6, on the database files that
-step just built. It writes into `db/app.abn_lookup.sqlite` and
-`db/app.directory.sqlite`:
+Log in at http://localhost:8091/backend and click through the dashboard,
+Tickets, KB articles, Users, Configuration and Settings (and your modules'
+pages). Every page should load; if one doesn't, check `logs/app.log`. Then
+stop the server (Ctrl+C).
 
-```bash
-php ../internal/bin/sqlite-demo-sampler.php --target="$PWD/db/app.sqlite" --synthetic --wipe
-./run prospect-search refresh
-```
+### 7. Package it
 
-You should see a table of row counts (300 businesses, 4 campaigns, ~130
-campaign members, ~450 contacts, ~100 leads, 6 directory claims) ending in
-`Done.`, then `mv_prospect_search refreshed: 130 rows`.
-
-Everything is invented: fake but checksum-valid ABNs, made-up names,
-`*.example` domains, phone numbers in ACMA's fictitious-use range. It's safe
-to show publicly. `--wipe` clears the demo tables first (not your admin
-account), so you can re-run it.
-
-### 9. Check it locally
-
-With the server from step 7 still running, log in at
-http://localhost:8091/backend and click through:
-
-- Dashboard, Tickets, KB articles, Users, Configuration
-- Marketing → Prospects (try searching "harbour"), Campaigns, Leads, Lead
-  Reservations, Addresses, Mail Templates
-- Directory → Claims, Records (open one), Opt-outs, Enquiries
-- KPI → Dashboard; Agent Rooms; Announcements; Requirements; Licensing
-- http://localhost:8091/api/v1/directory/search?q=harbour&portal=entity
-  returns JSON with results
-
-Every page should load. If one doesn't, check `logs/app.log`.
-
-Then stop the server (Ctrl+C in its tab).
-
-### 10. Package it
-
-From `demo-site`, clear what belongs to this Mac only, then zip:
+From the site folder, clear what belongs to this machine only, then zip:
 
 ```bash
 find sessions cache/volt logs -type f ! -name .gitkeep -delete
 find db -maxdepth 1 \( -name '*.advisory-lock-*' -o -name '*-journal' \) -delete
 rm -f public/webtools.php public/webtools.config.php
 cd ..
-zip -qr demo-site.zip demo-site -x 'demo-site/.git/*' 'demo-site/.github/*' 'demo-site/.claude/*' \
-  'demo-site/tests/*' 'demo-site/docker/*' 'demo-site/node_modules/*' 'demo-site/backups/*' \
-  'demo-site/composer.local.json' '*.DS_Store'
-ls -lh demo-site.zip
+zip -qr site.zip site -x 'site/.git/*' 'site/.github/*' 'site/.claude/*' \
+  'site/tests/*' 'site/docker/*' 'site/node_modules/*' 'site/backups/*' \
+  'site/composer.local.json' '*.DS_Store'
+ls -lh site.zip
 ```
 
-About 6 MB. What's in it and why:
+Why:
+
+- Session files, compiled templates and logs from your machine would only
+  be stale on the host, which recreates them.
+- `public/webtools.php` and `public/webtools.config.php` are the Phalcon
+  developer tools' web entry point. They sit in the web root, and the config
+  file contains a hard-coded developer path. Never upload them.
+- `.encryption_key` only exists if you saved an external connection in
+  Configuration. If it exists, keep it in the zip: saved credentials can't
+  be decrypted without it.
+
+What's in the zip:
 
 | Path | Needed on the host? | Web-served? |
 |---|---|---|
 | `public/` | yes | **yes, the only folder that is** |
 | `app/` (including `config/config.local.php`) | yes | never |
-| `vendor/` (framework deps + the 7 modules) | yes | never |
-| `db/app*.sqlite` (the three database files) | yes | **never** |
+| `vendor/` | yes | never |
+| `db/*.sqlite` | yes | **never** |
 | `run`, `bin/` | yes (cron) | never |
 | `cache/volt/`, `logs/`, `sessions/`, `storage/` | yes, as empty folders | never |
-| `.git/`, `tests/`, `docker/`, `composer.local.json` | no | |
 
-Why the two `rm` lines:
-
-- Session files, compiled templates and logs from your Mac would only be
-  stale on the host; it recreates them.
-- `public/webtools.php` and `public/webtools.config.php` are the Phalcon
-  developer tools' web entry point. They sit in the web root, and the config
-  file has a hard-coded `/Users/...` path from whoever first generated the
-  skeleton. Never upload them.
-- `.encryption_key` doesn't exist unless you saved an external connection
-  in Configuration. If you did, keep it in the zip, because those saved
-  credentials can't be read without it.
-
-Nothing else in the folder holds a Mac path. Checked on 26 Sep: the built
-folder, database files included, had no copy of the build path in it, and
-the unzipped copy worked from a different path unchanged.
+Nothing in the built folder holds a path from your machine, so it works
+unchanged at `/home/USER/example.com`.
 
 ## Part B: on the host
 
-The account's default PHP is 8.3, with every extension this needs already
-on (checked 26 Sep: phalcon, psr, pdo_sqlite, intl, mbstring, curl and the
-rest), so there's nothing to set up for PHP.
+### 8. Upload and unpack
 
-### 11. Upload and unpack
+1. File manager → `/home/USER`. Upload `site.zip`. (PHP's
+   `upload_max_filesize` limits uploads *through the app*, not the host's
+   file manager. If the file manager refuses a large zip, use FTP.)
+2. *Extract* it, giving `/home/USER/site`.
+3. Move its contents into `/home/USER/example.com`, or rename the folder to
+   that. `/home/USER/example.com/public/index.php` must exist.
+4. Delete `site.zip` from the server.
 
-1. cPanel → *File Manager* → `/home/zgqeztaq`. Upload `demo-site.zip`.
-   About 6 MB, which File Manager takes in one go. (PHP's 2M
-   `upload_max_filesize` limits uploads through the app, not File Manager.)
-   If File Manager ever refuses a bigger zip, upload it by FTP instead.
-2. *Extract* it. You get `/home/zgqeztaq/demo-site`.
-3. Move the *contents* of `demo-site` into
-   `/home/zgqeztaq/demo-sqlite-stack.xten.au`, or rename the folder to that,
-   replacing any placeholder cPanel created. Afterwards
-   `/home/zgqeztaq/demo-sqlite-stack.xten.au/public/index.php` must exist.
-4. Delete `demo-site.zip` from the server.
+### 9. Permissions
 
-### 12. Permissions
-
-The site runs as your cPanel user, so the usual **755 for folders, 644 for
-files** is enough. Check these folders are 755 and owned by `zgqeztaq`:
-`db`, `cache/volt`, `logs`, `sessions`, `storage`, `backups` (create
-`backups` if it isn't there).
+The site runs as your hosting user, so **755 for folders and 644 for
+files** is enough. Check these folders are 755 and owned by `USER`: `db`,
+`cache/volt`, `logs`, `sessions`, `storage`, `backups` (create `backups`
+if it's missing).
 
 `db` matters most. SQLite writes a temporary journal file *next to* the
 database while it saves, so the folder must be writable, not just the
-`.sqlite` files. If saving anything gives "attempt to write a readonly
-database" or "unable to open database file", `db` or a file in it isn't
-writable by `zgqeztaq`. Never make anything 777.
+`.sqlite` files. "attempt to write a readonly database" or "unable to open
+database file" means `db` or a file in it isn't writable by `USER`. Never
+use 777.
 
-### 13. Point the domain at `public/`
+### 10. PHP version
 
-cPanel → *Domains* → `demo-sqlite-stack.xten.au` → *Manage* → set the
-**document root** to `demo-sqlite-stack.xten.au/public`.
+Make sure the site runs on PHP 8.3+ with the extensions from "What you
+need". If the account default is 8.3+ with them enabled, there's nothing to
+do.
 
-That keeps `db/`, `app/` and `vendor/` out of the web root entirely. (The
-skeleton's root `.htaccess` would also route everything into `public/` if
-the docroot were left at the folder, but pointing it at `public/` doesn't
-depend on that.)
+### 11. Point the domain at `public/`
 
-Check: https://demo-sqlite-stack.xten.au/ loads the landing page, and
-https://demo-sqlite-stack.xten.au/db/app.sqlite returns the site's 404, not a
-download. Log in at `/backend` with the account from step 7.
+In the host's domain settings, set the **document root** of `example.com`
+to `example.com/public`. That keeps `db/`, `app/` and `vendor/` out of the
+web root. (The skeleton's root `.htaccess` also routes everything into
+`public/` if the document root is left at the folder, but don't rely on
+it.)
 
-### 14. Cron
+Check: `https://example.com/` loads the landing page, and
+`https://example.com/db/app.sqlite` returns the site's 404, not a download.
+Log in at `/backend` with the account from step 5.
 
-cPanel → *Cron Jobs* → every 5 minutes:
+### 12. Cron
+
+Add one cron job, every 5 minutes:
 
 ```
-/opt/alt/php83/usr/bin/php /home/zgqeztaq/demo-sqlite-stack.xten.au/run cron run >/dev/null 2>&1
+*/5 * * * * /path/to/php /home/USER/example.com/run cron run >/dev/null 2>&1
 ```
 
-Use `/opt/alt/php83/usr/bin/php`, the CloudLinux PHP 8.3 binary. It stays
-8.3 even if the account's default version changes later.
-`/usr/local/bin/php` follows the account default, so it works today too,
-but would quietly switch versions with it. Once, before relying on it, add
-a one-off cron job
-`/opt/alt/php83/usr/bin/php -m > /home/zgqeztaq/php83-cron-check.txt`, let it
-run, check the file lists `phalcon` and `pdo_sqlite`, then delete the job
-and the file.
+Pick the PHP binary deliberately:
 
-The cron job runs the demo's scheduled work: the hourly search refresh
-from step 6, the daily backup (`./run backup run`, compacted gzipped copies
-of the three database files in `backups/`, 14 days kept), and the rest.
+- **A version-pinned binary** stays on that version even if the account's
+  default changes later. On CloudLinux/cPanel hosts it's
+  `/opt/alt/phpXX/usr/bin/php`, so `/opt/alt/php83/usr/bin/php` for 8.3.
+  This is the safe choice.
+- **The default binary** (often `/usr/local/bin/php` or `/usr/bin/php`)
+  follows the account's selected version. It works while that is 8.3+, but
+  it switches silently when the default changes.
 
-### 15. Mail
+Once, before relying on it, add a one-off job
+`/path/to/php -m > /home/USER/php-cron-check.txt`, let it run, check the
+file lists `phalcon` and `pdo_sqlite`, then delete the job and the file.
 
-Leave it off: no `mail.resend_api_key` in `config.local.php`. Signup
-verification and password-reset mails are logged and skipped. To add an
-account on the live demo, create it the same way as step 7, locally, and
-re-upload (next part), or sign up on the site and run step 7's SQL on the
-host's `db/app.sqlite` via cPanel *Terminal* if the account has it.
+The cron runner runs the scheduled jobs, including the daily backup:
+`./run backup run` writes compacted, gzipped copies of every database file
+into `backups/` and keeps 14 days.
+
+### 13. Mail
+
+Signup verification and password-reset emails go through Resend
+(`mail.resend_api_key` in `config.local.php`). Without a key they're logged
+and skipped. For a demo or training site you can leave it out, and verify
+accounts with the SQL from step 5.
 
 ## Part C: re-seed or reset
 
-Do it on the Mac and re-upload the database files. The code on the host
-stays as it is.
+Do it on your machine and re-upload the database files; the code on the
+host stays as it is.
 
-- **Fresh demo data, same accounts:** in `~/demo-build/demo-site`, run
-  step 8 again (`--wipe` replaces the demo tables).
-- **Start completely clean:** `rm db/*.sqlite`, then steps 6, 7 and 8
-  again.
+- **Start clean:** `rm db/*.sqlite`, then steps 4–6 again (and reload your
+  own demo data, if any).
 
-Then upload only the three files `db/app.sqlite`, `db/app.abn_lookup.sqlite`
-and `db/app.directory.sqlite` into `/home/zgqeztaq/demo-sqlite-stack.xten.au/db/`,
-overwriting. Upload all three together: they belong together (the demo data
-references accounts and codes across them). Anything visitors changed on the
-live demo since the last upload is replaced, which is usually the point.
+Then upload the files from `db/` (`app.sqlite` and any schema files, see
+"Adding modules") into `/home/USER/example.com/db/`, overwriting, all
+together. Anything visitors changed on the live site since the last upload
+is replaced.
 
-If you pulled new code (a module update), rebuild from step 5 and upload
-the whole folder again as in steps 10–11.
+If the code changed, rebuild from step 3 and upload the whole folder again
+(steps 7–8).
 
-## Reference
+## Adding modules
 
-### What works on SQLite, module by module
+Modules are Composer packages with a `module.json` manifest (see
+[MODULE-SPEC.md](MODULE-SPEC.md) and [INTERNAL-MODULES.md](INTERNAL-MODULES.md)).
 
-Checked on 26 Sep by loading every menu page, the detail and edit pages, the
-create/update forms, the JSON APIs listed and the cron tasks.
+### Installing them into the build
 
-| Module | Works | Doesn't, or differs |
-|---|---|---|
-| Base skeleton | everything above, cron, backups, KB, tickets | one writer at a time (fine for a demo) |
-| Announcements | backend list/history/create/publish/edit, `GET/POST /api/announcements`, the status-feed poller | none found |
-| Agent Rooms | backend rooms and the whole `/agent_rooms/api/*` flow | read receipts stored as `'{1,2}'` text instead of an integer array; same API output |
-| Requirements | requirements and changelogs | none found |
-| Licensing | keys list/create/revoke | none found |
-| KPI | dashboard, entries, period form, metrics, `POST /api/kpi/entry` | none found |
-| Directory | backend claims, records, opt-outs, enquiries; the public `/api/v1/directory/*` API | paid claims need Dolibarr; searches are `LIKE` scans, not trigram-indexed; JSON booleans are `0`/`1` |
-| Marketing | prospects, campaigns, leads, lead reservations, addresses, mail templates, contacts redirect, public lead capture, cron tasks | see below |
+Put your module repositories next to the skeleton (e.g.
+`~/build/your-modules/`) and create `composer.local.json` in the site folder
+**before step 3**:
 
-Marketing on SQLite:
+```json
+{
+    "repositories": [
+        { "type": "path", "url": "../your-modules/*", "options": { "symlink": false } }
+    ],
+    "require": {
+        "your-vendor/your-module": "*"
+    }
+}
+```
 
-- **No materialized view, no trigram index.** `mv_prospect_search` is a
-  table rebuilt by `./run prospect-search refresh`, searched with `LIKE`.
-  Fine for thousands of rows, not for production's ~450k.
-- **The pre-module tables match production.** The eight objects the
-  Postgres migrations assume already exist (`campaigns`, `campaign_members`,
-  `contacts`, `entity_domains`, `site_profile`, `asic_business_names`,
-  `dgr`, `v_prospect_qualification`) are built by the SQLite
-  `000_base_tables.sql` from production's own definition, with the same
-  columns, constraints and indexes. `v_prospect_qualification` is the same
-  view, translated, and gives the same output as production's on the same
-  rows. One difference: `asic_business_names.name_normalised` is a plain
-  column filled by the demo loader (on Postgres it's generated by a
-  database function whose body isn't in any repo).
-- **Not available:** `bulk_convert_leads_to_campaign()` (an operator SQL
-  helper the PHP code doesn't use) and G-NAF address lookup (shows its
-  normal "not loaded" state). `normalise_name()` is replaced by a PHP
-  normaliser for public lead capture's name match.
-- **Needs outside services, as on any instance:** mail (Resend), address
-  verification (DeBounce / MillionVerifier), the search resolver
-  (Gemini / Brave).
+A `vcs` repository (`{ "type": "vcs", "url": "https://..." }`) works too,
+for modules that live in their own git repos.
 
-### How the SQLite port works
+`"symlink": false` matters: Composer must copy each module into `vendor/`.
+A symlink would point at a folder that doesn't exist on the host. After
+installing, `ls -l vendor/your-vendor` must show real folders, not `->`
+links. Install with
+`composer update --no-dev --optimize-autoloader 'your-vendor/*'`. Composer
+may first print `Pattern "your-vendor/*" listed for update does not match
+any locked packages.` That's expected: the lock file doesn't list your
+modules, and the merge plugin adds them in a second pass. Never commit the
+`composer.lock` this produces.
 
-- **Schemas are attached files.** `abn_lookup.abns` in module SQL works
-  unchanged because `App_skeleton\Db\SqliteAdapter` attaches
-  `app.abn_lookup.sqlite` as `abn_lookup` (and the same for `directory`) on
-  every connection, at a path worked out from `database.dbname`. A view or
-  trigger can only use tables in its own file, and there are no foreign
-  keys between files.
-- **Postgres functions as PHP functions.** `now()`, `greatest()`,
-  `least()`, `split_part()`, `btrim()`, `left()`, `right()`, `initcap()`,
+Each module needs to ship SQLite migrations: `module.json` names its
+migrations folder (`"migrations": "migrations"`), and `./run migrate run`
+applies `<that folder>/sqlite/*.sql` when the adapter is SQLite (and
+`<that folder>/postgresql/*.sql` on Postgres). A module with only a
+`postgresql/` folder installs with no tables on SQLite.
+
+### Modules that use Postgres schemas
+
+If a module's SQL uses schema-qualified names (`sales.orders`), list the
+schemas in the config:
+
+```php
+'database' => [
+    'adapter' => 'Sqlite',
+    'dbname'  => BASE_PATH . '/db/app.sqlite',
+    'schemas' => ['sales'],
+],
+```
+
+Each listed schema becomes its own database file next to the main one
+(`db/app.sales.sqlite`), attached under the schema's name on every
+connection, so `sales.orders` works unchanged. Its path follows `dbname`,
+so it moves with the folder. Upload these files with `app.sqlite`. No
+schemas are attached unless listed. Missing one shows up as
+`unknown database <name>` during migration.
+
+### Porting a module's SQL to SQLite (for module authors)
+
+Write `migrations/sqlite/` as a port of `migrations/postgresql/`, file for
+file, same names. Start each with a comment naming the Postgres file it
+mirrors. Typical changes: `SERIAL`/`BIGSERIAL PRIMARY KEY` → `INTEGER
+PRIMARY KEY AUTOINCREMENT`; `TIMESTAMPTZ` → `TIMESTAMP`; `JSONB` → `TEXT`;
+`NUMERIC(p,s)` → `DECIMAL(p,s)`; `now()` defaults → `CURRENT_TIMESTAMP`.
+Also:
+
+- **Indexes and references in a schema:** `CREATE INDEX sales.idx ON orders
+  (...)`, with the schema on the index name, not the table. `REFERENCES`
+  must name a table in the same file, unqualified.
+- **One statement per `ALTER TABLE`.** SQLite can't alter a column type,
+  default or constraint in place. For a fresh install, create the final
+  shape in the earlier SQLite file and make the later one a commented
+  no-op (`SELECT 1;`).
+- **Views and triggers** may only use tables in their own file, so write
+  their bodies without a schema prefix. `LATERAL` joins become
+  `ROW_NUMBER() OVER (PARTITION BY ...)` subqueries; stored functions
+  either become inline expressions or aren't available.
+
+What the SQLite connection handles automatically in your PHP code's raw SQL
+(`App_skeleton\Db\SqliteAdapter`, `SqliteDialect`, `PgSqlTranslator`):
+
+- `ILIKE`, `::type` casts, `FOR UPDATE`, `+/- INTERVAL 'n unit'`,
+  `UPDATE table alias SET`, and `~*`/`~` against a bound pattern are
+  rewritten.
+- These are available as functions: `now()`, `greatest()`, `least()`,
+  `split_part()`, `btrim()`, `left()`, `right()`, `initcap()`,
   `date_trunc()`, `md5()`, `similarity()`, `regexp()`/`iregexp()`,
-  `regexp_substr()` and CronRunner's advisory-lock functions are registered
-  on the connection. Views that use them only work through the app, not the
-  bare `sqlite3` command line.
-- **A small SQL translator** (`App_skeleton\Db\PgSqlTranslator`) rewrites
-  only purely syntactic differences in raw SQL on the SQLite connection:
-  `ILIKE`, `::casts`, `FOR UPDATE`, `INTERVAL` arithmetic, `UPDATE t alias`,
-  `~*`/`~`.
-- **Everything else is an explicit branch** in module code on
-  `$db->getType() === 'sqlite'`, leaving the Postgres query as it was.
-- **Keep the two migration folders in step.** Each `migrations/sqlite/`
-  file starts with "SQLite port of postgresql/<same name>". Where SQLite
-  can't alter a column or constraint in place, the earlier SQLite file
-  creates the final shape and the later one is a documented no-op. SQLite
-  installs are always built fresh, so there's no upgrade path to protect.
+  `regexp_substr()`, and `pg_try_advisory_lock()`/`pg_advisory_unlock()`.
+- `RETURNING`, `ON CONFLICT`, `FILTER (WHERE ...)`, `IS DISTINCT FROM`,
+  `NULLS LAST` and window functions are native in SQLite 3.39+.
+- PHP booleans are bound as 1/0.
+- Models with `setSchema()` find their tables in attached schemas, and a
+  model may sit on a view.
 
-### Sampling real data instead
+What needs an explicit branch, keeping the Postgres query exactly as it
+is:
 
-`sqlite-demo-sampler.php` can also sample a Postgres database (a restored
-backup, or a read-only role) with `--source-dsn`/`--source-user` in place of
-`--synthetic`. It reads inside a `READ ONLY` transaction and replaces every
-ABN, name, email, phone, domain, street and free-text field. It never copies
-unsubscribes or opt-outs. It also scans the result for any real value it
-replaced, and if it finds one it rolls the whole run back (exit code 2).
-For a public demo, stick with `--synthetic`.
+```php
+if ($this->db->getType() === 'sqlite') {
+    // SQLite version
+} else {
+    // the existing Postgres query, unchanged
+}
+```
 
-### Known differences from a Postgres install
+Use one for `DISTINCT ON`, arrays (`ANY(:ids)`, `@>`, `array_agg(...)[1]`),
+`LATERAL`, materialized views (`REFRESH MATERIALIZED VIEW` → rebuild a
+plain table), trigram operators/indexes, and calls to stored Postgres
+functions. Functions registered by the connection only exist inside the
+app. A view that uses them can't be queried from the bare `sqlite3` tool.
+
+## Known differences from a Postgres install
 
 - One writer at a time. The connection waits up to 5 seconds for a lock
-  rather than failing.
+  rather than failing. That's fine for a demo, training or small site, but
+  not for a busy one.
 - Booleans are stored and returned as `1`/`0`.
 - `now()` and PHP-written timestamps use PHP's timezone; column defaults
   (`CURRENT_TIMESTAMP`) are UTC.

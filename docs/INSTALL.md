@@ -61,9 +61,9 @@ the Composer path above from that directory. There's no separate
 > `db/migrations/sqlite/` holds a port of every base migration, and
 > `./run migrate run` handles SQLite. For a step-by-step shared-hosting
 > install, see [RUNBOOK-SHARED-HOST-SQLITE.md](RUNBOOK-SHARED-HOST-SQLITE.md).
-> The XTen modules (xtenstack/internal, XTenDeploy/plugins) ship SQLite
-> migrations too; the runbook lists what each one supports. MySQL is
-> unchanged: what follows still applies to it.
+> Optional modules run on SQLite when they ship a `migrations/sqlite/`
+> folder; the runbook's "Adding modules" section covers installing and
+> porting them. MySQL is unchanged: what follows still applies to it.
 
 Postgres is the only fully-supported adapter today — this is the
 honest state of things, not a "should just work" claim. Two separate
