@@ -115,11 +115,16 @@ Leave `mail.resend_api_key` out: the demo sends no mail.
 ### 5. Install the code
 
 ```bash
-composer update --no-dev --no-scripts --optimize-autoloader 'xtendeploy/*' 'xtenstack/*'
+composer update --no-dev --optimize-autoloader 'xtendeploy/*' 'xtenstack/*'
 ```
 
 You should see Composer install the framework's dependencies and seven
-`xtenstack/...`/`xtendeploy/...` packages, ending without errors. Check:
+`xtenstack/...`/`xtendeploy/...` packages, then the skeleton's own install
+script: `app_skeleton: applying migrations...`, `seeding defaults...`,
+`syncing module registry...`, `install complete.` That script creates the
+empty database files from step 4's config. It runs even with
+`--no-scripts`, because the plugin that merges `composer.local.json` runs a
+second install pass, so don't bother adding it. Check:
 
 ```bash
 ls vendor/xtenstack vendor/xtendeploy
@@ -128,9 +133,8 @@ ls vendor/xtenstack vendor/xtendeploy
 That should list six module folders and `announcements`. They must be real
 folders, not links (`ls -l` shows no `->`).
 
-`--no-scripts` stops Composer from building the database itself; you do that
-as its own step next. Composer also rewrites `composer.lock` with the
-modules in it. That's fine for this build folder; just never commit it.
+Composer also rewrites `composer.lock` with the modules in it. That's fine
+for this build folder; just never commit it.
 
 ### 6. Build the database (migrations)
 
@@ -142,18 +146,20 @@ for m in announcements agent_rooms requirements licensing kpi directory marketin
 ./run unspsc import
 ```
 
-What you should see:
+Each command only does what isn't done yet, so it's safe that Composer's
+install script already ran the first three. What you should see:
 
-- `Migrations complete (92 applied).` (22 base + 70 module)
+- `No pending migrations.` (Composer's script applied all 92: 22 base + 70
+  module. On a folder where it didn't run, you see `Migrations complete
+  (92 applied).`)
 - `Seeding complete.`
-- seven `discovered:` lines, then `Sync complete.`
+- seven `updated:` (or `discovered:`) lines, then `Sync complete.`
 - seven `...: enabled` lines
 - `Import completed successfully! Total records processed: 23873` (the public
   UNSPSC code list the directory module uses, about 10 seconds)
 
-`ls db` now shows `app.sqlite`, `app.abn_lookup.sqlite` and
-`app.directory.sqlite`. Running `./run migrate run` again prints
-`No pending migrations.`
+`ls db` shows `app.sqlite`, `app.abn_lookup.sqlite` and
+`app.directory.sqlite`.
 
 Add the hourly job that keeps the marketing search up to date (on Postgres
 this is a materialized view; on SQLite a task rebuilds a table):
