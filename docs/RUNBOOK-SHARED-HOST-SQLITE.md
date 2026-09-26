@@ -121,7 +121,7 @@ composer update --no-dev --optimize-autoloader 'xtendeploy/*' 'xtenstack/*'
 You should see Composer install the framework's dependencies and seven
 `xtenstack/...`/`xtendeploy/...` packages, then the skeleton's own install
 script: `app_skeleton: applying migrations...`, `seeding defaults...`,
-`syncing module registry...`, `install complete.` That script creates the
+`syncing module registry...`, `install complete.` (possibly twice). That script creates the
 empty database files from step 4's config. It runs even with
 `--no-scripts`, because the plugin that merges `composer.local.json` runs a
 second install pass, so don't bother adding it. Check:
