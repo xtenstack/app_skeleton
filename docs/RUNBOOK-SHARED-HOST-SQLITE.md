@@ -126,7 +126,12 @@ Leave `mail.resend_api_key` out: the demo sends no mail.
 composer update --no-dev --optimize-autoloader 'xtendeploy/*' 'xtenstack/*'
 ```
 
-You should see Composer install the framework's dependencies and seven
+Composer first prints `Pattern "xtendeploy/*" listed for update does not
+match any locked packages.` (and the same for `xtenstack/*`). That's expected
+on a fresh clone: the skeleton's lock file doesn't list the modules yet, and
+the merge plugin adds them in its second pass. Ignore it.
+
+You should then see Composer install the framework's dependencies and seven
 `xtenstack/...`/`xtendeploy/...` packages, then the skeleton's own install
 script: `app_skeleton: applying migrations...`, `seeding defaults...`,
 `syncing module registry...`, `install complete.` (possibly twice). That script creates the
