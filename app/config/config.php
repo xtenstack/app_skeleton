@@ -62,7 +62,9 @@ $base = [
     'printNewLine' => true,
 ];
 
-$localConfigFile = __DIR__ . '/config.local.php';
+// APP_CONFIG_LOCAL points at an alternative local config (e.g. a throwaway
+// SQLite one for tests) without touching the real config.local.php.
+$localConfigFile = getenv('APP_CONFIG_LOCAL') ?: __DIR__ . '/config.local.php';
 $local = is_file($localConfigFile) ? (array) include $localConfigFile : [];
 
 return new \Phalcon\Config\Config(array_replace_recursive($base, $local));

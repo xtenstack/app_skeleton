@@ -77,6 +77,16 @@ $di->setShared('db', function () {
         $params['gssencmode'] = 'disable';
     }
 
+    if ($config->database->adapter === 'Sqlite') {
+        // Postgres schemas as ATTACHed files, PG function shims and the
+        // ILIKE/::cast translator. SQLite only; see App_skeleton\Db\SqliteAdapter.
+        $class = \App_skeleton\Db\SqliteAdapter::class;
+
+        if (isset($config->database->schemas)) {
+            $params['schemas'] = $config->database->schemas->toArray();
+        }
+    }
+
     $connection = new $class($params);
 
     $profiler = $this->getShared('dbProfiler');

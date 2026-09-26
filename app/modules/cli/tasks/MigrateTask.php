@@ -60,7 +60,7 @@ class MigrateTask extends \Phalcon\Cli\Task
             $this->db->begin();
 
             try {
-                $this->db->execute($sql);
+                $this->executeScript($sql);
                 $this->db->execute(
                     'INSERT INTO schema_migrations (module, version) VALUES (:module, :version)',
                     ['module' => $migration['module'], 'version' => $migration['version']]
@@ -107,9 +107,36 @@ class MigrateTask extends \Phalcon\Cli\Task
         // — existing rows have no way to have come from anything but the
         // base engine, so they read back correctly as module='base' with no
         // data backfill needed (see qualified-version scheme below).
+        if ($this->adapter() === 'sqlite') {
+            // SQLite has no ADD COLUMN IF NOT EXISTS — check the column list.
+            $columns = array_column($this->db->fetchAll('PRAGMA table_info(schema_migrations)'), 'name');
+            if (!in_array('module', $columns, true)) {
+                $this->db->execute("ALTER TABLE schema_migrations ADD COLUMN module VARCHAR(100) NOT NULL DEFAULT 'base'");
+            }
+
+            return;
+        }
+
         $this->db->execute(
             "ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS module VARCHAR(100) NOT NULL DEFAULT 'base'"
         );
+    }
+
+    /**
+     * Run a whole migration file. pdo_pgsql executes every statement in a
+     * multi-statement string, but pdo_sqlite's prepare() compiles only the
+     * first one and silently drops the rest — so SQLite goes through
+     * PDO::exec(), which runs them all.
+     */
+    private function executeScript(string $sql): void
+    {
+        if ($this->adapter() === 'sqlite') {
+            $this->db->getInternalHandler()->exec($sql);
+
+            return;
+        }
+
+        $this->db->execute($sql);
     }
 
     private function adapter(): string
