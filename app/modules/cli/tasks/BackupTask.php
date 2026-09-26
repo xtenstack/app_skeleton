@@ -47,6 +47,12 @@ class BackupTask extends \Phalcon\Cli\Task
             throw new \RuntimeException("Could not create backup directory: {$backupDir}");
         }
 
+        if ($db->adapter === 'Sqlite') {
+            $this->runSqlite($backupDir);
+
+            return;
+        }
+
         $timestamp = date('Ymd-His');
         $dumpFile  = "{$backupDir}/{$db->dbname}-{$timestamp}.sql.gz";
         $tmpSql    = "{$backupDir}/.{$db->dbname}-{$timestamp}.sql.tmp";
@@ -140,6 +146,52 @@ class BackupTask extends \Phalcon\Cli\Task
                 $this->formatBytes($size),
                 $this->formatBytes(self::SIZE_WARNING_BYTES)
             ) . PHP_EOL;
+        }
+    }
+
+    /**
+     * SQLite installs (shared-host demos): no pg_dump. VACUUM INTO writes a
+     * consistent, compacted copy of the main file and of every ATTACHed
+     * schema file (see App_skeleton\Db\SqliteAdapter) while the site stays
+     * up; each copy is then gzipped. Same backups/ directory and 14-day
+     * retention as the Postgres path.
+     */
+    private function runSqlite(string $backupDir): void
+    {
+        $timestamp = date('Ymd-His');
+        $files     = ['main' => (string) $this->config->database->dbname];
+
+        if ($this->db instanceof \App_skeleton\Db\SqliteAdapter) {
+            $files += $this->db->getAttachedSchemas();
+        }
+
+        foreach ($files as $schema => $source) {
+            $base    = preg_replace('/\.(sqlite3?|db)$/i', '', basename($source));
+            $copy    = "{$backupDir}/{$base}-{$timestamp}.sqlite";
+            $gzipped = $copy . '.gz';
+
+            $this->db->execute('VACUUM "' . $schema . '" INTO ' . $this->db->escapeString($copy));
+
+            $in  = fopen($copy, 'rb');
+            $out = gzopen($gzipped, 'wb6');
+
+            while (!feof($in)) {
+                gzwrite($out, (string) fread($in, 1 << 20));
+            }
+
+            fclose($in);
+            gzclose($out);
+            unlink($copy);
+
+            $cutoff = time() - self::RETENTION_DAYS * 86400;
+
+            foreach (glob("{$backupDir}/{$base}-*.sqlite.gz") ?: [] as $old) {
+                if (filemtime($old) < $cutoff) {
+                    unlink($old);
+                }
+            }
+
+            echo sprintf('wrote %s (%s)', basename($gzipped), $this->formatBytes((int) filesize($gzipped))) . PHP_EOL;
         }
     }
 
