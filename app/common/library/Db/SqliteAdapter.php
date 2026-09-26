@@ -25,7 +25,8 @@ use Phalcon\Db\ResultInterface;
  * 2. Postgres functions module SQL relies on are registered as PHP
  *    functions: now(), greatest(), least(), split_part(), btrim(),
  *    left(), right(), initcap(), date_trunc(), md5(), similarity() and
- *    regexp()/REGEXP (case-sensitive) and iregexp() (for ~*), plus
+ *    regexp()/REGEXP (case-sensitive), iregexp() (for ~*) and
+ *    regexp_substr() (for substring(x, 'regex')), plus
  *    pg_try_advisory_lock()/pg_advisory_unlock() backed by flock() on a
  *    lock file next to the database (<db file>.advisory-lock-<key>) (CronRunner's overlap guard), held
  *    until unlocked or the PHP process ends, like a session-level lock.
@@ -216,6 +217,15 @@ class SqliteAdapter extends \Phalcon\Db\Adapter\Pdo\Sqlite
             'similarity' => [static fn ($a, $b) => self::similarity((string) $a, (string) $b), 2],
             'regexp'    => [static fn ($pattern, $value) => $value === null ? null : (int) preg_match('/' . str_replace('/', '\/', (string) $pattern) . '/u', (string) $value), 2],
             'iregexp'   => [static fn ($pattern, $value) => $value === null ? null : (int) preg_match('/' . str_replace('/', '\/', (string) $pattern) . '/iu', (string) $value), 2],
+            // Postgres substring(value FROM 'regex'): the first capture group
+            // if the pattern has one, else the whole match; NULL if none.
+            'regexp_substr' => [static function ($value, $pattern) {
+                if ($value === null || !preg_match('/' . str_replace('/', '\/', (string) $pattern) . '/u', (string) $value, $m)) {
+                    return null;
+                }
+
+                return $m[1] ?? $m[0];
+            }, 2],
         ];
 
         $fns['pg_try_advisory_lock'] = [static fn ($key) => self::advisoryLock((string) $key) ? 1 : 0, 1];
