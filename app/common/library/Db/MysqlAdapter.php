@@ -33,6 +33,12 @@ class MysqlAdapter extends \Phalcon\Db\Adapter\Pdo\Mysql
 {
     public const SQL_MODE = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
+    /**
+     * @psalm-suppress UndefinedConstant PDO's MYSQL_* constants only exist
+     *                  where pdo_mysql is loaded, which a Postgres/SQLite
+     *                  build (and CI) may not have; this class only loads
+     *                  when the adapter is Mysql.
+     */
     public function __construct(array $descriptor)
     {
         $descriptor['charset'] ??= 'utf8mb4';

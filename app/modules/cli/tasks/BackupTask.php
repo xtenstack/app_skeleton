@@ -249,6 +249,10 @@ class BackupTask extends \Phalcon\Cli\Task
         return 'mysqldump';
     }
 
+    /**
+     * @psalm-suppress UndefinedConstant PDO::MYSQL_* only exists where
+     *                  pdo_mysql is loaded; this only runs for Mysql.
+     */
     private function mysqlDumpWithPhp(string $dumpFile): void
     {
         $db  = $this->config->database;
