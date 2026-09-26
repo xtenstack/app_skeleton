@@ -165,12 +165,19 @@ class BackupTask extends \Phalcon\Cli\Task
             $files += $this->db->getAttachedSchemas();
         }
 
+        // VACUUM refuses to run on a connection with a statement still open,
+        // and under `./run cron run` the shared connection is mid-way through
+        // CronRunner's job list ("cannot VACUUM - SQL statements in
+        // progress"). Copy each file through its own short-lived connection.
         foreach ($files as $schema => $source) {
             $base    = preg_replace('/\.(sqlite3?|db)$/i', '', basename($source));
             $copy    = "{$backupDir}/{$base}-{$timestamp}.sqlite";
             $gzipped = $copy . '.gz';
 
-            $this->db->execute('VACUUM "' . $schema . '" INTO ' . $this->db->escapeString($copy));
+            $pdo = new \PDO('sqlite:' . $source, null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+            $pdo->exec('PRAGMA busy_timeout = 5000');
+            $pdo->exec('VACUUM INTO ' . $pdo->quote($copy));
+            $pdo = null;
 
             $in  = fopen($copy, 'rb');
             $out = gzopen($gzipped, 'wb6');
