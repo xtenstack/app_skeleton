@@ -57,60 +57,24 @@ the Composer path above from that directory. There's no separate
 
 ## MySQL or SQLite instead of Postgres
 
-> **Update (Sep 2026): SQLite now works for the base skeleton.**
-> `db/migrations/sqlite/` holds a port of every base migration, and
-> `./run migrate run` handles SQLite. For a step-by-step shared-hosting
-> install, see [RUNBOOK-SHARED-HOST-SQLITE.md](RUNBOOK-SHARED-HOST-SQLITE.md).
-> Optional modules run on SQLite when they ship a `migrations/sqlite/`
-> folder; the runbook's "Adding modules" section covers installing and
-> porting them. MySQL is unchanged: what follows still applies to it.
+All three adapters work: set `config.database.adapter` in
+`app/config/config.local.php` to `Postgresql` (the default), `Mysql`
+(MySQL 8.0+ or MariaDB 10.6+) or `Sqlite`, and `./run migrate run` applies
+the matching `db/migrations/<adapter>/` set (`postgresql/`, `mysql/`,
+`sqlite/`, one port of every base migration each) plus each module's
+`migrations/<adapter>/`. Everything else (seeding, `./run modules sync`,
+the app) is adapter-agnostic. Postgres is the reference: it's what the
+Docker setup and CI run.
 
-Postgres is the only fully-supported adapter today — this is the
-honest state of things, not a "should just work" claim. Two separate
-pieces need to exist before either of the other two adapters is
-usable, and only the first one does yet:
-
-1. **Connection wiring** — `app/config/services.php`'s `db` service
-   builds its connection params generically off
-   `config.database.adapter` (`Postgresql`, `Mysql`, or `Sqlite`), so
-   pointing `config.local.php` at a different adapter is enough on this
-   front alone.
-2. **Schema migrations** — `db/migrations/<adapter>/*.sql`, applied by
-   `./run migrate run` (or automatically via `bin/install.php` on
-   `composer install`/first Docker boot) for whichever adapter is
-   configured. **Only `db/migrations/postgresql/` exists right now.**
-   Point the config at `Mysql` or `Sqlite` today and the migration
-   runner finds zero files for that adapter — nothing gets created, and
-   the app has no tables to work with. There is currently no MySQL or
-   SQLite migration set to translate the Postgres SQL (`SERIAL`,
-   `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`, etc.) into the target
-   dialect's syntax and place under a matching
-   `db/migrations/mysql/` or `db/migrations/sqlite/` directory,
-   filename-ordered the same way `postgresql/`'s files are, before
-   `./run migrate run` has anything to apply.
-
-If you're testing on shared hosting with only MySQL/SQLite available
-(no Postgres, likely no Docker either — use the Composer path above):
-
-1. Edit `app/config/config.local.php`'s `database` block —
-   `adapter` = `Mysql` or `Sqlite`, plus whatever `host`/`port`/
-   `username`/`password`/`dbname` your host gives you (`Sqlite` only
-   needs `dbname` — the database file's path).
-2. Hand-translate `db/migrations/postgresql/*.sql` into the target
-   dialect under a new `db/migrations/<adapter>/` directory (same
-   filenames, same order) before running `composer install` or
-   `./run migrate run` — see point 2 above.
-3. Everything else (`./run modules sync`, seeding, the app itself) is
-   already adapter-agnostic — it's specifically the schema files that
-   are Postgres-only right now.
-
-**Planned, not built**: consolidating the (by-then-frozen) migration
-set into one rolled-up schema file per adapter, applied automatically
-based on an adapter choice at install time — see `docs/user-guide.md`
-and the project's requirements log. Fine to stay Postgres-only until
-then; this section exists for the shared-hosting case that can't wait.
+For a step-by-step build-locally, upload-to-shared-hosting install with
+any of the three, see [RUNBOOK-SHARED-HOST.md](RUNBOOK-SHARED-HOST.md).
+It covers the config for each adapter, what differs between them, and
+porting a module's migrations to MySQL or SQLite.
 
 ## Shared hosting (no command line, no Docker)
+
+The tested, step-by-step version of this (SQLite, MySQL/MariaDB or
+PostgreSQL) is [RUNBOOK-SHARED-HOST.md](RUNBOOK-SHARED-HOST.md).
 
 Most shared hosts don't give you SSH, Composer, or Docker — just FTP/SFTP
 and a database. The pattern is: build the instance somewhere that *does*

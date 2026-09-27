@@ -30,7 +30,7 @@ namespace App_skeleton\Db;
  * query stays as it is. Quoted literals, quoted identifiers and comments
  * are never rewritten.
  */
-final class PgSqlTranslator
+class PgSqlTranslator
 {
     private const CASTS = [
         'text' => 'TEXT', 'varchar' => 'TEXT', 'character varying' => 'TEXT', 'char' => 'TEXT', 'citext' => 'TEXT', 'name' => 'TEXT',
@@ -88,7 +88,7 @@ final class PgSqlTranslator
      * Apply $fn to the parts of $sql outside '...' literals, "..." identifiers
      * and comments.
      */
-    private static function mapCode(string $sql, callable $fn): string
+    protected static function mapCode(string $sql, callable $fn): string
     {
         $parts = preg_split("/('(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|--[^\n]*|\/\*.*?\*\/)/s", $sql, -1, PREG_SPLIT_DELIM_CAPTURE);
         $out   = '';
@@ -101,7 +101,7 @@ final class PgSqlTranslator
     }
 
     /** Mask literals/comments with same-length placeholders so offsets line up. */
-    private static function mask(string $sql): string
+    protected static function mask(string $sql): string
     {
         return preg_replace_callback(
             "/('(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|--[^\n]*|\/\*.*?\*\/)/s",
@@ -174,7 +174,7 @@ final class PgSqlTranslator
     }
 
     /** Walk back from a '::' to the start of the operand it casts. */
-    private static function operandStart(string $masked, int $pos): int
+    protected static function operandStart(string $masked, int $pos): int
     {
         $i = $pos - 1;
 

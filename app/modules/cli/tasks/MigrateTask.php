@@ -12,7 +12,7 @@ namespace App_skeleton\Modules\Cli\Tasks;
  * in filename order for whichever adapter the running config uses — see
  * config.database.adapter. This exists so the skeleton can eventually be
  * deployed against MySQL or SQLite too without touching this runner, just
- * by adding sibling migration files; only postgresql/ is written today.
+ * by adding sibling migration files (postgresql/, sqlite/ and mysql/ exist).
  *
  * Module-aware: besides the base engine's own db/migrations/<adapter>/,
  * every Composer-installed module package discovered by ModuleManager that
@@ -57,7 +57,16 @@ class MigrateTask extends \Phalcon\Cli\Task
 
             $sql = (string) file_get_contents($migration['path']);
 
-            $this->db->begin();
+            // MySQL/MariaDB commit implicitly on every DDL statement, so a
+            // transaction around a migration protects nothing there (and
+            // PDO then fails the COMMIT with "no active transaction"). On
+            // MySQL a failed file can leave its earlier statements applied;
+            // see docs/RUNBOOK-SHARED-HOST.md.
+            $transactional = $this->adapter() !== 'mysql';
+
+            if ($transactional) {
+                $this->db->begin();
+            }
 
             try {
                 $this->executeScript($sql);
@@ -65,9 +74,14 @@ class MigrateTask extends \Phalcon\Cli\Task
                     'INSERT INTO schema_migrations (module, version) VALUES (:module, :version)',
                     ['module' => $migration['module'], 'version' => $migration['version']]
                 );
-                $this->db->commit();
+
+                if ($transactional) {
+                    $this->db->commit();
+                }
             } catch (\Throwable $e) {
-                $this->db->rollback();
+                if ($transactional) {
+                    $this->db->rollback();
+                }
 
                 echo "  FAILED on {$qualified}: " . $e->getMessage() . PHP_EOL;
                 echo '  Stopped — migrations after this one were not applied.' . PHP_EOL;
@@ -96,6 +110,29 @@ class MigrateTask extends \Phalcon\Cli\Task
 
     private function ensureMigrationsTable(): void
     {
+        if ($this->adapter() === 'mysql') {
+            // DATETIME rather than TIMESTAMP: no 2038 limit and no MariaDB
+            // auto-update quirks. MySQL has no ADD COLUMN IF NOT EXISTS
+            // (MariaDB does), so check information_schema like SQLite does.
+            $this->db->execute(
+                'CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version     VARCHAR(255) NOT NULL PRIMARY KEY,
+                    applied_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+            );
+
+            $hasModule = (int) $this->db->fetchColumn(
+                "SELECT COUNT(*) FROM information_schema.columns
+                  WHERE table_schema = DATABASE() AND table_name = 'schema_migrations' AND column_name = 'module'"
+            );
+
+            if (!$hasModule) {
+                $this->db->execute("ALTER TABLE schema_migrations ADD COLUMN module VARCHAR(100) NOT NULL DEFAULT 'base'");
+            }
+
+            return;
+        }
+
         $this->db->execute(
             'CREATE TABLE IF NOT EXISTS schema_migrations (
                 version     VARCHAR(255) PRIMARY KEY,
@@ -130,6 +167,16 @@ class MigrateTask extends \Phalcon\Cli\Task
      */
     private function executeScript(string $sql): void
     {
+        // pdo_mysql runs a multi-statement string but only reports an error
+        // from the first statement, so MySQL goes one statement at a time.
+        if ($this->adapter() === 'mysql') {
+            foreach (\App_skeleton\Db\MysqlAdapter::splitStatements($sql) as $statement) {
+                $this->db->getInternalHandler()->exec($statement);
+            }
+
+            return;
+        }
+
         if ($this->adapter() === 'sqlite') {
             $this->db->getInternalHandler()->exec($sql);
 
