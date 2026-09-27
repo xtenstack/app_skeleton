@@ -5,7 +5,7 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 /**
  * Human-facing KB article authoring (Knowledge-Base-Module-Plan.md v0.1
- * sections 5-7). Operators can read (index/view); every other action
+ * sections 5-7). Operators and Charter Agents can read (index/view); every other action
  * (create, edit, delete, publish, bulk) is admin only (Travis, 27 Sep 2026,
  * MAA-20260927-001: Charter Agents get operator and must not author or
  * publish KB). Authoring and publishing stays human, agents get
@@ -25,7 +25,7 @@ class KbArticlesController extends ControllerBase
     protected function onConstruct()
     {
         $canRead = in_array($this->dispatcher->getActionName(), self::READ_ACTIONS, true);
-        $this->allowedRoles = \Roles::idsByNames($canRead ? ['admin', 'operator'] : ['admin']);
+        $this->allowedRoles = \Roles::idsByNames($canRead ? ['admin', 'operator', 'charter_agent'] : ['admin']);
 
         parent::onConstruct();
 

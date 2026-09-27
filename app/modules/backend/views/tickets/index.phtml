@@ -39,6 +39,7 @@
 <form method="post" action="<?= $this->url->get('backend/tickets/bulk') ?>" id="tickets-bulk-form">
   <div class="row mb-2">
     <div class="col-12 d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+<?php if ($isStaff): ?>
       <div class="dropdown">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="bulk-dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
           With selected
@@ -75,6 +76,7 @@
         </div>
       </div>
       <span class="text-muted small" id="bulk-selected-count">0 selected</span>
+<?php endif; ?>
     </div>
   </div>
 
@@ -116,8 +118,10 @@
                 <td><?= $this->escaper->escapeHtml($ticket->created_at) ?></td>
                 <td class="text-right">
                   <a href="<?= $this->url->get('backend/tickets/view/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">View</a>
+<?php if ($isStaff): ?>
                   <a href="<?= $this->url->get('backend/tickets/edit/' . $ticket->id) ?>" class="btn btn-sm btn-outline-secondary">Edit</a>
                   <button type="submit" formaction="<?= $this->url->get('backend/tickets/delete/' . $ticket->id) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete ticket #<?= $ticket->id ?>?')">Delete</button>
+<?php endif; ?>
                 </td>
               </tr>
 <?php endforeach; ?>
