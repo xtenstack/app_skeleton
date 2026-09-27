@@ -20,7 +20,9 @@ namespace App_skeleton\Modules\Api\Controllers;
  */
 class KbArticlesController extends ControllerBase
 {
-    private const WRITE_ROLES = ['admin', 'operator'];
+    // admin only: operators (Charter Agents) must not author or publish KB
+    // (Travis, 27 Sep 2026, MAA-20260927-001).
+    private const WRITE_ROLES = ['admin'];
 
     public function indexAction()
     {

@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please **do not** open a public GitHub issue for a suspected security
-vulnerability. Instead, email **stack@xten.au** with:
+vulnerability. Instead, email **security@xten.au** with:
 
 - A description of the issue and its potential impact.
 - Steps to reproduce, or a proof of concept if you have one.

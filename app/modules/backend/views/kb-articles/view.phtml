@@ -6,10 +6,12 @@
       <span class="badge badge-<?= $article->visibility === 'public' ? 'info' : 'secondary' ?>"><?= $this->escaper->escapeHtml(\KbArticles::VISIBILITIES[$article->visibility] ?? $article->visibility) ?></span>
     </h1>
     <div>
+<?php if ($canWrite): ?>
       <a href="<?= $this->url->get('backend/kb-articles/edit/' . $article->id) ?>" class="btn btn-outline-secondary">Edit</a>
       <form method="post" action="<?= $this->url->get('backend/kb-articles/delete/' . $article->id) ?>" class="d-inline" data-confirm="Delete this article?">
         <button type="submit" class="btn btn-outline-danger">Delete</button>
       </form>
+<?php endif; ?>
       <a href="<?= $this->url->get('backend/kb-articles') ?>" class="btn btn-outline-secondary">Back</a>
     </div>
   </div>
@@ -50,6 +52,7 @@
       </div>
     </div>
 
+<?php if ($canWrite): ?>
     <div class="card mb-3">
       <div class="card-header">Status</div>
       <div class="card-body d-flex" style="gap: .5rem;">
@@ -64,5 +67,6 @@
 <?php endif; ?>
       </div>
     </div>
+<?php endif; ?>
   </div>
 </div>
