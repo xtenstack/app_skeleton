@@ -8,10 +8,11 @@ use PHPUnit\Framework\TestCase;
  * api\KbArticlesController coverage. Read actions (index/view/match) are
  * reachable by any authenticated principal, agents included, but an
  * agent caller only ever sees status=published regardless of what it
- * asks for; create/update/publish are admin/operator only, gated
+ * asks for; create/update/publish are admin only (operators = Charter
+ * Agents must not author or publish, MAA-20260927-001), gated
  * per-action the same way api\TicketsController::closeAction() is.
  *
- * Covers: agent read-OK, agent write-403, operator write-201, and that
+ * Covers: agent read-OK, agent/operator write-403, admin write-201, and that
  * matchAction() returns a published article for its enquiry type while
  * excluding a draft in the same type — not just that the endpoints
  * respond, but that the actual RBAC/status filtering lands. Real HTTP
@@ -29,6 +30,8 @@ final class ApiKbArticlesControllerTest extends TestCase
     private static int $operatorId;
     private static int $agentId;
 
+    private static string $adminApiKeyRawToken;
+    private static int $adminApiKeyId;
     private static string $operatorApiKeyRawToken;
     private static int $operatorApiKeyId;
     private static string $agentApiKeyRawToken;
@@ -89,6 +92,16 @@ final class ApiKbArticlesControllerTest extends TestCase
         self::assertTrue($agent->save(), 'fixture agent failed to save: ' . implode('; ', $agent->getMessages()));
         self::$agentId = (int) $agent->id;
 
+        self::$adminApiKeyRawToken = 'phpunit-apikb-admintoken-' . bin2hex(random_bytes(16));
+
+        $adminApiKey               = new \ApiKeys();
+        $adminApiKey->user_id      = self::$adminId;
+        $adminApiKey->name         = 'phpunit-apikb-admin-fixture-key';
+        $adminApiKey->token_hash   = hash('sha256', self::$adminApiKeyRawToken);
+        $adminApiKey->token_prefix = substr(self::$adminApiKeyRawToken, 0, 10);
+        self::assertTrue($adminApiKey->save(), 'fixture admin api key failed to save: ' . implode('; ', $adminApiKey->getMessages()));
+        self::$adminApiKeyId = (int) $adminApiKey->id;
+
         self::$operatorApiKeyRawToken = 'phpunit-apikb-optoken-' . bin2hex(random_bytes(16));
 
         $operatorApiKey               = new \ApiKeys();
@@ -116,6 +129,7 @@ final class ApiKbArticlesControllerTest extends TestCase
             \KbArticles::findFirstById($articleId)?->delete();
         }
 
+        \ApiKeys::findFirstById(self::$adminApiKeyId)?->delete();
         \ApiKeys::findFirstById(self::$operatorApiKeyId)?->delete();
         \ApiKeys::findFirstById(self::$agentApiKeyId)?->delete();
 
@@ -216,19 +230,42 @@ final class ApiKbArticlesControllerTest extends TestCase
         $this->assertSame('draft', $article->status);
     }
 
-    public function testOperatorCanCreateAndPublishArticleAndItBecomesVisibleToAgent(): void
+    public function testOperatorCannotCreatePublishOrUpdateArticle(): void
     {
         $client = new HttpClient();
 
         $createResponse = $client->postJson('/api/kb-articles/create', [
-            'title'           => 'phpunit-apikb-operator-created',
-            'body'            => 'Operator-authored body.',
-            'summary'         => 'Operator summary',
+            'title'           => 'phpunit-apikb-operator-should-fail',
+            'body'            => 'Should not be created.',
+            'enquiry_type_id' => self::$enquiryTypeId,
+        ], ['X-Api-Key: ' . self::$operatorApiKeyRawToken]);
+        $this->assertSame(403, $createResponse['status'], 'operator should be forbidden from creating KB articles: ' . $createResponse['body']);
+
+        $article = $this->newArticle('draft');
+
+        $publishResponse = $client->postJson('/api/kb-articles/publish/' . $article->id, [], ['X-Api-Key: ' . self::$operatorApiKeyRawToken]);
+        $this->assertSame(403, $publishResponse['status']);
+
+        $updateResponse = $client->postJson('/api/kb-articles/update/' . $article->id, ['title' => 'should not apply'], ['X-Api-Key: ' . self::$operatorApiKeyRawToken]);
+        $this->assertSame(403, $updateResponse['status']);
+
+        $article->refresh();
+        $this->assertSame('draft', $article->status);
+    }
+
+    public function testAdminCanCreateAndPublishArticleAndItBecomesVisibleToAgent(): void
+    {
+        $client = new HttpClient();
+
+        $createResponse = $client->postJson('/api/kb-articles/create', [
+            'title'           => 'phpunit-apikb-admin-created',
+            'body'            => 'Admin-authored body.',
+            'summary'         => 'Admin summary',
             'enquiry_type_id' => self::$enquiryTypeId,
             'visibility'      => 'internal',
-        ], ['X-Api-Key: ' . self::$operatorApiKeyRawToken]);
+        ], ['X-Api-Key: ' . self::$adminApiKeyRawToken]);
 
-        $this->assertSame(201, $createResponse['status'], 'operator should be able to create a KB article: ' . $createResponse['body']);
+        $this->assertSame(201, $createResponse['status'], 'admin should be able to create a KB article: ' . $createResponse['body']);
 
         $payload   = json_decode($createResponse['body'], true);
         $articleId = (int) $payload['article']['id'];
@@ -239,9 +276,9 @@ final class ApiKbArticlesControllerTest extends TestCase
         $publishResponse = $client->postJson(
             '/api/kb-articles/publish/' . $articleId,
             [],
-            ['X-Api-Key: ' . self::$operatorApiKeyRawToken]
+            ['X-Api-Key: ' . self::$adminApiKeyRawToken]
         );
-        $this->assertSame(200, $publishResponse['status'], 'operator should be able to publish: ' . $publishResponse['body']);
+        $this->assertSame(200, $publishResponse['status'], 'admin should be able to publish: ' . $publishResponse['body']);
 
         $publishedPayload = json_decode($publishResponse['body'], true);
         $this->assertSame('published', $publishedPayload['article']['status']);

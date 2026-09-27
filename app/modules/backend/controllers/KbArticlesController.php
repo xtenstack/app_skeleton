@@ -5,8 +5,10 @@ namespace App_skeleton\Modules\Backend\Controllers;
 
 /**
  * Human-facing KB article authoring (Knowledge-Base-Module-Plan.md v0.1
- * sections 5-7). admin/operator only, same roles/reasoning as
- * TicketsController — authoring and publishing stays human, agents get
+ * sections 5-7). Operators and Charter Agents can read (index/view); every other action
+ * (create, edit, delete, publish, bulk) is admin only (Travis, 27 Sep 2026,
+ * MAA-20260927-001: Charter Agents get operator and must not author or
+ * publish KB). Authoring and publishing stays human, agents get
  * read-only API access (see App_skeleton\Modules\Api\Controllers\
  * KbArticlesController). List/create/edit/view/delete follow the
  * TicketsController pattern; publishAction() is the one KB-specific
@@ -17,11 +19,18 @@ class KbArticlesController extends ControllerBase
 {
     protected ?array $allowedRoles = null; // resolved at runtime, see onConstruct()
 
+    /** Everything not listed here is admin only (deny by default). */
+    private const READ_ACTIONS = ['index', 'view'];
+
     protected function onConstruct()
     {
-        $this->allowedRoles = \Roles::idsByNames(['admin', 'operator']);
+        $canRead = in_array($this->dispatcher->getActionName(), self::READ_ACTIONS, true);
+        $this->allowedRoles = \Roles::idsByNames($canRead ? ['admin', 'operator', 'charter_agent'] : ['admin']);
 
         parent::onConstruct();
+
+        $roleId = $this->session->get('auth')['role_id'] ?? null;
+        $this->view->setVar('canWrite', in_array($roleId, \Roles::idsByNames(['admin']), true));
     }
 
     public function indexAction(): void

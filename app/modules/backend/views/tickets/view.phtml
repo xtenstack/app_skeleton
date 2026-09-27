@@ -2,10 +2,12 @@
   <div class="col-12 d-flex justify-content-between align-items-center">
     <h1>Ticket #<?= $ticket->id ?>: <?= $this->escaper->escapeHtml($ticket->title) ?></h1>
     <div>
+<?php if ($isStaff): ?>
       <a href="<?= $this->url->get('backend/tickets/edit/' . $ticket->id) ?>" class="btn btn-outline-secondary">Edit</a>
       <form method="post" action="<?= $this->url->get('backend/tickets/delete/' . $ticket->id) ?>" class="d-inline" onsubmit="return confirm('Delete this ticket?')">
         <button type="submit" class="btn btn-outline-danger">Delete</button>
       </form>
+<?php endif; ?>
       <a href="<?= $this->url->get('backend/tickets') ?>" class="btn btn-outline-secondary">Back</a>
     </div>
   </div>
@@ -96,9 +98,11 @@
               <a href="<?= $this->url->get('backend/tickets/download-attachment/' . $ticket->id . '/' . $attachment->id) ?>"><?= $this->escaper->escapeHtml($attachment->original_filename) ?></a>
               <span class="text-muted small">(<?= number_format($attachment->size_bytes / 1024, 1) ?> KB)</span>
             </span>
+<?php if ($isStaff): ?>
             <form method="post" action="<?= $this->url->get('backend/tickets/delete-attachment/' . $ticket->id . '/' . $attachment->id) ?>" onsubmit="return confirm('Remove this attachment?')">
               <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
             </form>
+<?php endif; ?>
           </li>
 <?php endforeach; ?>
         </ul>
@@ -140,6 +144,7 @@
 <?php else: ?>
         <p class="text-warning mb-3">Not yet spot-checked by a human.</p>
 <?php endif; ?>
+<?php if ($isStaff): ?>
         <form method="post" action="<?= $this->url->get('backend/tickets/qa-review/' . $ticket->id) ?>" class="form-inline">
           <select name="outcome" class="form-control mr-2">
             <option value="confirmed">Confirm — correctly auto-closed</option>
@@ -147,12 +152,14 @@
           </select>
           <button type="submit" class="btn btn-primary">Record QA outcome</button>
         </form>
+<?php endif; ?>
       </div>
     </div>
 <?php endif; ?>
   </div>
 
   <div class="col-12 col-md-5">
+<?php if ($isStaff): ?>
     <div class="card mb-3">
       <div class="card-header">Assign</div>
       <div class="card-body">
@@ -199,5 +206,6 @@
 <?php endif; ?>
       </div>
     </div>
+<?php endif; ?>
   </div>
 </div>
