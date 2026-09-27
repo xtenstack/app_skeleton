@@ -102,14 +102,14 @@ return [
         'icon'       => 'fas fa-ticket-alt',
         'controller' => 'tickets',
         'url'        => 'backend/tickets',
-        'roles'      => \Roles::idsByNames(['admin', 'operator']),
+        'roles'      => \Roles::idsByNames(['admin', 'operator', 'charter_agent']),
     ],
     [
         'label'      => 'Knowledge Base',
         'icon'       => 'fas fa-book',
         'controller' => 'kb-articles',
         'url'        => 'backend/kb-articles',
-        'roles'      => \Roles::idsByNames(['admin', 'operator']),
+        'roles'      => \Roles::idsByNames(['admin', 'operator', 'charter_agent']),
     ],
     [
         'label'      => 'KB Enquiry Types',

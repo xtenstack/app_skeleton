@@ -31,11 +31,40 @@ class TicketsController extends ControllerBase
     /**
      * @return void
      */
+    /**
+     * What a Charter Agent (role charter_agent, MAA-20260927-001) may do
+     * here: lodge a ticket and follow the ones they lodged. Triage, edit,
+     * delete and bulk stay admin/operator. Ids in the URL are checked
+     * against reporter_user_id, so another ticket is a 404, not a 403.
+     */
+    private const CHARTER_AGENT_ACTIONS = ['index', 'new', 'create', 'view', 'uploadAttachment', 'downloadAttachment'];
+
+    private bool $isCharterAgent = false;
+
     protected function onConstruct()
     {
-        $this->allowedRoles = \Roles::idsByNames(['admin', 'operator']);
+        $action = lcfirst(str_replace('-', '', ucwords((string) $this->dispatcher->getActionName(), '-')));
+        $staff  = \Roles::idsByNames(['admin', 'operator']);
+        $agents = \Roles::idsByNames(['charter_agent']);
+
+        $this->allowedRoles = in_array($action, self::CHARTER_AGENT_ACTIONS, true) ? array_merge($staff, $agents) : $staff;
 
         parent::onConstruct();
+
+        $auth = $this->session->get('auth') ?? [];
+        $this->isCharterAgent = in_array($auth['role_id'] ?? null, $agents, true);
+        $this->view->setVar('isStaff', !$this->isCharterAgent);
+
+        $ticketId = (int) ($this->dispatcher->getParams()[0] ?? 0);
+        if ($this->isCharterAgent && $ticketId > 0) {
+            $ticket = \Tickets::findFirstById($ticketId);
+            if (!$ticket || (int) $ticket->reporter_user_id !== (int) ($auth['id'] ?? 0)) {
+                $this->response->setStatusCode(404, 'Not Found');
+                $this->response->setContent('<h1>404 Not Found</h1>');
+                $this->response->send();
+                exit;
+            }
+        }
     }
 
     public function indexAction(): void
@@ -58,6 +87,11 @@ class TicketsController extends ControllerBase
         if ($assignedTo) {
             $conditions[]         = 'assigned_to_user_id = :assigned_to:';
             $bind['assigned_to']  = (int) $assignedTo;
+        }
+
+        if ($this->isCharterAgent) {
+            $conditions[]  = 'reporter_user_id = :me:';
+            $bind['me']    = (int) $this->session->get('auth')['id'];
         }
 
         // Search/sort/pagination (Session 15, list-view convention) layers
@@ -87,6 +121,13 @@ class TicketsController extends ControllerBase
         // Spot-check banner: what share of this week's auto-closes haven't
         // been QA-reviewed yet — a human-driven filtered queue rather than
         // an automated sampler (see plan section 6).
+        if ($this->isCharterAgent) {
+            $this->view->needsQaCount   = 0;
+            $this->view->needsQaPercent = 0;
+
+            return;
+        }
+
         $autoClosedThisWeek = \Tickets::find([
             'conditions' => 'auto_closed_at >= :since:',
             'bind'       => ['since' => date('Y-m-d H:i:s', strtotime('-7 days'))],
@@ -163,7 +204,15 @@ class TicketsController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'index']);
         }
 
-        $this->view->ticket           = $ticket;
+        $this->view->ticket = $ticket;
+
+        if ($this->isCharterAgent) {   // no staff list or other tickets on a Charter Agent's page
+            $this->view->assignableUsers  = [];
+            $this->view->otherOpenTickets = [];
+
+            return;
+        }
+
         $this->view->assignableUsers  = $this->humanUsers();
         $this->view->otherOpenTickets = \Tickets::find([
             'conditions' => 'id != :id:',
