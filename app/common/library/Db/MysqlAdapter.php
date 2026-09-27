@@ -160,6 +160,49 @@ class MysqlAdapter extends \Phalcon\Db\Adapter\Pdo\Mysql
     }
 
     /**
+     * Report TINYINT(1) columns (this project's BOOLEAN) as boolean.
+     *
+     * Phalcon describes them as TYPE_TINYINTEGER, which is numeric, and the
+     * model's automatic not-null check treats `false` on a numeric column
+     * as missing: an update that sets a flag to false fails with "<column>
+     * is required". That hit module_registry.enabled (`./run modules
+     * enable/disable`) and every plugin's boolean. As a BOOLEAN column,
+     * `false` is a value; binding still goes out as 0/1, since execute()
+     * and query() pass booleans as integers. Plain TINYINT (no width 1)
+     * stays numeric.
+     *
+     * @return \Phalcon\Db\ColumnInterface[]
+     */
+    public function describeColumns(string $table, ?string $schema = null): array
+    {
+        $columns = parent::describeColumns($table, $schema);
+
+        foreach ($columns as $i => $column) {
+            if ($column->getType() !== \Phalcon\Db\Column::TYPE_TINYINTEGER || (int) $column->getSize() !== 1) {
+                continue;
+            }
+
+            $definition = [
+                'type'          => \Phalcon\Db\Column::TYPE_BOOLEAN,
+                'notNull'       => $column->isNotNull(),
+                'primary'       => $column->isPrimary(),
+                'first'         => $column->isFirst(),
+                'after'         => $column->getAfterPosition(),
+                'isNumeric'     => false,
+                'bindType'      => \Phalcon\Db\Column::BIND_PARAM_BOOL,
+            ];
+
+            if ($column->getDefault() !== null) {
+                $definition['default'] = $column->getDefault();
+            }
+
+            $columns[$i] = new \Phalcon\Db\Column($column->getName(), $definition);
+        }
+
+        return $columns;
+    }
+
+    /**
      * @return array{0: array, 1: array}
      */
     private static function booleansAsIntegers(array $bindParams, array $bindTypes): array
