@@ -94,6 +94,7 @@ services:
       MILLIONVERIFIER_API_KEY: ${MILLIONVERIFIER_API_KEY:-}
       DEBOUNCE_API_KEY: ${DEBOUNCE_API_KEY:-}
       DOLIBARR_WATSON_TOKEN: ${DOLIBARR_WATSON_TOKEN:-}
+      DOLIBARR_TIM_TOKEN: ${DOLIBARR_TIM_TOKEN:-}
     volumes:
       - ./data/encryption_key:/app/.encryption_key
       - ./data/files:/app/public/files

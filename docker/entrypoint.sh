@@ -37,6 +37,8 @@ return [
     'dolibarr' => [
         'base_url'  => '${DOLIBARR_BASE_URL:-https://accts.xten.au/dolibarr}',
         'api_token' => '${DOLIBARR_WATSON_TOKEN}',
+        // directory-module authors claims as Tim (user 8), MAA-20260925-007
+        'tim_api_token' => '${DOLIBARR_TIM_TOKEN:-}',
     ],
     'database' => [
         'host'     => '${DB_HOST}',
