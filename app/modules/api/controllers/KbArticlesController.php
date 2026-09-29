@@ -6,12 +6,14 @@ namespace App_skeleton\Modules\Api\Controllers;
 /**
  * Knowledge-Base-Module-Plan.md v0.1 section 5. Scope: list/view/match are
  * reachable by any authenticated principal (agents included — the whole
- * point is Tim/Watson/Cowork-style callers grounding a response), but an
- * agent caller only ever sees status=published articles regardless of
- * what it asks for — enforced in each read action, not via
+ * point is Tim/Watson/Cowork-style callers grounding a response), scoped
+ * by role in each read action: admin/operator see everything, agent and
+ * charter_agent only published articles, and everyone else (member =
+ * customers) only published PUBLIC ones (see publishedOnly()/publicOnly())
+ * regardless of what they ask for — enforced in each read action, not via
  * ControllerBase's class-wide $allowedRoles (which would also have to
  * cover create/update/publish, and those stay read-only for agents).
- * create/update/publish are gated per-action to admin/operator, the same
+ * create/update/publish are gated per-action to admin (WRITE_ROLES), the same
  * pattern App_skeleton\Modules\Api\Controllers\TicketsController::
  * closeAction() uses — human-authored only for now (plan section 5: "an
  * agent can draft and submit for review, not publish directly" is a
@@ -53,9 +55,15 @@ class KbArticlesController extends ControllerBase
 
         $status = trim((string) $this->request->getQuery('status', 'string', ''));
 
-        if ($this->isAgent()) {
-            // Agent callers only ever see published articles, regardless
-            // of what status they ask for (plan section 5/7).
+        if ($this->publicOnly()) {
+            $conditions[]                = 'visibility = :scope_visibility:';
+            $bind['scope_visibility']    = 'public';
+        }
+
+        if ($this->publishedOnly()) {
+            // Agent, Charter Agent and customer callers only ever see
+            // published articles, regardless of what status they ask for
+            // (plan section 5/7).
             $conditions[]   = 'status = :status:';
             $bind['status'] = 'published';
         } elseif (in_array($status, array_keys(\KbArticles::STATUSES), true)) {
@@ -81,7 +89,9 @@ class KbArticlesController extends ControllerBase
     {
         $article = \KbArticles::findFirstById($id);
 
-        if (!$article || ($this->isAgent() && $article->status !== 'published')) {
+        if (!$article
+            || ($this->publishedOnly() && $article->status !== 'published')
+            || ($this->publicOnly() && $article->visibility !== 'public')) {
             $this->response->setStatusCode(404, 'Not Found');
 
             return $this->response->setJsonContent(['error' => 'Not found']);
@@ -133,7 +143,8 @@ class KbArticlesController extends ControllerBase
         }
 
         $candidates = \KbArticles::find([
-            'conditions' => 'enquiry_type_id = :enquiry_type_id: AND status = :status:',
+            'conditions' => 'enquiry_type_id = :enquiry_type_id: AND status = :status:'
+                . ($this->publicOnly() ? " AND visibility = 'public'" : ''),
             'bind'       => ['enquiry_type_id' => (int) $type->id, 'status' => 'published'],
             'order'      => 'updated_at DESC, id DESC',
         ]);
@@ -367,11 +378,30 @@ class KbArticlesController extends ControllerBase
         return $this->response->setJsonContent(['article' => $this->serialize($article)]);
     }
 
-    private function isAgent(): bool
-    {
-        $agentRoleId = \Roles::idsByNames(['agent'])[0] ?? null;
+    /**
+     * Read scope by role (29 Sep 2026, Travis): admin and operator see
+     * everything; agent and charter_agent see published articles of either
+     * visibility; every other role — member (customers, who can
+     * self-register) or any role added later — sees published PUBLIC
+     * articles only, the same set /api/public-kb/faq serves. Until then a
+     * logged-in member could list internal and draft articles here.
+     */
+    private const STAFF_ROLES = ['admin', 'operator'];
+    private const AGENT_ROLES = ['agent', 'charter_agent'];
 
-        return $agentRoleId !== null && (int) $this->principal['role_id'] === $agentRoleId;
+    private function hasRole(array $names): bool
+    {
+        return in_array((int) $this->principal['role_id'], array_map('intval', \Roles::idsByNames($names)), true);
+    }
+
+    private function publishedOnly(): bool
+    {
+        return !$this->hasRole(self::STAFF_ROLES);
+    }
+
+    private function publicOnly(): bool
+    {
+        return !$this->hasRole(self::STAFF_ROLES) && !$this->hasRole(self::AGENT_ROLES);
     }
 
     /** @return \Phalcon\Http\ResponseInterface|null null when the caller is allowed through */

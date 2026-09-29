@@ -39,6 +39,12 @@ final class ApiKbArticlesControllerTest extends TestCase
 
     private static int $enquiryTypeId;
 
+    /** member (customer) and charter_agent callers, 29 Sep 2026 read-scope fix */
+    private static array $extraUserIds = [];
+    private static array $extraKeyIds = [];
+    private static string $memberApiKeyRawToken;
+    private static string $charterApiKeyRawToken;
+
     /** @var int[] */
     private static array $articleIds = [];
 
@@ -121,6 +127,36 @@ final class ApiKbArticlesControllerTest extends TestCase
         $agentApiKey->token_prefix = substr(self::$agentApiKeyRawToken, 0, 10);
         self::assertTrue($agentApiKey->save(), 'fixture agent api key failed to save: ' . implode('; ', $agentApiKey->getMessages()));
         self::$agentApiKeyId = (int) $agentApiKey->id;
+
+        self::$memberApiKeyRawToken  = self::userWithKey('member', 'ApiKbMember');
+        self::$charterApiKeyRawToken = self::userWithKey('charter_agent', 'ApiKbCharter');
+    }
+
+    private static function userWithKey(string $role, string $lastName): string
+    {
+        $roleId = \Roles::idsByNames([$role])[0] ?? null;
+        self::assertNotNull($roleId, "fixture setup requires a '{$role}' role to exist — run ./run seed / ./run migrate run");
+
+        $user                = new \Users();
+        $user->email         = 'phpunit-apikb-' . $role . '-' . bin2hex(random_bytes(6)) . '@example.invalid';
+        $user->password_hash = password_hash(self::$password, PASSWORD_DEFAULT);
+        $user->first_name    = 'PHPUnit';
+        $user->last_name     = $lastName;
+        $user->role_id       = $roleId;
+        $user->is_active     = 1;
+        self::assertTrue($user->save(), "fixture {$role} failed to save: " . implode('; ', $user->getMessages()));
+        self::$extraUserIds[] = (int) $user->id;
+
+        $raw                = 'phpunit-apikb-' . $role . '-' . bin2hex(random_bytes(16));
+        $key                = new \ApiKeys();
+        $key->user_id       = (int) $user->id;
+        $key->name          = 'phpunit-apikb-' . $role . '-fixture-key';
+        $key->token_hash    = hash('sha256', $raw);
+        $key->token_prefix  = substr($raw, 0, 10);
+        self::assertTrue($key->save(), "fixture {$role} api key failed to save: " . implode('; ', $key->getMessages()));
+        self::$extraKeyIds[] = (int) $key->id;
+
+        return $raw;
     }
 
     public static function tearDownAfterClass(): void
@@ -132,6 +168,14 @@ final class ApiKbArticlesControllerTest extends TestCase
         \ApiKeys::findFirstById(self::$adminApiKeyId)?->delete();
         \ApiKeys::findFirstById(self::$operatorApiKeyId)?->delete();
         \ApiKeys::findFirstById(self::$agentApiKeyId)?->delete();
+
+        foreach (self::$extraKeyIds as $keyId) {
+            \ApiKeys::findFirstById($keyId)?->delete();
+        }
+
+        foreach (self::$extraUserIds as $userId) {
+            \Users::findFirstById($userId)?->softDelete();
+        }
 
         foreach ([self::$adminEmail, self::$operatorEmail, self::$agentEmail] as $email) {
             $user = \Users::findFirstWithTrashed(['conditions' => 'email = :email:', 'bind' => ['email' => $email]]);
@@ -191,6 +235,55 @@ final class ApiKbArticlesControllerTest extends TestCase
 
         $viewPublished = $client->getWithHeaders('/api/kb-articles/view/' . $published->id, $headers);
         $this->assertSame(200, $viewPublished['status']);
+    }
+
+    public function testMemberOnlyEverSeesPublishedPublicArticles(): void
+    {
+        $public   = $this->newArticle('published', 'public', 'memberpublic');
+        $internal = $this->newArticle('published', 'internal', 'memberinternal');
+        $draft    = $this->newArticle('draft', 'public', 'memberdraft');
+
+        $client  = new HttpClient();
+        $headers = ['X-Api-Key: ' . self::$memberApiKeyRawToken];
+
+        // Asking for internal drafts explicitly must not widen what a customer sees.
+        foreach (['/api/kb-articles', '/api/kb-articles?visibility=internal&status=draft'] as $url) {
+            $response = $client->getWithHeaders($url, $headers);
+            $this->assertSame(200, $response['status'], $response['body']);
+            $articles = json_decode($response['body'], true)['articles'] ?? [];
+            $ids      = array_column($articles, 'id');
+            $this->assertNotContains((int) $internal->id, $ids, "member must never see an internal article ({$url})");
+            $this->assertNotContains((int) $draft->id, $ids, "member must never see a draft ({$url})");
+            foreach ($articles as $a) {
+                $this->assertSame('public', $a['visibility']);
+                $this->assertSame('published', $a['status']);
+            }
+        }
+        $all = array_column(json_decode($client->getWithHeaders('/api/kb-articles', $headers)['body'], true)['articles'] ?? [], 'id');
+        $this->assertContains((int) $public->id, $all, 'member should see a published public article');
+
+        $this->assertSame(404, $client->getWithHeaders('/api/kb-articles/view/' . $internal->id, $headers)['status']);
+        $this->assertSame(404, $client->getWithHeaders('/api/kb-articles/view/' . $draft->id, $headers)['status']);
+        $this->assertSame(200, $client->getWithHeaders('/api/kb-articles/view/' . $public->id, $headers)['status']);
+
+        $match = $client->getWithHeaders('/api/kb-articles/match?enquiry_type=qualifying-question', $headers);
+        $this->assertSame(200, $match['status'], $match['body']);
+        $matchIds = array_column(json_decode($match['body'], true)['articles'] ?? [], 'id');
+        $this->assertNotContains((int) $internal->id, $matchIds, 'match must not hand a customer an internal article');
+    }
+
+    public function testCharterAgentSeesPublishedInternalButNoDrafts(): void
+    {
+        $internal = $this->newArticle('published', 'internal', 'charterinternal');
+        $draft    = $this->newArticle('draft', 'internal', 'charterdraft');
+
+        $client  = new HttpClient();
+        $headers = ['X-Api-Key: ' . self::$charterApiKeyRawToken];
+
+        $ids = array_column(json_decode($client->getWithHeaders('/api/kb-articles?status=draft', $headers)['body'], true)['articles'] ?? [], 'id');
+        $this->assertContains((int) $internal->id, $ids, 'a Charter Agent reads published internal articles');
+        $this->assertNotContains((int) $draft->id, $ids, 'a Charter Agent must not see drafts');
+        $this->assertSame(404, $client->getWithHeaders('/api/kb-articles/view/' . $draft->id, $headers)['status']);
     }
 
     public function testAgentCannotCreateArticle(): void
