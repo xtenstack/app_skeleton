@@ -15,7 +15,7 @@ set -eu
 # (REQ-025) and missed the same treatment — confirmed on prod as the
 # silent cause of ticket-attachment uploads failing (mkdir(): Permission
 # denied, moveTo() failing, both non-fatal warnings the app didn't check).
-mkdir -p /app/storage/ticket-attachments
+mkdir -p /app/storage/ticket-attachments /app/storage/lin-media
 chown -R www-data:www-data /app/logs /app/public/files /app/sessions /app/storage
 
 # Renders app/config/config.local.php from env vars on every container

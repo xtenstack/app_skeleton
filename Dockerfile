@@ -169,9 +169,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
 # misreports as "session expired" since it just sees a POST with no token.
 # Some headroom above the app's own limit for multipart overhead and any
 # other form fields on the same request.
+#
+# Raised from 12M/15M on 2026-10-01 for lin-module media: LinkedIn accepts
+# documents up to 100 MB, and short videos land in the same range. Each
+# controller still enforces its own, lower limit (tickets stay at 10MB).
+# max_input_time gives a large upload on a slow link five minutes to
+# arrive instead of php-fpm's default 60s.
 RUN { \
-        echo "upload_max_filesize = 12M"; \
-        echo "post_max_size = 15M"; \
+        echo "upload_max_filesize = 105M"; \
+        echo "post_max_size = 110M"; \
+        echo "max_input_time = 300"; \
     } > /etc/php/8.3/fpm/conf.d/zz-uploads.ini
 
 WORKDIR /app

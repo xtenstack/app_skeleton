@@ -121,6 +121,11 @@ services:
       # served through an authenticated action, not Caddy's static
       # file_server, so this is an app-only mount too.
       - ./data/agent-room-attachments:/app/storage/agent-room-attachments
+      # Lin Review & Publish media (xtenstack/lin-module): images, video
+      # and documents attached to LinkedIn drafts. Same rationale again —
+      # served only through an authenticated action, so app-only. Without
+      # it every deploy's container recreate would lose the uploads.
+      - ./data/lin-media:/app/storage/lin-media
       # Same host path docker/backup-db.sh already wrote to (not under
       # data/) — BackupTask (REQ-077) reuses it so existing backups on
       # any already-deployed instance stay in one place, not split
