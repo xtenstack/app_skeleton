@@ -132,8 +132,17 @@ fi
 # Crypto now refuses it; `./run crypto rekey` fixes an existing instance.
 if [ ! -f /app/.encryption_key ]; then
     echo "entrypoint: WARNING /app/.encryption_key is not a file — create the host file before first run (see docs/INSTALL.md)" >&2
-elif [ "$(wc -c < /app/.encryption_key | tr -d ' ')" != "32" ]; then
-    echo "entrypoint: WARNING /app/.encryption_key is $(wc -c < /app/.encryption_key | tr -d ' ') bytes, not 32 — stored credentials can't be used until you run ./run crypto rekey (see docs/INSTALL.md)" >&2
+else
+    # Readable by php-fpm (www-data), not by other users. This container
+    # runs as root, so it can fix whatever the host-side owner/mode is
+    # (a host `chmod 600` by a non-root user would otherwise lock
+    # www-data out).
+    chown root:www-data /app/.encryption_key && chmod 640 /app/.encryption_key \
+        || echo "entrypoint: WARNING could not set owner/mode on /app/.encryption_key" >&2
+
+    if [ "$(wc -c < /app/.encryption_key | tr -d ' ')" != "32" ]; then
+        echo "entrypoint: WARNING /app/.encryption_key is $(wc -c < /app/.encryption_key | tr -d ' ') bytes, not 32 — stored credentials can't be used until you run ./run crypto rekey (see docs/INSTALL.md)" >&2
+    fi
 fi
 
 # Wait for Postgres — docker-compose's own healthcheck/depends_on handles

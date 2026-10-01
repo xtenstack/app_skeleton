@@ -31,7 +31,8 @@ use App_skeleton\Crypto;
  *   3. One DB transaction: re-encrypt every value with the new key.
  *   4. Overwrite .encryption_key IN PLACE with the new key. In place, not
  *      rename: under Docker the file is a single-file bind mount, and the
- *      running app container only sees writes to the same inode.
+ *      running app container only sees writes to the same inode. Owner
+ *      and mode are kept, so php-fpm (www-data) can still read it.
  *   5. Re-read every value through the normal Crypto::decrypt() path and
  *      compare SHA-256s of the plaintexts with step 1.
  * If anything fails after step 3 commits, the stash file holds the key
@@ -145,8 +146,10 @@ class CryptoTask extends \Phalcon\Cli\Task
             $this->fail("DATA IS ON THE NEW KEY but {$keyPath} could not be written. Copy {$stashFile} over {$keyPath} now.");
         }
 
+        // Owner and mode are left as they were (an in-place write keeps
+        // them): php-fpm runs as www-data and must still be able to read
+        // the file. docker/entrypoint.sh sets root:www-data 0640 on start.
         fclose($handle);
-        @chmod($keyPath, 0640);
         clearstatcache();
 
         // 5. Verify through the normal path.
