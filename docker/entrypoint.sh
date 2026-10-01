@@ -122,13 +122,27 @@ MSMTP
     chmod 600 /etc/msmtprc
 fi
 
-# .encryption_key (App_skeleton\Crypto) must be a bind-mounted host FILE,
-# not a named volume — if nothing exists at the host path on first
-# `docker compose up`, Docker creates a directory there instead of a file,
-# which breaks Crypto's file_exists()/file_put_contents() silently. Create
-# the host-side file before first run: touch ./data/encryption_key
+# .encryption_key (App_skeleton\Crypto) must be a bind-mounted host FILE
+# holding exactly 32 random bytes — if nothing exists at the host path on
+# first `docker compose up`, Docker creates a directory there instead.
+# Create it before first run (docs/INSTALL.md):
+#   head -c 32 /dev/urandom > data/encryption_key && chmod 600 data/encryption_key
+# The old advice here was `touch`, which makes an EMPTY file that Crypto
+# used to accept silently (an empty key is a key anyone can reproduce).
+# Crypto now refuses it; `./run crypto rekey` fixes an existing instance.
 if [ ! -f /app/.encryption_key ]; then
-    echo "entrypoint: /app/.encryption_key doesn't exist as a file — check the host bind mount was created with 'touch', not left for Docker to create" >&2
+    echo "entrypoint: WARNING /app/.encryption_key is not a file — create the host file before first run (see docs/INSTALL.md)" >&2
+else
+    # Readable by php-fpm (www-data), not by other users. This container
+    # runs as root, so it can fix whatever the host-side owner/mode is
+    # (a host `chmod 600` by a non-root user would otherwise lock
+    # www-data out).
+    chown root:www-data /app/.encryption_key && chmod 640 /app/.encryption_key \
+        || echo "entrypoint: WARNING could not set owner/mode on /app/.encryption_key" >&2
+
+    if [ "$(wc -c < /app/.encryption_key | tr -d ' ')" != "32" ]; then
+        echo "entrypoint: WARNING /app/.encryption_key is $(wc -c < /app/.encryption_key | tr -d ' ') bytes, not 32 — stored credentials can't be used until you run ./run crypto rekey (see docs/INSTALL.md)" >&2
+    fi
 fi
 
 # Wait for Postgres — docker-compose's own healthcheck/depends_on handles

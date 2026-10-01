@@ -255,6 +255,20 @@ forward should assume this table, not propose its own credential
 storage (the AI-SSA application module's `sidecar_auth_pass text not
 null (store as-is)` is the gap that prompted writing this down).
 
+### Encrypting a module's own secrets
+
+A module that has to store a secret of its own (an OAuth token for one of
+its users, say) rather than a shared integration credential encrypts it
+with `App_skeleton\Crypto::encrypt()` and **declares the column in
+`module.json`** so `./run crypto rekey` re-encrypts it along with core's:
+
+```json
+"encrypted_columns": [{"table": "lin_connections", "column": "access_token_enc"}]
+```
+
+The table's primary key must be `id`. A column that isn't declared here is
+left on the old key by a rekey and becomes unreadable.
+
 ## Isolation
 
 - Everything hangs off `user_id`.

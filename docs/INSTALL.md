@@ -12,7 +12,7 @@ git clone <your fork or this repo>
 cd app_skeleton
 cp .env.example .env
 # edit .env — DB_PASSWORD is required, everything else has a working default
-mkdir -p data && touch data/encryption_key
+mkdir -p data && head -c 32 /dev/urandom > data/encryption_key && chmod 600 data/encryption_key
 docker compose up -d --build
 ```
 
@@ -24,6 +24,30 @@ seed data, and module registry sync all run automatically on first
 nothing extra to run by hand.
 
 Visit `http://localhost:8080` (or whatever `HTTP_PORT` you set).
+
+### The encryption key
+
+`data/encryption_key` holds the key that encrypts stored secrets (External
+Connections credentials, module tokens). It must be **exactly 32 random
+bytes**; the command above creates one. Back it up somewhere other than
+your database backups. Without it, stored secrets can't be decrypted, and
+anyone holding both the key and a DB backup can read them.
+
+Earlier versions of this guide said `touch data/encryption_key`, which
+makes an *empty* file that the app accepted and used as the key. If your
+install was set up that way, the container logs warn on start and stored
+credentials stop working until you rekey:
+
+```bash
+docker compose run --rm -v "$PWD/data:/rekey-data" app php run crypto rekey dry-run
+docker compose run --rm -v "$PWD/data:/rekey-data" app php run crypto rekey run /rekey-data/encryption_key.new
+```
+
+The second command generates a new key, re-encrypts every stored secret in
+one transaction, writes the key into `data/encryption_key` and verifies
+everything. Then back up `data/encryption_key.new` safely and delete it.
+Rotate any secrets that were stored under the empty key, because older
+database backups still hold them in readable form.
 
 ## Composer, against your own PHP + Postgres
 
