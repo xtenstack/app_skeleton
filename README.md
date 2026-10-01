@@ -51,7 +51,7 @@ conventions the existing code follows.
 git clone <your fork or this repo>
 cd app_skeleton
 cp .env.example .env   # fill in DB_PASSWORD at minimum
-mkdir -p data && touch data/encryption_key
+mkdir -p data && head -c 32 /dev/urandom > data/encryption_key && chmod 600 data/encryption_key
 docker compose up -d --build
 ```
 
