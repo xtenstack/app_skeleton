@@ -351,6 +351,136 @@ with `App_skeleton\Crypto::encrypt()` and **declares the column in
 The table's primary key must be `id`. A column that isn't declared here is
 left on the old key by a rekey and becomes unreadable.
 
+## PDF documents
+
+The core has a `pdf` service (`App_skeleton\Pdf`, registered in
+`app/config/services.php`, so it is there on web and CLI) for any module
+that needs a PDF: an invoice, a statement, a quote, a report. A module
+does not bundle a PDF library of its own. Callers pass plain UTF-8
+strings and get the file's bytes back; what to do with them (send them
+as a response, attach them with `Mailer::send()`'s `$attachments`, store
+them) is the caller's business.
+
+The service is newer than the module system, so a module that may be
+installed on an older skeleton checks for it and offers no PDF when it is
+missing:
+
+```php
+$di  = $this->getDI();
+$pdf = $di->has('pdf') ? $di->getShared('pdf') : null;
+
+if ($pdf === null || !$pdf->supports('1.0')) {
+    // no PDF on this instance: hide the link, send the email without one
+}
+```
+
+### Interface 1.0
+
+The service:
+
+| Method | Returns |
+|---|---|
+| `document(array $options = [])` | a new, empty document (`App_skeleton\Pdf\Document`) |
+| `supports(string $version)` | `true` when the interface is that version or later within the same major (`'1.0'`) |
+| `interfaceVersion()` | `'1.0.0'` |
+
+`document()` options, all optional:
+
+| Option | Meaning | Default |
+|---|---|---|
+| `title`, `author`, `subject` | the file's metadata | none |
+| `size` | `'A4'`, `'A3'`, `'A5'`, `'Letter'`, `'Legal'` | `'A4'` |
+| `orientation` | `'portrait'`, `'landscape'` | `'portrait'` |
+| `margins` | millimetres: one number for all sides, or any of `top`, `right`, `bottom`, `left` (5 to 100) | 18 / 16 / 20 / 16 |
+| `fontSize` | points, 6 to 16: the body text; headings and small print scale from it | 10 |
+| `footer` | text repeated at the foot of every page | none |
+| `pageNumbers` | `true` puts "Page n of N" at the foot of every page | `false` |
+| `compress` | `false` leaves page content readable in the bytes. For tests | `true` |
+
+The document is built top to bottom. Every method except `output()`
+returns the document, so calls chain. Lengths are millimetres; `align` is
+`left` (the default), `center` or `right`.
+
+| Method | What it adds |
+|---|---|
+| `heading(string $text, int $level = 1, array $options = [])` | A heading, level 1 (largest) to 3, kept on the same page as the line after it. Options: `align` |
+| `paragraph(string $text, array $options = [])` | Text that wraps to the page width and flows over page breaks; a line break in the text is kept. Options: `align`, `style` (`normal`, `bold`), `size` (`normal`, `small`, `large`), `muted` (grey) |
+| `keyValues(array $blocks, array $options = [])` | Blocks of label / value lines. Each block: `title` (a small caption), `lead` (a bold first line, such as a name), `rows` (a list of `[label, value]`; an empty label gives the value the block's full width; values wrap). Options: `layout` (`columns`: side by side in equal columns and kept on one page, the default; `stacked`: one under another), `labelWidth` |
+| `table(array $columns, array $rows, array $options = [])` | A table. Each column: `label`, `width` (omit to share what is left), `align` (`right` for money). Each row: a list with one value per column. Cells wrap; a row is never split across pages; the header is repeated on every page the table runs onto. Options: `repeatHeader` (default `true`), `size` (`normal`, `small`) |
+| `totals(array $rows, array $options = [])` | Label / amount lines at the right of the page, kept together on one page. Each row: `[label, value]`, or `[label, value, true]` for a bold row under a rule (the total). Options: `width` (default 80) |
+| `spacer(float $height = 4.0)` | Vertical space (dropped at the top of a page) |
+| `output(): string` | Finishes the document and returns the PDF's bytes, which start with `%PDF-`. The document cannot be used afterwards |
+
+```php
+$bytes = $pdf->document(['title' => 'Statement 42', 'footer' => 'Example Pty Ltd', 'pageNumbers' => true])
+    ->heading('Statement of account')
+    ->keyValues([
+        ['title' => 'From', 'lead' => 'Example Pty Ltd', 'rows' => [['ABN', '51 824 753 556'], ['', "12 Example Street\nPerth WA 6000"]]],
+        ['title' => 'To',   'lead' => 'Zoë Brontë',      'rows' => [['Account', 'C-0042']]],
+    ])
+    ->spacer(6)
+    ->table(
+        [['label' => 'Item'], ['label' => 'Qty', 'width' => 16, 'align' => 'right'], ['label' => 'Amount', 'width' => 28, 'align' => 'right']],
+        [['Widget', '3', '31.50'], ['Gadget', '1', '9.95']]
+    )
+    ->totals([['Subtotal', '41.45'], ['GST', '4.15'], ['Total', '45.60', true]])
+    ->output();
+```
+
+### What a caller can rely on
+
+- **Always pass UTF-8; these scripts print.** Western and Central
+  European Latin (French, German, Spanish, Polish, Czech, Hungarian …),
+  Greek, Cyrillic (Russian, Ukrainian, Bulgarian, Serbian …), Turkish
+  and the Baltic languages are drawn as written, mixed freely in one
+  string: `β-Mercaptoethanol 99% — 100 mL для Łukasz Żółć` prints as it
+  reads. So do the euro sign, typographic quotes and dashes.
+- **Anything else is replaced, not printed.** Chinese, Japanese, Korean,
+  Arabic, Hebrew, Indic scripts and emoji are not supported: each such
+  character becomes the plain-ASCII equivalent the platform's `iconv`
+  offers, or `?`. Invalid UTF-8 is repaired and control characters are
+  dropped. No string makes a method throw, and none can damage the file.
+- **How.** The library underneath (FPDF) draws with single-byte fonts,
+  256 characters each. The service embeds DejaVu Sans (regular and bold)
+  cut into one font per Windows code page — cp1252, cp1250, cp1251,
+  cp1253, cp1254, cp1257 — and one place,
+  `App_skeleton\Pdf\Text::runs()`, splits every string into runs by code
+  page. Lines are measured and broken by the service itself across those
+  runs, so wrapping, right-aligned money and truncation work on mixed
+  text. A document carries only the fonts its text used: about 30 KB
+  each, so a one-page Western invoice is roughly 60 to 70 KB. The font
+  files are in `app/common/library/Pdf/fonts/` (see its README for how
+  they are regenerated).
+- **Page breaks are the document's job.** Text flows; a table row, a
+  totals block, a set of side-by-side blocks and a heading with its next
+  line are each kept whole. A single table cell with more text than a
+  page holds is cut to one page and ends in `...`. A totals block, a
+  `keyValues` block or a heading that is itself taller than a page is not
+  split or cut: it starts at the top of a page and runs off the bottom,
+  so keep those to what a page holds (a long list belongs in a table).
+- **Formatting is the caller's.** The service draws strings. Money is
+  whatever string you pass (`'45.60'`), right-aligned if you say so.
+- **Errors.** Only `App_skeleton\Pdf\PdfException` leaves the service:
+  an unknown option key (refused, not ignored, so a misspelling is
+  noticed), a value outside what is listed above, a row with the wrong
+  number of values, a call on a document that has been output, or a
+  failure inside the library (`getPrevious()`).
+- **FPDF is not part of the interface.** No method returns it. Do not
+  use `\FPDF` or `App_skeleton\Pdf\Sheet` from a module; they can be
+  replaced without notice.
+- **Versioning.** Minor versions (1.x) only add methods, options and
+  option values. Anything else is a new major version. Guard a later
+  addition with `supports()`.
+
+Left out of 1.0 on purpose: images and logos, italics and other
+typefaces, scripts beyond those listed, colours and borders chosen by
+the caller, links, a manual page break, a repeating page header, writing
+straight to a file or the browser, and number, date or currency
+formatting. FPDF is pinned at 1.8.2 in `composer.json`: its later 1.x
+releases require PHP's `gd` extension, which the runtime image does not
+install. Third-party licences (FPDF, the DejaVu fonts) are in
+`licences/`.
+
 ## Isolation
 
 - Everything hangs off `user_id`.

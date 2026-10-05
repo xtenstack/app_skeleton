@@ -11,6 +11,7 @@
         "ext-pdo_pgsql": "*",
         "ext-phalcon": "^5.8",
         "league/commonmark": "^2.5",
+        "setasign/fpdf": "1.8.2",
         "wikimedia/composer-merge-plugin": "^2.1"
     },
     "require-dev": {
