@@ -616,6 +616,36 @@ final class PdfTest extends TestCase
         $this->assertNotSame([], self::pagesShowing($pdf, 'after'));
     }
 
+    /**
+     * The blocks that are kept whole (totals, keyValues, a heading) are not
+     * split when one is taller than a page: it starts on a page of its own
+     * and runs off the bottom (docs/MODULE-SPEC.md says so). What matters
+     * here is that building such a document ends, throws nothing, gives a
+     * sound file and goes on to draw what follows on a later page.
+     */
+    public function testABlockTallerThanAPageStillGivesASoundDocument(): void
+    {
+        $rows = array_map(static fn (int $n): array => ["Label {$n}", "Value {$n}"], range(1, 200));
+
+        $builds = [
+            'totals'    => static fn (Document $d): Document => $d->totals($rows),
+            'keyValues' => static fn (Document $d): Document => $d->keyValues([['title' => 'Block', 'rows' => $rows]]),
+            'stacked'   => static fn (Document $d): Document => $d->keyValues([['rows' => $rows], ['rows' => $rows]], ['layout' => 'stacked']),
+            'heading'   => static fn (Document $d): Document => $d->heading(implode(' ', array_fill(0, 2000, 'heading'))),
+        ];
+
+        foreach ($builds as $what => $build) {
+            $pdf = $build(self::document()->paragraph('before'))->paragraph('after the block')->output();
+
+            $this->assertIsAWellFormedPdf($pdf);
+            $this->assertSame([0], self::pagesShowing($pdf, 'before'), $what);
+
+            $after = self::pagesShowing($pdf, 'after the block');
+            $this->assertCount(1, $after, "{$what}: what follows is drawn once");
+            $this->assertGreaterThan(1, $after[0], "{$what}: on a page after the block's own");
+        }
+    }
+
     public function testPageSizeOrientationMarginsAndFontSize(): void
     {
         $a4 = self::document()->paragraph('x')->output();

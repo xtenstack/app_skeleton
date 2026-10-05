@@ -454,7 +454,10 @@ $bytes = $pdf->document(['title' => 'Statement 42', 'footer' => 'Example Pty Ltd
 - **Page breaks are the document's job.** Text flows; a table row, a
   totals block, a set of side-by-side blocks and a heading with its next
   line are each kept whole. A single table cell with more text than a
-  page holds is cut to one page and ends in `...`.
+  page holds is cut to one page and ends in `...`. A totals block, a
+  `keyValues` block or a heading that is itself taller than a page is not
+  split or cut: it starts at the top of a page and runs off the bottom,
+  so keep those to what a page holds (a long list belongs in a table).
 - **Formatting is the caller's.** The service draws strings. Money is
   whatever string you pass (`'45.60'`), right-aligned if you say so.
 - **Errors.** Only `App_skeleton\Pdf\PdfException` leaves the service:
