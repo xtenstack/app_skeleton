@@ -75,6 +75,21 @@ vendor stage), so `../plugins/*` resolves inside the image just as
 build host even if empty (`mkdir -p ../plugins`). It can't be a `vcs`
 Composer repository instead: several packages share one git tree.
 
+## Application modules (`../applications`)
+
+The application-module monorepo, XTenDeploy/applications (one top-level
+folder per module, e.g. `invo/`, `ai-ssa-application/`), is the third
+sibling and works the same way: a checkout beside this repo, a
+`{ "type": "path", "url": "../applications/*", "options": { "symlink": false } }`
+entry in `composer.local.json`, and the module's package in `require`
+(e.g. `"xtendeploy/invo": "*"`). The Docker build takes it in through the
+`application-modules: ../applications` context (→ `/applications` in the
+vendor stage). As with the other two, the directory must exist on the
+build host even if empty (`mkdir -p ../applications`); `docker/deploy.sh`
+creates all three. An application module that depends on a plugin (Invo
+needs `xtendeploy/contacts`) needs the plugin's path repository present
+too.
+
 ## Setup
 
 ```bash
