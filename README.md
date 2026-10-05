@@ -38,6 +38,10 @@ tests locally and what they do and don't cover.
 - **Audit logging** — opt-in per model (`keepSnapshots(true)`), captures
   before/after values with reversal support.
 - **Soft deletes** — a shared trait, not a bespoke column per table.
+- **PDF documents** — a `pdf` service the core and any module can ask
+  for an A4 document (headings, tables that break pages cleanly, totals;
+  Latin, Greek and Cyrillic text) without bundling a PDF library; see
+  [docs/MODULE-SPEC.md](docs/MODULE-SPEC.md#pdf-documents).
 - **Module system** — Composer-installed packages with a `module.json`
   manifest are discovered and toggleable from the admin Configuration
   page, without touching core code.

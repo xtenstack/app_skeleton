@@ -15,6 +15,7 @@ use App_skeleton\CurrentPrincipal;
 use App_skeleton\LicenseManager;
 use App_skeleton\Mailer;
 use App_skeleton\ModuleManager;
+use App_skeleton\Pdf;
 use App_skeleton\SettingsRegistry;
 
 $di->setShared('session', function () {
@@ -238,6 +239,15 @@ $di->setShared('mailer', function () {
     $mailer->setDI($this);
 
     return $mailer;
+});
+
+/**
+ * Builds PDF documents (an invoice, a statement, a report) for the core
+ * and for modules — see App_skeleton\Pdf and docs/MODULE-SPEC.md, "PDF
+ * documents". Stateless; FPDF is not loaded until a document is asked for.
+ */
+$di->setShared('pdf', function () {
+    return new Pdf();
 });
 
 /**
