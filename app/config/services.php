@@ -35,7 +35,7 @@ $di->setShared('session', function () {
     // http://localhost install can still log in.
     if (PHP_SAPI !== 'cli' && !headers_sent()) {
         $https = ($_SERVER['HTTPS'] ?? '') === 'on'
-            || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+            || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
 
         session_set_cookie_params([
             'lifetime' => 0,
