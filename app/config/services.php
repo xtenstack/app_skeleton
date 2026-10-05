@@ -12,6 +12,7 @@ use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
 use App_skeleton\CurrentPrincipal;
+use App_skeleton\LicenseManager;
 use App_skeleton\Mailer;
 use App_skeleton\ModuleManager;
 use App_skeleton\SettingsRegistry;
@@ -263,6 +264,19 @@ $di->setShared('moduleManager', function () {
     $moduleManager->setDI($this);
 
     return $moduleManager;
+});
+
+/**
+ * Licence state of installed paid modules, and the check-in against the
+ * licence server — see App_skeleton\LicenseManager and docs/MODULE-SPEC.md
+ * (Licensing). On web and CLI alike: a module asks
+ * $di->getShared('licenseManager')->isLicensed('<its key>').
+ */
+$di->setShared('licenseManager', function () {
+    $licenseManager = new LicenseManager();
+    $licenseManager->setDI($this);
+
+    return $licenseManager;
 });
 
 /**

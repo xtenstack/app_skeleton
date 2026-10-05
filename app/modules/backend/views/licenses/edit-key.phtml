@@ -1,0 +1,29 @@
+<?php
+/**
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var \LicenseKeys $licenseKey
+ * @var string[] $assigned
+ * @var array<string, array<string, mixed>> $entitlements
+ */
+?>
+<div class="row mb-2">
+  <div class="col-12">
+    <h1 class="mb-0">Edit or replace a licence key</h1>
+    <p class="text-muted mb-0"><?= $this->escaper->escapeHtml(sprintf('Key %s', $licenseKey->masked())) ?></p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/licenses/save-key/' . $licenseKey->id) ?>" autocomplete="off">
+          <?= $this->partial('partials/csrf-field') ?>
+          <?= $this->partial('licenses/key-fields', ['licenseKey' => $licenseKey, 'assigned' => $assigned, 'entitlements' => $entitlements]) ?>
+          <button type="submit" class="btn btn-primary">Save and check now</button>
+          <a href="<?= $this->url->get('backend/licenses') ?>" class="btn btn-link">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

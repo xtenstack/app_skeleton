@@ -42,6 +42,17 @@ $base = [
         'resend_webhook_secret' => '',
     ],
 
+    /**
+     * Where paid modules' licence keys are checked (see
+     * App_skeleton\LicenseManager). Empty means XTen's licence server,
+     * LicenseCheckinClient::DEFAULT_SERVER_URL. Override the base URL in
+     * config.local.php only to point at another licence server; it must
+     * be https:// (plain http is accepted for localhost alone, for tests).
+     */
+    'licensing' => [
+        'server_url' => '',
+    ],
+
     'application' => [
         'appDir'         => APP_PATH . '/',
         'modelsDir'      => APP_PATH . '/common/models/',

@@ -14,8 +14,9 @@ use App_skeleton\Crypto;
  * .encryption_key (an empty legacy key included — see Crypto's docblock)
  * to a freshly generated one.
  *
- * Where the ciphertexts are: core's external_connections.credential, plus
- * any column an installed module declares in its module.json:
+ * Where the ciphertexts are: core's external_connections.credential and
+ * license_keys.key_encrypted, plus any column an installed module declares
+ * in its module.json:
  *
  *     "encrypted_columns": [{"table": "lin_connections", "column": "access_token_enc"}]
  *
@@ -176,7 +177,10 @@ class CryptoTask extends \Phalcon\Cli\Task
     /** @return list<array{table: string, column: string}> */
     private function targets(): array
     {
-        $targets = [['table' => 'external_connections', 'column' => 'credential']];
+        $targets = [
+            ['table' => 'external_connections', 'column' => 'credential'],
+            ['table' => 'license_keys', 'column' => 'key_encrypted'],
+        ];
 
         foreach ($this->moduleManager->discover() as $manifest) {
             foreach ((array) ($manifest['encrypted_columns'] ?? []) as $col) {

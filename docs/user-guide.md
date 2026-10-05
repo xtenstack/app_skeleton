@@ -92,7 +92,8 @@ them per-instance. The CLI equivalent is `./run modules sync|list|enable|disable
 A module can declare other modules it depends on: the list shows what
 each module requires and what requires it, a module can't be enabled
 until its dependencies are, and disabling a module also disables the
-modules that depend on it (see MODULE-SPEC.md's "Dependencies").
+modules that depend on it (see MODULE-SPEC.md's "Dependencies"). The
+list also shows each module's licence state; see [Licences](#licences).
 
 **Items.** A small, complete CRUD resource kept in the base product as a
 worked reference — list, create, edit, and soft delete on one plain
@@ -142,6 +143,71 @@ favor of shipping a working feature first. The Requirements module is
 the first feature built as a *real* optional module, now that
 `ModuleManager` v1 is proven — treat it as the current worked example
 for the pattern below, not Ticketing.
+
+## Licences
+
+Free modules need nothing here. A paid module needs a licence key, which
+you enter once per instance on **Settings → Licences** (admins only; also
+reached from the *Licence keys* button on the Configuration page).
+
+### Entering a key
+
+1. Open **Licences**. The top table lists every installed module that
+   needs a key.
+2. Under *Add a licence key*, paste the key, give it a label if you like
+   (the product name, or the invoice it came with), and tick the
+   module(s) it was issued for.
+   - A **bundle** key covers several modules. Tick the main module; the
+     modules that say "also tried automatically with any key ticked
+     for ..." use the same key without being ticked.
+   - A module bought **on its own** has its own key. Add it as a second
+     key and tick just that module. An instance can hold as many keys as
+     it needs.
+3. *Save and check now*. The instance asks the licence server straight
+   away and tells you, module by module, whether the key was confirmed.
+
+The key is stored encrypted and is never shown again; the screen shows
+only its last four characters. *Edit or replace* changes the label, the
+ticked modules or the key itself (leave the key field blank to keep the
+current one). *Remove* takes the key off this instance: any module it
+was licensing is unlicensed from that moment, until another key is
+confirmed for it.
+
+### What the states mean
+
+| Shown as | Meaning | What to do |
+|---|---|---|
+| **Licensed** | The licence server confirmed the module at the last check-in. | Nothing. |
+| **Licensed, check-in overdue** | The module was confirmed within the last 120 days, but the latest check-in did not succeed: either the licence server could not be reached, or it did not accept the key. The screen says which, and how many days of grace are left. The module keeps working. | If the server could not be reached, check the instance can make outbound HTTPS requests, then *Check now*. If the key was not accepted, contact whoever issued it. |
+| **Not licensed** | No key is stored for the module, or the key has never been confirmed, or the last confirmation was more than 120 days ago. | Enter a key, or *Check now* if the key is already there. |
+| **No key needed** | A free module. | Nothing. |
+
+### Check-ins
+
+You do not need to schedule anything. Once a day, after the first
+signed-in request of the day, the instance checks each enabled paid
+module with the licence server. It sends the licence key and the
+module's key, nothing else, and the page that triggered it is not held
+up. A day with nobody signed in makes no call.
+
+A module stays licensed for **120 days** after its last successful
+check-in. A network outage, the licence server being down, or the
+instance sitting unused for a few weeks changes nothing. *Check now*
+(per module) and *Check all enabled modules now* ask immediately;
+`./run license checkin` does the same from the command line and
+`./run license status` shows the current state without asking.
+
+### Notices
+
+Admins see licence problems on every backend page; other users never do.
+
+- While a module is **in its grace period**, a yellow notice says which
+  module, why, and how many days are left.
+- While an enabled module is **not licensed**, a red alert stays at the
+  top of every page and a *Licence required* window opens on each page
+  load. Close it to carry on working. It stops appearing once the module
+  is licensed (or disabled). The module itself is not switched off by
+  the platform, though a module may limit what it does while unlicensed.
 
 ## Building your own module
 

@@ -1,0 +1,39 @@
+<?php
+/**
+ * The fields shared by "add a key" and "edit or replace a key".
+ *
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var \LicenseKeys|null $licenseKey null when adding
+ * @var string[] $assigned module keys this key is already tried for
+ * @var array<string, array<string, mixed>> $entitlements
+ */
+?>
+          <div class="form-group">
+            <label for="license_key">Licence key</label>
+            <input type="password" class="form-control" id="license_key" name="license_key" autocomplete="new-password" <?= $licenseKey === null ? 'required' : '' ?>
+              placeholder="<?= $this->escaper->escapeHtmlAttr($licenseKey === null ? '' : sprintf('Leave blank to keep the current key (%s)', $licenseKey->masked())) ?>">
+            <small class="form-text text-muted">Stored encrypted. Once saved it is never shown again, only its last four characters.</small>
+          </div>
+          <div class="form-group">
+            <label for="label">Label (optional)</label>
+            <input type="text" class="form-control" id="label" name="label" maxlength="100" value="<?= $this->escaper->escapeHtmlAttr((string) ($licenseKey->label ?? '')) ?>">
+            <small class="form-text text-muted">Your own name for this key, for example the product or the invoice it came with.</small>
+          </div>
+          <div class="form-group">
+            <label>Try this key for</label>
+<?php foreach ($entitlements as $moduleKey => $entitlement): ?>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="module_<?= $this->escaper->escapeHtmlAttr($moduleKey) ?>" name="modules[]" value="<?= $this->escaper->escapeHtmlAttr($moduleKey) ?>" <?= in_array($moduleKey, $assigned, true) ? 'checked' : '' ?>>
+              <label class="form-check-label" for="module_<?= $this->escaper->escapeHtmlAttr($moduleKey) ?>">
+                <code><?= $this->escaper->escapeHtml($moduleKey) ?></code>
+<?php if ($entitlement['sharesKeyWith'] !== null): ?>
+                <span class="small text-muted"><?= $this->escaper->escapeHtml(sprintf('(also tried automatically with any key ticked for %s)', $entitlement['sharesKeyWith'])) ?></span>
+<?php endif; ?>
+              </label>
+            </div>
+<?php endforeach; ?>
+<?php if (!$entitlements): ?>
+            <p class="text-muted mb-0">No installed module needs a licence key.</p>
+<?php endif; ?>
+            <small class="form-text text-muted">Tick the modules the key was issued for. A bundle key covers several; a module bought separately has a key of its own.</small>
+          </div>

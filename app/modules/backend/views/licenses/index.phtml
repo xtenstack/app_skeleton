@@ -1,0 +1,160 @@
+<?php
+/**
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var array<string, array<string, mixed>> $entitlements
+ * @var iterable<\LicenseKeys> $licenseKeys
+ * @var array<int, string[]> $assignments
+ * @var string $serverUrl
+ * @var int $graceDays
+ */
+$keyLabels = [];
+
+foreach ($licenseKeys as $licenseKey) {
+    $keyLabels[(int) $licenseKey->id] = trim(($licenseKey->label ?? '') . ' ' . $licenseKey->masked());
+}
+?>
+<div class="row mb-2">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="mb-0">Licences</h1>
+      <p class="text-muted mb-0">Licence keys for the paid modules installed on this instance.</p>
+    </div>
+    <a href="<?= $this->url->get('backend/configuration') ?>" class="btn btn-outline-secondary">Back to Configuration</a>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title mb-0">Modules that need a licence key</h3>
+<?php if ($entitlements): ?>
+        <form method="post" action="<?= $this->url->get('backend/licenses/check-all') ?>" class="ml-auto">
+          <?= $this->partial('partials/csrf-field') ?>
+          <button type="submit" class="btn btn-sm btn-outline-primary">Check all enabled modules now</button>
+        </form>
+<?php endif; ?>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Licence</th>
+              <th>Confirmed with</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($entitlements as $moduleKey => $entitlement): ?>
+            <tr>
+              <td>
+                <code><?= $this->escaper->escapeHtml($moduleKey) ?></code>
+<?php if ($entitlement['sharesKeyWith'] !== null): ?>
+                <div class="small text-muted"><?= $this->escaper->escapeHtml(sprintf('Can use the key of %s', $entitlement['sharesKeyWith'])) ?></div>
+<?php endif; ?>
+              </td>
+              <td><?= $this->partial('partials/license-state', ['entitlement' => $entitlement]) ?></td>
+              <td class="small">
+<?php if ($entitlement['licenseKeyId'] !== null && isset($keyLabels[$entitlement['licenseKeyId']])): ?>
+                <?= $this->escaper->escapeHtml($keyLabels[$entitlement['licenseKeyId']]) ?>
+<?php endif; ?>
+              </td>
+              <td class="text-right text-nowrap">
+                <form method="post" action="<?= $this->url->get('backend/licenses/check/' . $moduleKey) ?>">
+                  <?= $this->partial('partials/csrf-field') ?>
+                  <button type="submit" class="btn btn-sm btn-outline-primary">Check now</button>
+                </form>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!$entitlements): ?>
+            <tr>
+              <td colspan="4" class="text-center text-muted">No installed module needs a licence key.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div class="card-footer small text-muted">
+        <?= $this->escaper->escapeHtml(sprintf(
+            'This instance checks in with the licence server (%s) once a day, after the first signed-in request of the day. A module stays licensed for %d days after its last successful check-in, so an outage or a quiet spell changes nothing.',
+            $serverUrl,
+            $graceDays
+        )) ?>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title mb-0">Licence keys on this instance</h3>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Key</th>
+              <th>Tried for</th>
+              <th>Added</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+<?php foreach ($licenseKeys as $licenseKey): ?>
+            <tr>
+              <td><?= $this->escaper->escapeHtml((string) $licenseKey->label) ?></td>
+              <td><code><?= $this->escaper->escapeHtml($licenseKey->masked()) ?></code></td>
+              <td class="small">
+<?php if (!empty($assignments[(int) $licenseKey->id])): ?>
+                <?= $this->escaper->escapeHtml(implode(', ', $assignments[(int) $licenseKey->id])) ?>
+<?php else: ?>
+                <span class="text-danger">No module yet</span>
+<?php endif; ?>
+              </td>
+              <td class="small"><?= $this->escaper->escapeHtml($licenseKey->created_at ? date('j M Y', strtotime((string) $licenseKey->created_at)) : '') ?></td>
+              <td class="text-right text-nowrap">
+                <a href="<?= $this->url->get('backend/licenses/edit-key/' . $licenseKey->id) ?>" class="btn btn-sm btn-outline-secondary">Edit or replace</a>
+                <form method="post" action="<?= $this->url->get('backend/licenses/remove-key/' . $licenseKey->id) ?>" class="d-inline" data-confirm="Remove this licence key from this instance? Modules it validated will be unlicensed until another key is confirmed for them.">
+                  <?= $this->partial('partials/csrf-field') ?>
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              </td>
+            </tr>
+<?php endforeach; ?>
+<?php if (!count($licenseKeys)): ?>
+            <tr>
+              <td colspan="5" class="text-center text-muted">No licence key has been entered yet.</td>
+            </tr>
+<?php endif; ?>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title mb-0">Add a licence key</h3>
+      </div>
+      <div class="card-body">
+        <form method="post" action="<?= $this->url->get('backend/licenses/add-key') ?>" autocomplete="off">
+          <?= $this->partial('partials/csrf-field') ?>
+          <?= $this->partial('licenses/key-fields', ['licenseKey' => null, 'assigned' => [], 'entitlements' => $entitlements]) ?>
+          <button type="submit" class="btn btn-primary">Save and check now</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

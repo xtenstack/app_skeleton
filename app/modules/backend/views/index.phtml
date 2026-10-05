@@ -26,6 +26,12 @@ if (!in_array($themeMode, $allowedModes, true)) {
 
 $isAdmin     = ((int) ($this->session->get('auth')['role_id'] ?? 0)) === 1;
 $debugActive = !$isAuthPage && $isAdmin && $this->settings->get('debug_mode', '0') === '1';
+
+/**
+ * Licence notices are for admins only: they are the ones who can enter a
+ * key. Local read, no network (see App_skeleton\LicenseManager).
+ */
+$licenseNotice = !$isAuthPage && $isAdmin ? $this->licenseManager->adminNotice() : ['grace' => [], 'unlicensed' => []];
 ?>
 <!DOCTYPE html>
 <html lang="en" data-palette="<?= $this->escaper->escapeHtmlAttr($themePalette) ?>" data-mode="<?= $this->escaper->escapeHtmlAttr($themeMode) ?>">
@@ -81,6 +87,9 @@ $this->flash->clear();
         <div class="content">
           <div class="container-fluid">
             <?= $flashHtml ?>
+<?php if ($licenseNotice['grace'] || $licenseNotice['unlicensed']): ?>
+            <?= $this->partial('partials/license-notice', ['licenseNotice' => $licenseNotice]) ?>
+<?php endif; ?>
             <?= $this->getContent() ?>
           </div>
         </div>
@@ -97,6 +106,9 @@ $this->flash->clear();
          (extracted from inline, Session 13, so script-src can drop
          'unsafe-inline' from the CSP). -->
     <script src="/assets/js/app.js"></script>
+<?php if ($licenseNotice['unlicensed'] && $controllerName !== 'licenses'): ?>
+    <?= $this->partial('partials/license-modal', ['unlicensed' => $licenseNotice['unlicensed']]) ?>
+<?php endif; ?>
 <?php if ($debugActive): ?>
     <?= $this->partial('partials/debugbar') ?>
 <?php endif; ?>

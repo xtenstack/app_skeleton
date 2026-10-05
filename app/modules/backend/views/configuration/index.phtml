@@ -55,8 +55,9 @@
 <div class="row">
   <div class="col-12">
     <div class="card">
-      <div class="card-header">
+      <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title mb-0">Modules</h3>
+        <a href="<?= $this->url->get('backend/licenses') ?>" class="btn btn-sm btn-outline-secondary ml-auto">Licence keys</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -68,6 +69,7 @@
               <th>Tier</th>
               <th>Version</th>
               <th>Dependencies</th>
+              <th>Licence</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -76,6 +78,7 @@
 <?php foreach ($modules as $module): ?>
 <?php
     $deps      = $moduleDependencies[$module->module_key];
+    $license   = $moduleLicenses[$module->module_key];
     $notLoaded = $module->enabled && ($deps['unmet'] || $deps['error'] !== null);
     $requires  = array_map(
         fn ($key) => isset($deps['unmet'][$key]) ? sprintf('%s (%s)', $key, $deps['unmet'][$key]) : $key,
@@ -96,6 +99,17 @@
 <?php endif; ?>
 <?php if ($deps['error'] !== null): ?>
                 <div class="text-danger"><?= $this->escaper->escapeHtml(sprintf('module.json error: %s', $deps['error'])) ?></div>
+<?php endif; ?>
+              </td>
+              <td class="small">
+<?php if ($license['state'] === 'valid'): ?>
+                <a href="<?= $this->url->get('backend/licenses') ?>" class="badge badge-success">Licensed</a>
+<?php elseif ($license['state'] === 'grace'): ?>
+                <a href="<?= $this->url->get('backend/licenses') ?>" class="badge badge-warning"><?= $this->escaper->escapeHtml(sprintf('Licensed, check-in overdue (days left: %d)', $license['graceDaysLeft'])) ?></a>
+<?php elseif ($license['required']): ?>
+                <a href="<?= $this->url->get('backend/licenses') ?>" class="badge badge-danger">Not licensed</a>
+<?php else: ?>
+                <span class="text-muted">No key needed</span>
 <?php endif; ?>
               </td>
               <td>
@@ -125,7 +139,7 @@
 <?php endforeach; ?>
 <?php if (!count($modules)): ?>
             <tr>
-              <td colspan="7" class="text-center text-muted">
+              <td colspan="8" class="text-center text-muted">
                 No modules discovered yet — install a module package via Composer, then run <code>./run modules sync</code>.
               </td>
             </tr>
