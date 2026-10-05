@@ -30,6 +30,9 @@ class Mailer extends Injectable
 {
     private const API_URL = 'https://api.resend.com/emails';
 
+    /** Raw bytes of all attachments on one message. The provider's own limit is 40 MB after encoding; nothing here needs a tenth of that. */
+    public const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
     /**
      * $unsubscribeUrl, when given, adds a one-click List-Unsubscribe
      * header (RFC 8058) — the small "Unsubscribe" control Gmail/Outlook
@@ -58,9 +61,26 @@ class Mailer extends Injectable
      * `text` fallback alongside it. Default false keeps every existing
      * caller (signup, password reset, the plain-text campaign templates)
      * sending exactly what it sent before.
+     *
+     * $attachments: files sent with the message, each
+     * ['filename' => 'INV-0001.pdf', 'content' => <raw bytes>,
+     * 'content_type' => 'application/pdf'] (content_type optional). A
+     * malformed entry, or more than MAX_ATTACHMENT_BYTES in total, fails
+     * the send (false) before anything goes to the provider: a document
+     * the caller meant to attach must never be silently left off.
+     *
+     * @param array<int, array{filename: string, content: string, content_type?: string}> $attachments
      */
-    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null, bool $isHtml = false): string|bool
+    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null, bool $isHtml = false, array $attachments = []): string|bool
     {
+        $attached = self::attachmentsPayload($attachments);
+
+        if ($attached === null) {
+            error_log("Mailer: '{$subject}' to {$to} not sent -- an attachment is malformed or the attachments exceed " . self::MAX_ATTACHMENT_BYTES . ' bytes');
+
+            return false;
+        }
+
         // Ticket #19: real signup/password-reset flows exercised by
         // PHPUnit's RbacTest (and Playwright's fixtures) use this
         // project's own convention of an @*.invalid address -- the IANA-
@@ -103,6 +123,10 @@ class Mailer extends Injectable
         // an instance has actually configured one.
         if ($replyTo !== '') {
             $payload['reply_to'] = $replyTo;
+        }
+
+        if ($attached) {
+            $payload['attachments'] = $attached;
         }
 
         if ($unsubscribeUrl !== null) {
@@ -148,6 +172,43 @@ class Mailer extends Injectable
         }
 
         return $id;
+    }
+
+
+    /**
+     * Resend's attachment shape (filename, base64 content, content_type)
+     * from send()'s $attachments, or null if any entry is unusable or the
+     * raw bytes total more than MAX_ATTACHMENT_BYTES.
+     *
+     * @param array<int, mixed> $attachments
+     *
+     * @return array<int, array{filename: string, content: string, content_type?: string}>|null
+     */
+    private static function attachmentsPayload(array $attachments): ?array
+    {
+        $payload = [];
+        $bytes   = 0;
+
+        foreach ($attachments as $attachment) {
+            $filename = is_array($attachment) ? ($attachment['filename'] ?? null) : null;
+            $content  = is_array($attachment) ? ($attachment['content'] ?? null) : null;
+
+            if (!is_string($filename) || !is_string($content) || $content === '' || preg_match('/^[\w.\- ]{1,120}$/', $filename) !== 1) {
+                return null;
+            }
+
+            $bytes += strlen($content);
+
+            $entry = ['filename' => $filename, 'content' => base64_encode($content)];
+
+            if (isset($attachment['content_type']) && is_string($attachment['content_type']) && preg_match('#^[\w.+-]+/[\w.+-]+$#', $attachment['content_type']) === 1) {
+                $entry['content_type'] = $attachment['content_type'];
+            }
+
+            $payload[] = $entry;
+        }
+
+        return $bytes > self::MAX_ATTACHMENT_BYTES ? null : $payload;
     }
 
     /**
