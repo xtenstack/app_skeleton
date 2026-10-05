@@ -123,7 +123,10 @@ class ModulesTask extends \Phalcon\Cli\Task
         } catch (ModuleDependencyException $e) {
             echo '  ' . $e->getMessage() . PHP_EOL;
 
-            return;
+            // Non-zero, so an install script or CI step that enables
+            // modules in turn stops here instead of carrying on as if
+            // the module were running.
+            exit(1);
         }
 
         if (!$changed) {
