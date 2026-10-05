@@ -25,6 +25,27 @@ $di->setShared('session', function () {
     // reasoning as logs/public/files.
     $files = new SessionStream(['savePath' => BASE_PATH . '/sessions']);
     $session->setAdapter($files);
+
+    // PHP's defaults send the session cookie bare: "PHPSESSID=…; path=/",
+    // with no HttpOnly, Secure or SameSite attribute (seen on the live
+    // instance 2026-10-05). HttpOnly keeps page script away from it,
+    // SameSite=Lax keeps it off cross-site POSTs, and Secure keeps it off
+    // plain HTTP. Secure is only set when this request arrived over HTTPS
+    // (directly, or as the reverse proxy reports it), so a local
+    // http://localhost install can still log in.
+    if (PHP_SAPI !== 'cli' && !headers_sent()) {
+        $https = ($_SERVER['HTTPS'] ?? '') === 'on'
+            || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path'     => '/',
+            'secure'   => $https,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+
     $session->start();
     return $session;
 });
