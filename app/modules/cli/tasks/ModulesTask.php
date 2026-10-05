@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App_skeleton\Modules\Cli\Tasks;
 
+use App_skeleton\ModuleDependencyException;
+
 /**
  * Usage: ./run modules sync
  *        ./run modules list
@@ -14,6 +16,11 @@ namespace App_skeleton\Modules\Cli\Tasks;
  * the only place "installed but disabled" is representable, since
  * Composer's own installed.json has no concept of enablement. Run 'sync'
  * after any composer require/remove of a module package, before 'enable'.
+ *
+ * 'enable' is refused while a module the key declares in its module.json
+ * 'dependsOn' isn't installed and enabled; 'disable' also disables every
+ * enabled module that depends on the key. Both go through ModuleManager,
+ * the same as the admin Configuration page.
  */
 class ModulesTask extends \Phalcon\Cli\Task
 {
@@ -77,6 +84,23 @@ class ModulesTask extends \Phalcon\Cli\Task
         foreach ($rows as $row) {
             $marker = $row->enabled ? '[enabled] ' : '[disabled]';
             echo "  {$marker} {$row->module_key} ({$row->tier}, {$row->code}, v{$row->version})" . PHP_EOL;
+
+            $requires = $this->moduleManager->dependenciesOf($row->module_key);
+            $unmet    = $this->moduleManager->unmetDependencies($row->module_key);
+            $error    = $this->moduleManager->manifestError($row->module_key);
+
+            if ($requires) {
+                $labels = array_map(fn ($key) => isset($unmet[$key]) ? "{$key} ({$unmet[$key]})" : $key, $requires);
+                echo '             requires: ' . implode(', ', $labels) . PHP_EOL;
+            }
+
+            if ($error !== null) {
+                echo "             module.json error: {$error}" . PHP_EOL;
+            }
+
+            if ($row->enabled && ($unmet || $error !== null)) {
+                echo '             not loaded until that is resolved' . PHP_EOL;
+            }
         }
     }
 
@@ -94,7 +118,13 @@ class ModulesTask extends \Phalcon\Cli\Task
             return;
         }
 
-        $changed = $this->moduleManager->enableModule($key);
+        try {
+            $changed = $this->moduleManager->enableModule($key);
+        } catch (ModuleDependencyException $e) {
+            echo '  ' . $e->getMessage() . PHP_EOL;
+
+            return;
+        }
 
         if (!$changed) {
             echo "  '{$key}' is not registered — run './run modules sync' first." . PHP_EOL;
@@ -115,24 +145,16 @@ class ModulesTask extends \Phalcon\Cli\Task
             return;
         }
 
-        $row = \ModuleRegistry::findFirst([
-            'conditions' => 'module_key = :key:',
-            'bind'       => ['key' => $key],
-        ]);
+        $changed = $this->moduleManager->disableModule($key);
 
-        if (!$row) {
+        if (!$changed) {
             echo "  '{$key}' is not registered — run './run modules sync' first." . PHP_EOL;
 
             return;
         }
 
-        $row->enabled    = false;
-        $row->updated_at = date('Y-m-d H:i:s');
-
-        if ($row->save()) {
-            echo "  {$key}: disabled" . PHP_EOL;
-        } else {
-            echo "  FAILED to update {$key}: " . implode(', ', $row->getMessages()) . PHP_EOL;
+        foreach ($changed as $disabledKey) {
+            echo '  ' . $disabledKey . ': disabled' . ($disabledKey === $key ? '' : ' (depends on ' . $key . ')') . PHP_EOL;
         }
     }
 }

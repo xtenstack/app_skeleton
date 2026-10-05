@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App_skeleton\Modules\Backend\Controllers;
 
+use App_skeleton\ModuleDependencyException;
+
 /**
  * Admin hub for instance-level configuration that isn't a good fit for the
  * self-service Settings page — starts with module management (enable/
@@ -16,7 +18,23 @@ class ConfigurationController extends ControllerBase
 
     public function indexAction(): void
     {
-        $this->view->modules              = \ModuleRegistry::find(['order' => 'module_key']);
+        $modules      = \ModuleRegistry::find(['order' => 'module_key']);
+        $dependencies = [];
+
+        foreach ($modules as $module) {
+            $key = $module->module_key;
+
+            $dependencies[$key] = [
+                'requires'     => $this->moduleManager->dependenciesOf($key),
+                'unmet'        => $this->moduleManager->unmetDependencies($key),
+                'requiredBy'   => $this->moduleManager->dependentsOf($key),
+                'alsoDisables' => $module->enabled ? $this->moduleManager->enabledDependentsOf($key) : [],
+                'error'        => $this->moduleManager->manifestError($key),
+            ];
+        }
+
+        $this->view->modules              = $modules;
+        $this->view->moduleDependencies   = $dependencies;
         $this->view->maintenanceMode      = $this->settings->get('maintenance_mode', '0') === '1';
         $this->view->maintenanceModeUntil = (string) $this->settings->get('maintenance_mode_until', '');
     }
@@ -80,11 +98,18 @@ class ConfigurationController extends ControllerBase
      * Also enables whatever $key bundles via its own composer.json
      * 'require' (see ModuleManager::enableModule()) — e.g. enabling
      * ai-ssa-application brings its Chat/Phone/Email plugins online
-     * too, not just itself.
+     * too, not just itself. Refused, with the reason, while a module
+     * $key declares in 'dependsOn' isn't installed and enabled.
      */
     public function enableAction($key = null)
     {
-        $changed = $key ? $this->moduleManager->enableModule($key) : [];
+        try {
+            $changed = $key ? $this->moduleManager->enableModule($key) : [];
+        } catch (ModuleDependencyException $e) {
+            $this->flash->error($e->getMessage());
+
+            return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
+        }
 
         if (!$changed) {
             $this->flash->error("Module '{$key}' is not registered.");
@@ -98,26 +123,23 @@ class ConfigurationController extends ControllerBase
         return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
     }
 
+    /**
+     * Also disables every enabled module that depends on $key (see
+     * ModuleManager::disableModule()). There is no confirm step, so the
+     * list shows what a Disable will take with it beforehand and the
+     * flash message names what it took afterwards.
+     */
     public function disableAction($key = null)
     {
-        $module = $key ? \ModuleRegistry::findFirst([
-            'conditions' => 'module_key = :key:',
-            'bind'       => ['key' => $key],
-        ]) : null;
+        $changed = $key ? $this->moduleManager->disableModule($key) : [];
 
-        if (!$module) {
+        if (!$changed) {
             $this->flash->error("Module '{$key}' is not registered.");
-
-            return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
-        }
-
-        $module->enabled    = false;
-        $module->updated_at = date('Y-m-d H:i:s');
-
-        if ($module->save()) {
-            $this->flash->success($module->module_key . ' disabled.');
+        } elseif (count($changed) === 1) {
+            $this->flash->success($changed[0] . ' disabled.');
         } else {
-            $this->flash->error('Failed to update ' . $module->module_key . ': ' . implode(', ', $module->getMessages()));
+            $dependents = array_slice($changed, 1);
+            $this->flash->success($key . ' disabled, along with module(s) that depend on it: ' . implode(', ', $dependents) . '.');
         }
 
         return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
