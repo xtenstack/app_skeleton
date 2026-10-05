@@ -93,6 +93,14 @@ services:
   # edge_shared should resolve a `db` alias here (see the 2026-09-14
   # alias-collision incident).
   db:
+    # Docker's default /dev/shm is 64 MB. Postgres puts parallel-query
+    # memory there, and concurrent directory searches against the 20M-row
+    # abns table exhausted it on 2026-10-04/05 ("could not resize shared
+    # memory segment ... No space left on device", HTTP 500 from the
+    # directory API). Parallel workers were switched off on the live server
+    # the same day (ALTER SYSTEM max_parallel_workers_per_gather = 0); this
+    # gives the room to turn them back on. Applies when db is next recreated.
+    shm_size: 256m
     volumes:
       - xten-marketing_db_data:/var/lib/postgresql
 
