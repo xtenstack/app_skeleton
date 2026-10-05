@@ -11,6 +11,7 @@ use App_skeleton\ApiKeyAuth;
 use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
+use App_skeleton\CurrentPrincipal;
 use App_skeleton\Mailer;
 use App_skeleton\ModuleManager;
 use App_skeleton\SettingsRegistry;
@@ -183,9 +184,19 @@ $di->setShared('settings', function () {
 });
 
 /**
+ * The acting user for this request, set by Auth (browser session) or
+ * ApiKeyAuth (API key) and read by Audit — see App_skeleton\CurrentPrincipal.
+ */
+$di->setShared('currentPrincipal', function () {
+    $currentPrincipal = new CurrentPrincipal();
+    $currentPrincipal->setDI($this);
+
+    return $currentPrincipal;
+});
+
+/**
  * API-key authentication (Authorization: Bearer / X-Api-Key header ->
- * users row), for api module controllers to fall back to when there's no
- * logged-in session — see ControllerBase::onConstruct().
+ * users row) — see the api module's ControllerBase::onConstruct().
  */
 $di->setShared('apiKeyAuth', function () {
     $apiKeyAuth = new ApiKeyAuth();

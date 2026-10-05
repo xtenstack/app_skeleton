@@ -112,7 +112,7 @@ $di->setShared('dispatcher', function () {
             $entry->trace           = $exception->getTraceAsString();
             $entry->request_method  = $_SERVER['REQUEST_METHOD'] ?? null;
             $entry->request_uri     = $_SERVER['REQUEST_URI'] ?? null;
-            $entry->user_id         = $dispatcher->getDI()->getSession()->get('auth')['id'] ?? null;
+            $entry->user_id         = $dispatcher->getDI()->getShared('currentPrincipal')->userId();
             $entry->save();
         } catch (\Throwable $loggingFailure) {
             error_log('ErrorLog write failed: ' . $loggingFailure->getMessage());

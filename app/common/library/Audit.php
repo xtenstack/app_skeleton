@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App_skeleton;
 
+use Phalcon\Di\Di;
 use Phalcon\Di\Injectable;
 use Phalcon\Events\Event;
 use Phalcon\Mvc\ModelInterface;
@@ -48,27 +49,55 @@ class Audit extends Injectable
             return;
         }
 
-        $auth = $this->session->get('auth');
+        $principal = self::principal();
 
-        $log                = new \AuditLog();
-        $log->entity_type   = $model->getSource();
-        $log->entity_id     = (int) $model->readAttribute('id');
-        $log->action        = $action;
-        $log->actor_user_id = $auth['id'] ?? null;
-        $log->old_values    = $old !== null ? json_encode($old) : null;
-        $log->new_values    = $new !== null ? json_encode($new) : null;
+        $log                   = new \AuditLog();
+        $log->entity_type      = $model->getSource();
+        $log->entity_id        = (int) $model->readAttribute('id');
+        $log->action           = $action;
+        $log->actor_user_id    = $principal?->userId();
+        $log->actor_api_key_id = $principal?->apiKeyId();
+        $log->old_values       = $old !== null ? json_encode($old) : null;
+        $log->new_values       = $new !== null ? json_encode($new) : null;
         $log->save();
     }
 
+    /**
+     * $actorUserId is explicit because an auth event is often about someone
+     * who is not (or not yet) this request's principal: a failed login, a
+     * logout. The API key is recorded only when the actor is the principal.
+     */
     public static function recordEvent(string $action, ?int $actorUserId, array $meta = []): void
     {
+        $principal = self::principal();
+
         $log                = new \AuditLog();
         $log->entity_type   = 'auth';
         $log->entity_id     = $actorUserId;
         $log->action        = $action;
         $log->actor_user_id = $actorUserId;
         $log->new_values    = $meta ? json_encode($meta) : null;
+
+        if ($actorUserId !== null && $principal?->userId() === $actorUserId) {
+            $log->actor_api_key_id = $principal->apiKeyId();
+        }
+
         $log->save();
+    }
+
+    /**
+     * Null where nothing registered one (a bare DI in a script or test):
+     * the entry is then recorded with no actor, as for a CLI task.
+     */
+    private static function principal(): ?CurrentPrincipal
+    {
+        $di = Di::getDefault();
+
+        if ($di === null || !$di->has('currentPrincipal')) {
+            return null;
+        }
+
+        return $di->getShared('currentPrincipal');
     }
 
     /**
@@ -141,13 +170,11 @@ class Audit extends Injectable
                 break;
         }
 
-        $auth = $this->session->get('auth');
-
         $log                        = new \AuditLog();
         $log->entity_type           = $table;
         $log->entity_id             = $entry->entity_id;
         $log->action                = 'reversal';
-        $log->actor_user_id         = $auth['id'] ?? null;
+        $log->actor_user_id         = self::principal()?->userId();
         $log->new_values            = json_encode($restored);
         $log->reversed_audit_log_id = $entry->id;
         $log->save();

@@ -34,7 +34,9 @@ class ApiKeyAuth extends Injectable
     /**
      * Null if the token doesn't match a live (non-revoked) key or its
      * owning user is no longer active — otherwise the normalized
-     * principal, after bumping the key's last_used_at.
+     * principal, after bumping the key's last_used_at. A resolved key's
+     * user also becomes this request's principal (see CurrentPrincipal),
+     * which is how Audit attributes what the caller goes on to change.
      */
     public function resolve(string $token): ?array
     {
@@ -58,6 +60,8 @@ class ApiKeyAuth extends Injectable
 
         $apiKey->last_used_at = date('Y-m-d H:i:s');
         $apiKey->save();
+
+        $this->currentPrincipal->set((int) $user->id, (int) $user->role_id, (int) $apiKey->id);
 
         return [
             'type'       => 'user',

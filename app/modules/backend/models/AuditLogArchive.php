@@ -33,6 +33,14 @@ class AuditLogArchive extends \Phalcon\Mvc\Model
     public $actor_user_id;
 
     /**
+     * The API key the actor authenticated with, null for a browser session
+     * or no actor. A soft reference (no foreign key): keys can be deleted.
+     *
+     * @var integer|null
+     */
+    public $actor_api_key_id;
+
+    /**
      *
      * @var string
      */

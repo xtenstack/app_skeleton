@@ -89,12 +89,15 @@
       <code><![CDATA[$this]]></code>
       <code><![CDATA[$this]]></code>
       <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
     </InvalidScope>
     <UndefinedConstant>
       <code><![CDATA[APP_PATH]]></code>
       <code><![CDATA[BASE_PATH]]></code>
     </UndefinedConstant>
     <UndefinedGlobalVariable>
+      <code><![CDATA[$di]]></code>
       <code><![CDATA[$di]]></code>
       <code><![CDATA[$di]]></code>
       <code><![CDATA[$di]]></code>

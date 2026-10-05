@@ -32,6 +32,10 @@ $fields = array_unique(array_merge(array_keys($old ?? []), array_keys($new ?? []
           <dd class="col-9"><?= $this->escaper->escapeHtml($entry->action) ?></dd>
           <dt class="col-3">Actor</dt>
           <dd class="col-9"><?= $this->escaper->escapeHtml($entry->Users ? $entry->Users->email : 'System / unknown') ?></dd>
+<?php if ($entry->actor_api_key_id): ?>
+          <dt class="col-3">Via API key</dt>
+          <dd class="col-9"><?= $this->escaper->escapeHtml(($entry->ApiKey ? $entry->ApiKey->name . ' ' : '') . '#' . $entry->actor_api_key_id) ?></dd>
+<?php endif; ?>
 <?php if ($entry->action === 'reversal' && $entry->reversed_audit_log_id): ?>
           <dt class="col-3">Reverses</dt>
           <dd class="col-9"><a href="<?= $this->url->get('backend/audit-log/view/' . $entry->reversed_audit_log_id) ?>">Audit entry #<?= $entry->reversed_audit_log_id ?></a></dd>

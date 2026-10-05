@@ -18,7 +18,8 @@ class Auth extends Injectable
 
     /**
      * Verifies credentials against the users table and, on success, stores
-     * the authenticated user's id/email/role_id in the session.
+     * the authenticated user's id/email/role_id in the session and makes
+     * that user this request's principal.
      */
     public function check(string $email, string $password): bool
     {
@@ -56,24 +57,40 @@ class Auth extends Injectable
         }
 
         $this->session->set('user_settings', $userSettings);
+        $this->currentPrincipal->set((int) $user->id, (int) $user->role_id);
 
-        Audit::recordEvent('login', $user->id);
+        Audit::recordEvent('login', (int) $user->id);
 
         return true;
     }
 
+    /**
+     * True when the session carries a logged-in user, who then becomes
+     * this request's principal (see CurrentPrincipal). The session service
+     * never starts for a request that presents an API key, so this is
+     * always false there.
+     */
     public function isLoggedIn(): bool
     {
-        return $this->session->has('auth');
+        $auth = $this->session->get('auth');
+
+        if (!is_array($auth) || !isset($auth['id'])) {
+            return false;
+        }
+
+        $this->currentPrincipal->set((int) $auth['id'], (int) ($auth['role_id'] ?? 0));
+
+        return true;
     }
 
     public function logout(): void
     {
         $auth = $this->session->get('auth');
-        Audit::recordEvent('logout', $auth['id'] ?? null);
+        Audit::recordEvent('logout', isset($auth['id']) ? (int) $auth['id'] : null);
 
         $this->session->remove('auth');
         $this->session->remove('user_settings');
+        $this->currentPrincipal->clear();
     }
 
     private function isRateLimited(string $email, string $ip): bool

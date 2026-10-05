@@ -33,6 +33,14 @@ class AuditLog extends \Phalcon\Mvc\Model
     public $actor_user_id;
 
     /**
+     * The API key the actor authenticated with, null for a browser session
+     * or no actor. A soft reference (no foreign key): keys can be deleted.
+     *
+     * @var integer|null
+     */
+    public $actor_api_key_id;
+
+    /**
      *
      * @var string
      */
@@ -66,6 +74,7 @@ class AuditLog extends \Phalcon\Mvc\Model
     {
         $this->setSource('audit_log');
         $this->belongsTo('actor_user_id', 'Users', 'id', ['alias' => 'Users']);
+        $this->belongsTo('actor_api_key_id', 'ApiKeys', 'id', ['alias' => 'ApiKey']);
     }
 
 }
