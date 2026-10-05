@@ -79,13 +79,14 @@ uses internally, and the two do not need to match.
 | `migrations` | No | Relative path to the module's own `migrations/<adapter>/` tree, applied by the migration runner. |
 | `icon` **(planned)** | No | Path to a square SVG/PNG shipped in the package. Engine will apply a default icon when absent so a module can never render icon-less on the dashboard or nav. |
 | `license` **(planned)** | Paid modules only | `{ "model": "per-instance", "keyRequired": true }` — declares licensing; `keyRequired: false` for free modules. See the design brief's licensing sections for the check-in/enforcement mechanics this ties into. |
-| `dependsOn` **(planned)** | No | Array of other modules' `key`s this module requires to already be installed and enabled (e.g. `["ACC"]`). Engine will refuse to enable a module until every declared dependency is enabled. Data flow between dependent modules happens over the event bus (below), never direct table access — `dependsOn` only gates *whether* a module can run. |
+| `dependsOn` | No | Array of other modules' `key`s this module requires to already be installed and enabled (e.g. `["acc"]`). The engine refuses to enable a module until every declared dependency is enabled, and disabling a module disables its dependents with it. See Dependencies, below. Data flow between dependent modules happens over the event bus, never direct table access — `dependsOn` only gates *whether* a module can run. |
 | Bundling | N/A — real | Not a manifest field at all — a module bundles another by naming it in its own `composer.json` `require` (every module already is a real Composer package). `ModuleManager::enableModule()` (used by both `./run modules enable <key>` and the admin Configuration page — never write `module_registry.enabled` directly) reads the enabling module's own `composer.json` and also enables any other discovered module it requires. One direction only: enabling `ai-ssa-application` enables its `ai-ssa-chat`/`ai-ssa-phone`/`ai-ssa-email` plugins too; disabling it does **not** cascade-disable them, since a plugin stays fully usable standalone even after the module that first brought it in is turned off. Adopted 2026-09-13 for the AI-SSA product family. |
 
 Only `key` and `tier` are actually validated as required fields today
 (`ModuleManager::REQUIRED_FIELDS`) — a manifest missing anything else
 is discovered but may not function (e.g. no `className` on an
-application-tier module means it's silently never routed).
+application-tier module means it's silently never routed). `dependsOn`
+is validated when present — see Dependencies, below.
 
 ## `src/Module.php`
 
@@ -147,7 +148,9 @@ services), before dispatch. Rules:
 - A hook that throws is logged and skipped; the rest of the instance
   keeps working, but that module's services will be missing.
 - Consumers must not assume the service exists, since the module may be
-  disabled or not installed: check `$di->has('yourService')`.
+  disabled or not installed: check `$di->has('yourService')`. A consumer
+  that declares the providing module in `dependsOn` (see Dependencies,
+  below) is only ever loaded when the provider is, and after it.
 
 ## Headless modules
 
@@ -156,6 +159,85 @@ A service-only plugin (no controllers, views or menu) sets
 `registerSharedServices()`, and leaves `registerServices()` empty. It is
 still enabled, migrated and licensed like any other module; it just has
 no URL space of its own.
+
+## Dependencies
+
+A module that cannot work without another declares it in `module.json`:
+
+```json
+{
+    "key": "ap",
+    "tier": "application",
+    "className": "XtenAp\\Module",
+    "dependsOn": ["acc"]
+}
+```
+
+`dependsOn` is an array of other modules' `key`s — the `key`, matched
+exactly, not the `code` or the Composer package name. Keys only: there
+is no version-constraint form. Omit the field when there is nothing to
+declare. The built-in modules (`backend`, `api`, `cli`, `frontend`) are
+always on and are not module keys; don't list them.
+
+What the engine does with it (`ModuleManager`):
+
+- **Enable guard.** `enableModule()` refuses to enable a module while
+  any module it declares is not installed or not enabled, and says
+  which: `ap cannot be enabled: it requires acc (not enabled).` Both
+  enable paths — `./run modules enable <key>` and the admin
+  Configuration page — go through that one method, so neither can
+  bypass it.
+- **Cascading disable.** `disableModule()` also disables every enabled
+  module that depends on the one being disabled, directly or through
+  another module, and reports which. Disabling `acc` disables `ap`, and
+  anything that depends on `ap`. A dependent is therefore never left
+  running against a dependency that is off. Re-enabling `acc` does
+  **not** re-enable what was cascaded off it; that stays a deliberate
+  admin action. The Configuration page shows what a Disable will take
+  with it ("Also disables: ...") before the button is pressed.
+- **Load order.** Dependencies are registered before the modules that
+  declare them — `registerSharedServices()` hooks, route registration
+  and menu contributions all run in that order (otherwise in discovery
+  order). A service a dependency registers in its
+  `registerSharedServices()` exists by the time a dependent's own hook
+  runs.
+- **Inconsistent state.** Enabling and disabling keep `module_registry`
+  consistent, but a hand-edited row or a removed package can still
+  leave a module enabled above a dependency that is disabled or gone.
+  Such a module is **not loaded** for the request — no routes, no menu,
+  no shared services — and the reason is written to the error log once
+  per request. Nothing fatals and no other module is affected. The
+  Configuration page shows it as "Enabled, not loaded" and
+  `./run modules list` as `not loaded`, each with the dependency that
+  is missing; enabling the dependency (or disabling the module) clears
+  it.
+- **Manifest errors.** A `dependsOn` that isn't an array of non-empty
+  strings, or one that forms a cycle (`a` needs `b` needs `a`,
+  including a module naming itself), is an error for the module(s)
+  concerned only. The module stays discovered — its migrations still
+  apply — but it is never loaded and can't be enabled until the
+  manifest is fixed; the error is logged and shown against the module
+  on the Configuration page and in `./run modules list`.
+
+`dependsOn` and bundling (the `module.json` table, above) are separate
+things. Bundling is "enabling me also enables these" and never cascades
+a disable. `dependsOn` is "I can't run without these": it never enables
+anything by itself, and it does cascade a disable. A bundled module
+whose own `dependsOn` isn't satisfied is left disabled when its bundle
+is enabled.
+
+Two rules come with `dependsOn` that are conventions for module
+authors, not something the engine checks:
+
+1. **Cross-module data flow goes over the event bus or a service the
+   other module publishes** (`registerSharedServices()`), never another
+   module's tables. `ap` emits `ap:invoice_posted`; `acc` listens and
+   writes its own journal rows. Declaring `dependsOn` gates whether a
+   module can run; it grants no access to the dependency's schema.
+2. **Field mapping is declared explicitly by the consuming module.** A
+   module that consumes another module's event payload or service
+   states which fields it expects, in its own code or docs. It is never
+   inferred or auto-discovered by inspecting the other module's schema.
 
 ## Routes
 
@@ -274,11 +356,11 @@ left on the old key by a rekey and becomes unreadable.
 - Everything hangs off `user_id`.
 - A module defines and owns its own tables if it needs storage — no
   shared/implicit state with another module's schema.
-- `dependsOn` **(planned)** gates whether a module can be *enabled*;
-  it does not grant schema access. Field-level expectations about
-  another module's event payloads are declared explicitly by the
-  consuming module, never inferred/auto-discovered from schema
-  inspection at runtime.
+- `dependsOn` gates whether a module can be *enabled* (see
+  Dependencies, above); it does not grant schema access. Field-level
+  expectations about another module's event payloads are declared
+  explicitly by the consuming module, never inferred/auto-discovered
+  from schema inspection at runtime.
 
 ## Enable/disable state
 
@@ -286,7 +368,11 @@ left on the old key by a rekey and becomes unreadable.
 into any module's own domain tables, just `module_key` / `code` /
 `tier` / `package_name` / `version` / `enabled`. Toggle via
 `./run modules sync|list|enable|disable` or the admin Configuration
-page.
+page. Both go through `ModuleManager::enableModule()` /
+`disableModule()`, which is where bundling and the `dependsOn` guard
+and cascade live — never write `module_registry.enabled` directly.
+Dependencies themselves are not stored: `module.json` is the only
+source for them.
 
 ## Licensing
 

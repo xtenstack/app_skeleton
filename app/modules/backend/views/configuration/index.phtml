@@ -67,19 +67,41 @@
               <th>Code</th>
               <th>Tier</th>
               <th>Version</th>
+              <th>Dependencies</th>
               <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
 <?php foreach ($modules as $module): ?>
+<?php
+    $deps      = $moduleDependencies[$module->module_key];
+    $notLoaded = $module->enabled && ($deps['unmet'] || $deps['error'] !== null);
+    $requires  = array_map(
+        fn ($key) => isset($deps['unmet'][$key]) ? sprintf('%s (%s)', $key, $deps['unmet'][$key]) : $key,
+        $deps['requires']
+    );
+?>
             <tr>
               <td><code><?= $this->escaper->escapeHtml($module->module_key) ?></code></td>
               <td><?= $this->escaper->escapeHtml((string) $module->code) ?></td>
               <td><?= $this->escaper->escapeHtml($module->tier) ?></td>
               <td><?= $this->escaper->escapeHtml((string) $module->version) ?></td>
+              <td class="small">
+<?php if ($requires): ?>
+                <div><?= $this->escaper->escapeHtml(sprintf('Requires: %s', implode(', ', $requires))) ?></div>
+<?php endif; ?>
+<?php if ($deps['requiredBy']): ?>
+                <div><?= $this->escaper->escapeHtml(sprintf('Required by: %s', implode(', ', $deps['requiredBy']))) ?></div>
+<?php endif; ?>
+<?php if ($deps['error'] !== null): ?>
+                <div class="text-danger"><?= $this->escaper->escapeHtml(sprintf('module.json error: %s', $deps['error'])) ?></div>
+<?php endif; ?>
+              </td>
               <td>
-<?php if ($module->enabled): ?>
+<?php if ($notLoaded): ?>
+                <span class="badge badge-warning">Enabled, not loaded</span>
+<?php elseif ($module->enabled): ?>
                 <span class="badge badge-success">Enabled</span>
 <?php else: ?>
                 <span class="badge badge-secondary">Disabled</span>
@@ -90,6 +112,9 @@
                 <form method="post" action="<?= $this->url->get('backend/configuration/disable/' . $module->module_key) ?>">
                   <button type="submit" class="btn btn-sm btn-outline-secondary">Disable</button>
                 </form>
+<?php if ($deps['alsoDisables']): ?>
+                <div class="small text-muted"><?= $this->escaper->escapeHtml(sprintf('Also disables: %s', implode(', ', $deps['alsoDisables']))) ?></div>
+<?php endif; ?>
 <?php else: ?>
                 <form method="post" action="<?= $this->url->get('backend/configuration/enable/' . $module->module_key) ?>">
                   <button type="submit" class="btn btn-sm btn-primary">Enable</button>
@@ -100,7 +125,7 @@
 <?php endforeach; ?>
 <?php if (!count($modules)): ?>
             <tr>
-              <td colspan="6" class="text-center text-muted">
+              <td colspan="7" class="text-center text-muted">
                 No modules discovered yet — install a module package via Composer, then run <code>./run modules sync</code>.
               </td>
             </tr>
