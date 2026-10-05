@@ -18,3 +18,12 @@ frontend/
 *.md
 .DS_Store
 backups/
+# The host's runtime state (docker-compose.yml bind-mounts each part of it
+# into the container): sessions, uploads, logs, attachments and the
+# encryption key. Never part of the image. Left out of this file until
+# 2026-10-06, every build copied all of it into a layer, including
+# hundreds of thousands of session files, until stack-prod ran out of
+# inodes mid-build.
+data/
+sessions/*
+!sessions/.gitkeep
