@@ -11,6 +11,7 @@ use App_skeleton\ApiKeyAuth;
 use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
+use App_skeleton\CurrentPrincipal;
 use App_skeleton\Mailer;
 use App_skeleton\ModuleManager;
 use App_skeleton\SettingsRegistry;
@@ -25,6 +26,18 @@ $di->setShared('session', function () {
     // reasoning as logs/public/files.
     $files = new SessionStream(['savePath' => BASE_PATH . '/sessions']);
     $session->setAdapter($files);
+
+    // A request that presents an API key is stateless: its session is
+    // never started, so it gets no cookie, reads no identity from a
+    // session cookie sent alongside the key, and has nothing to write one
+    // to (set() on an unstarted session does nothing). A controller that
+    // copies the key's user into the session hands back a PHPSESSID that
+    // opens the backend as that user with no key at all; refusing here,
+    // in the service, means no controller in this repo or in a module can
+    // do that.
+    if ($this->has('request') && $this->getShared('apiKeyAuth')->tokenFromRequest($this->getShared('request')) !== null) {
+        return $session;
+    }
 
     // PHP's defaults send the session cookie bare: "PHPSESSID=…; path=/",
     // with no HttpOnly, Secure or SameSite attribute (seen on the live
@@ -183,9 +196,19 @@ $di->setShared('settings', function () {
 });
 
 /**
+ * The acting user for this request, set by Auth (browser session) or
+ * ApiKeyAuth (API key) and read by Audit — see App_skeleton\CurrentPrincipal.
+ */
+$di->setShared('currentPrincipal', function () {
+    $currentPrincipal = new CurrentPrincipal();
+    $currentPrincipal->setDI($this);
+
+    return $currentPrincipal;
+});
+
+/**
  * API-key authentication (Authorization: Bearer / X-Api-Key header ->
- * users row), for api module controllers to fall back to when there's no
- * logged-in session — see ControllerBase::onConstruct().
+ * users row) — see the api module's ControllerBase::onConstruct().
  */
 $di->setShared('apiKeyAuth', function () {
     $apiKeyAuth = new ApiKeyAuth();

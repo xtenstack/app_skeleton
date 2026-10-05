@@ -208,4 +208,25 @@ final class MaintenanceModeTest extends TestCase
             self::setSetting('maintenance_mode', '0');
         }
     }
+
+    /**
+     * The maintenance check asks the session whether the caller is an
+     * admin. A request that presents an API key has no session to ask, and
+     * must not be given one (see ApiKeyStatelessTest) just to be told the
+     * service is down.
+     */
+    public function testMaintenanceModeOnSetsNoSessionCookieForAnApiKeyRequest(): void
+    {
+        self::setSetting('maintenance_mode_until', date('Y-m-d H:i:s', strtotime('+2 hours')));
+        self::setSetting('maintenance_mode', '1');
+
+        try {
+            $response = (new HttpClient())->exchange('GET', '/api/tickets', ['X-Api-Key: any-key-at-all']);
+
+            $this->assertSame(503, $response['status']);
+            $this->assertSame([], preg_grep('/^Set-Cookie:/i', $response['headers']), 'an API-key request was given a session cookie');
+        } finally {
+            self::setSetting('maintenance_mode', '0');
+        }
+    }
 }

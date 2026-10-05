@@ -31,31 +31,30 @@ class ControllerBase extends Controller
     {
         $this->response->setContentType('application/json', 'UTF-8');
 
+        $token = $this->apiKeyAuth->tokenFromRequest($this->request);
+
         if ($this->dispatcher->getControllerName() === 'session') {
+            // Login, logout and "who am I" are the session's own
+            // endpoints, and a request carrying a key has no session.
+            if ($token !== null) {
+                $this->response->setStatusCode(400, 'Bad Request');
+                $this->response->setJsonContent(['error' => 'Session endpoints do not accept an API key']);
+                $this->response->send();
+                exit;
+            }
+
             return;
         }
 
-        if ($this->auth->isLoggedIn()) {
+        // A presented key is the whole of the caller's identity: it is
+        // never combined with, or overridden by, a session cookie sent with
+        // it, and a key that doesn't resolve is a 401 whatever else the
+        // request carries. Only a request with no key uses the session.
+        if ($token !== null) {
+            $this->principal = $this->apiKeyAuth->resolve($token);
+        } elseif ($this->auth->isLoggedIn()) {
             $auth = $this->session->get('auth');
             $this->principal = ['type' => 'user', 'user_id' => $auth['id'], 'role_id' => $auth['role_id']];
-        } else {
-            $token = $this->apiKeyAuth->tokenFromRequest($this->request);
-            $this->principal = $token ? $this->apiKeyAuth->resolve($token) : null;
-
-            // Audit::record() only ever reads session('auth') to attribute a
-            // change (see app/common/library/Audit.php) — it predates
-            // ApiKeyAuth and was never taught about the API-key path. Mirror
-            // the resolved principal into the same slot so an API-key
-            // caller's model changes land in audit_log against their real
-            // user_id instead of NULL. This session is otherwise unused for
-            // a stateless API-key request (no cookie comes back), so it's
-            // scoped to this request only.
-            if ($this->principal) {
-                $this->session->set('auth', [
-                    'id'      => $this->principal['user_id'],
-                    'role_id' => $this->principal['role_id'],
-                ]);
-            }
         }
 
         if (!$this->principal) {

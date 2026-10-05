@@ -50,8 +50,8 @@ class AuditTask extends \Phalcon\Cli\Task
         $db->begin();
 
         $db->execute(
-            "INSERT INTO audit_log_archive (id, entity_type, entity_id, action, actor_user_id, old_values, new_values, created_at)
-             SELECT id, entity_type, entity_id, action, actor_user_id, old_values, new_values, created_at
+            "INSERT INTO audit_log_archive (id, entity_type, entity_id, action, actor_user_id, actor_api_key_id, old_values, new_values, created_at)
+             SELECT id, entity_type, entity_id, action, actor_user_id, actor_api_key_id, old_values, new_values, created_at
              FROM audit_log WHERE {$condition} AND created_at < :cutoff",
             ['cutoff' => $cutoff]
         );

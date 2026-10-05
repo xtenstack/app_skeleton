@@ -74,6 +74,53 @@ final class HttpClient
         return $this->request('GET', $path, null, $headers);
     }
 
+    /**
+     * One exchange exactly as sent: no cookie jar, no redirect following,
+     * and the response's header lines returned alongside the body. For
+     * tests about the cookies and redirects themselves (does this response
+     * set a session cookie, is this request sent to the login page), which
+     * the jar-and-follow methods above hide. A cookie goes in $headers
+     * like any other header.
+     *
+     * @param string[] $headers
+     * @return array{status: int, headers: string[], body: string}
+     */
+    public function exchange(string $method, string $path, array $headers = [], ?string $body = null): array
+    {
+        $ch          = curl_init($this->baseUrl . $path);
+        $headerLines = [];
+
+        $options = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => array_merge(['Host: ' . (getenv('APP_TEST_HOST') ?: 'localhost')], $headers),
+            CURLOPT_HEADERFUNCTION => function ($ch, string $line) use (&$headerLines): int {
+                if (trim($line) !== '') {
+                    $headerLines[] = trim($line);
+                }
+
+                return strlen($line);
+            },
+        ];
+
+        if ($method === 'POST') {
+            $options[CURLOPT_POST]       = true;
+            $options[CURLOPT_POSTFIELDS] = $body ?? '';
+        }
+
+        curl_setopt_array($ch, $options);
+
+        $responseBody = curl_exec($ch);
+
+        if ($responseBody === false) {
+            throw new \RuntimeException('HTTP request failed: ' . curl_error($ch));
+        }
+
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ['status' => $status, 'headers' => $headerLines, 'body' => $responseBody];
+    }
+
     /** @param string[] $extraHeaders */
     private function request(string $method, string $path, ?string $body = null, array $extraHeaders = []): array
     {
