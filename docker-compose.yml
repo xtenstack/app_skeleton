@@ -99,6 +99,9 @@ services:
       DEBOUNCE_API_KEY: ${DEBOUNCE_API_KEY:-}
       DOLIBARR_WATSON_TOKEN: ${DOLIBARR_WATSON_TOKEN:-}
       DOLIBARR_TIM_TOKEN: ${DOLIBARR_TIM_TOKEN:-}
+      # Licence server paid modules check in with (App_skeleton\LicenseManager).
+      # Blank = XTen's own server, which is what every normal instance wants.
+      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-}
     volumes:
       - ./data/encryption_key:/app/.encryption_key
       - ./data/files:/app/public/files

@@ -1,0 +1,10 @@
+<?php
+/**
+ * The session's CSRF token as a hidden field, for a form that has to
+ * submit with JavaScript off. app.js adds the same field to any POST form
+ * that lacks one, and leaves a form that already has it alone.
+ *
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ */
+?>
+<input type="hidden" name="<?= $this->escaper->escapeHtmlAttr($this->security->getTokenKey()) ?>" value="<?= $this->escaper->escapeHtmlAttr($this->security->getToken()) ?>">

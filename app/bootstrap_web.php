@@ -217,6 +217,21 @@ try {
         // to "maintenance mode off", same as the debug_mode read above.
     }
 
+    /**
+     * Usage-gated licence check-in (docs/MODULE-SPEC.md, Licensing): at
+     * most once a day, off the first authenticated request, after the
+     * response has gone out. A shutdown function rather than a line after
+     * handle() because several controllers end the request with exit.
+     * Does nothing on an instance with no paid module installed.
+     */
+    register_shutdown_function(static function () use ($di): void {
+        try {
+            $di->getShared('licenseManager')->checkInAfterResponse();
+        } catch (\Throwable $e) {
+            error_log('Licence check-in after response failed: ' . $e->getMessage());
+        }
+    });
+
     echo $application->handle($requestUri)->getContent();
 } catch (\Throwable $e) {
     $sendCrashResponse($logThrowable($e));

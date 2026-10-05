@@ -1,0 +1,66 @@
+<?php
+/**
+ * A module's licence state in plain words. Shared by the Licences screen
+ * and the admin notice so the wording cannot drift between them.
+ *
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var array<string, mixed> $entitlement from LicenseManager::entitlement()
+ * @var bool|null $withBadge false inside a coloured alert, where the badge would be the same colour as its background
+ */
+$formatDate = static fn (?string $at): string => $at ? date('j M Y', strtotime($at)) : '';
+
+$lastSuccess = $formatDate($entitlement['lastSuccessfulCheckinAt']);
+$lastAttempt = $formatDate($entitlement['lastAttemptAt']);
+$rejected    = $entitlement['lastResult'] === 'rejected';
+
+switch ($entitlement['state']) {
+    case 'not_required':
+        $badge = ['secondary', 'No key needed'];
+        $text  = 'This module does not need a licence key.';
+        break;
+
+    case 'valid':
+        $badge = ['success', 'Licensed'];
+        $text  = sprintf('Confirmed by the licence server on %s.', $lastSuccess);
+        break;
+
+    case 'grace':
+        $badge = ['warning', 'Licensed, check-in overdue'];
+        $text  = $rejected
+            ? sprintf('The licence server did not accept this module\'s key when last asked (%s). It last confirmed the licence on %s. Days of grace left: %d.', $lastAttempt, $lastSuccess, $entitlement['graceDaysLeft'])
+            : sprintf('The licence server could not be reached when last tried (%s). It last confirmed the licence on %s. Days of grace left: %d.', $lastAttempt, $lastSuccess, $entitlement['graceDaysLeft']);
+        break;
+
+    case 'expired':
+        $badge = ['danger', 'Not licensed'];
+        $text  = sprintf('The licence server last confirmed this module on %s, more than %d days ago.', $lastSuccess, \App_skeleton\LicenseManager::GRACE_DAYS);
+        break;
+
+    case 'unvalidated':
+        $badge = ['danger', 'Not licensed'];
+
+        if ($entitlement['lastAttemptAt'] === null) {
+            $text = 'A key is stored, but the licence server has not been asked about it yet.';
+        } elseif ($rejected) {
+            $text = sprintf('The licence server did not accept the stored key for this module (%s).', $lastAttempt);
+        } else {
+            $text = sprintf('A key is stored, but the licence server could not be reached to confirm it (%s).', $lastAttempt);
+        }
+        break;
+
+    case 'no_key':
+        $badge = ['danger', 'Not licensed'];
+        $text  = $entitlement['sharesKeyWith'] !== null
+            ? sprintf('No licence key is stored for this module or for %s, whose key it can use.', $entitlement['sharesKeyWith'])
+            : 'No licence key is stored for this module.';
+        break;
+
+    default:
+        $badge = ['secondary', 'Not installed'];
+        $text  = 'This module is not installed.';
+}
+?>
+<?php if ($withBadge ?? true): ?>
+<span class="badge badge-<?= $badge[0] ?>"><?= $this->escaper->escapeHtml($badge[1]) ?></span>
+<?php endif; ?>
+<span class="license-state-text"><?= $this->escaper->escapeHtml($text) ?></span>

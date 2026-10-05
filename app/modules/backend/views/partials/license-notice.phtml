@@ -1,0 +1,37 @@
+<?php
+/**
+ * Admin-only licence notices, on every backend page: a warning while an
+ * enabled paid module is in its grace period, and a standing alert while
+ * one is not licensed at all. The alert is in the page itself so it is
+ * there without JavaScript; partials/license-modal turns the same list
+ * into the modal.
+ *
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var array{grace: array<string, array<string, mixed>>, unlicensed: array<string, array<string, mixed>>} $licenseNotice
+ */
+$licensesUrl = $this->url->get('backend/licenses');
+?>
+<?php if ($licenseNotice['unlicensed']): ?>
+<div class="alert alert-danger" id="license-alert" role="alert">
+  <h5 class="alert-heading"><i class="icon fas fa-ban"></i> Licence required</h5>
+  <p class="mb-2">These modules are enabled on this instance without a current licence:</p>
+  <ul class="mb-2">
+<?php foreach ($licenseNotice['unlicensed'] as $moduleKey => $entitlement): ?>
+    <li><strong><?= $this->escaper->escapeHtml($moduleKey) ?></strong> &mdash; <?= $this->partial('partials/license-state', ['entitlement' => $entitlement, 'withBadge' => false]) ?></li>
+<?php endforeach; ?>
+  </ul>
+  <a href="<?= $licensesUrl ?>" class="alert-link">Open Licences</a>
+</div>
+<?php endif; ?>
+<?php if ($licenseNotice['grace']): ?>
+<div class="alert alert-warning" id="license-grace-notice" role="alert">
+  <h5 class="alert-heading"><i class="icon fas fa-exclamation-triangle"></i> Licence check-in overdue</h5>
+  <ul class="mb-2">
+<?php foreach ($licenseNotice['grace'] as $moduleKey => $entitlement): ?>
+    <li><strong><?= $this->escaper->escapeHtml($moduleKey) ?></strong> &mdash; <?= $this->partial('partials/license-state', ['entitlement' => $entitlement, 'withBadge' => false]) ?></li>
+<?php endforeach; ?>
+  </ul>
+  <p class="mb-2">Nothing has been switched off. The module keeps working while the grace period lasts.</p>
+  <a href="<?= $licensesUrl ?>" class="alert-link">Open Licences</a>
+</div>
+<?php endif; ?>

@@ -33,8 +33,15 @@ class ConfigurationController extends ControllerBase
             ];
         }
 
+        $licenses = [];
+
+        foreach ($modules as $module) {
+            $licenses[$module->module_key] = $this->licenseManager->entitlement($module->module_key);
+        }
+
         $this->view->modules              = $modules;
         $this->view->moduleDependencies   = $dependencies;
+        $this->view->moduleLicenses       = $licenses;
         $this->view->maintenanceMode      = $this->settings->get('maintenance_mode', '0') === '1';
         $this->view->maintenanceModeUntil = (string) $this->settings->get('maintenance_mode_until', '');
     }
@@ -125,6 +132,18 @@ class ConfigurationController extends ControllerBase
         } else {
             $bundled = array_slice($changed, 1);
             $this->flash->success($key . ' enabled, along with bundled module(s): ' . implode(', ', $bundled) . '.');
+        }
+
+        // A paid module is validated when it is switched on rather than at
+        // the next day's check-in. Enabling never waits on the answer or
+        // depends on it: an unlicensed module is flagged, not refused.
+        $unlicensed = array_keys(array_filter(
+            $this->licenseManager->checkInModules($changed),
+            static fn (array $entitlement): bool => !$entitlement['licensed']
+        ));
+
+        if ($unlicensed) {
+            $this->flash->warning(sprintf('Not licensed yet: %s. Enter or check the licence key under Licences.', implode(', ', $unlicensed)));
         }
 
         return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);

@@ -78,7 +78,7 @@ uses internally, and the two do not need to match.
 | `routes` | No | `false` for a headless (service-only) module with no controllers or views: the engine then adds none of the generic `/<key>/...` routes, so those URLs 404 like any other unknown path instead of dispatching into a module that cannot render. Defaults to `true`, except that a module with no `src/controllers` (or `controllers`) directory is treated as headless even without the flag. A `registerRoutes()` method is still honoured either way. See Headless modules, below. |
 | `migrations` | No | Relative path to the module's own `migrations/<adapter>/` tree, applied by the migration runner. |
 | `icon` **(planned)** | No | Path to a square SVG/PNG shipped in the package. Engine will apply a default icon when absent so a module can never render icon-less on the dashboard or nav. |
-| `license` **(planned)** | Paid modules only | `{ "model": "per-instance", "keyRequired": true }` — declares licensing; `keyRequired: false` for free modules. See the design brief's licensing sections for the check-in/enforcement mechanics this ties into. |
+| `license` | Paid modules only | `{ "model": "per-instance", "keyRequired": true }` for a module that needs a licence key of its own, `{ "sharesKeyWith": "<module key>" }` for one that uses another module's key, `{ "keyRequired": false }` (or no `license` at all) for a free one. See Licensing, below. |
 | `dependsOn` | No | Array of other modules' `key`s this module requires to already be installed and enabled (e.g. `["acc"]`). The engine refuses to enable a module until every declared dependency is enabled, and disabling a module disables its dependents with it. See Dependencies, below. Data flow between dependent modules happens over the event bus, never direct table access — `dependsOn` only gates *whether* a module can run. |
 | Bundling | N/A — real | Not a manifest field at all — a module bundles another by naming it in its own `composer.json` `require` (every module already is a real Composer package). `ModuleManager::enableModule()` (used by both `./run modules enable <key>` and the admin Configuration page — never write `module_registry.enabled` directly) reads the enabling module's own `composer.json` and also enables any other discovered module it requires. One direction only: enabling `ai-ssa-application` enables its `ai-ssa-chat`/`ai-ssa-phone`/`ai-ssa-email` plugins too; disabling it does **not** cascade-disable them, since a plugin stays fully usable standalone even after the module that first brought it in is turned off. Adopted 2026-09-13 for the AI-SSA product family. |
 
@@ -376,33 +376,228 @@ source for them.
 
 ## Licensing
 
-Not enforced by the engine today. Planned shape (see design brief): a
-paid module declares `license` in `module.json`; the installed instance
-tracks `last_successful_checkin_at`, advanced only by a successful,
-usage-gated (not calendar-gated) check-in against XTen's license
-server; a 120-day-since-last-contact grace period surfaces an unmissable
-admin modal rather than disabling the module outright. Catalogue modules
-ship under a short proprietary EULA; bespoke client-delivered modules
-ship MIT once delivered — see the design brief's licensing sections for
-the full reasoning.
+A paid ("catalogue") module is licensed per instance by a licence key.
+The engine stores the keys, checks them with the licence server, and
+keeps the answer locally; the module asks the engine whether it is
+licensed and decides for itself what to restrict. Implemented in
+`App_skeleton\LicenseManager` (the `licenseManager` service, on web and
+CLI) and `App_skeleton\LicenseCheckinClient`.
 
-**Bundle licensing** (agreed 2026-09-13, not yet code — there is no
-check-in engine yet to hook this into): a module that's *bundled* by
-another (its Composer package named in the bundling module's own
-`require` — see "Bundling" in the `module.json` table above) shares
-that module's license key rather than needing its own. Concretely, once
-the check-in engine exists: the bundled module's `license` entry is
-`{ "sharesKeyWith": "<bundling module's key>" }` instead of its own
-`model`/`keyRequired` pair, and the check-in engine validates against
-the named module's key/check-in state, not a separate one of its own.
-`ai-ssa-application` is the first real case: `ai-ssa-chat`/`ai-ssa-phone`/
-`ai-ssa-email` each declare `sharesKeyWith: "ai-ssa"` (the application
-module's own `key`) so a client who bought the bundle doesn't need four
-separate license keys for one product. A plugin installed standalone,
-without the application module present, would need its own real
-`model`/`keyRequired` license entry instead — that case isn't decided
-yet (no standalone AI-SSA plugin has shipped to a real client to force
-the decision).
+### Declaring it
+
+In `module.json`:
+
+| `license` | Meaning |
+|---|---|
+| absent, or `{ "keyRequired": false }` | Free. Always licensed; the engine never makes a call for it. |
+| `{ "model": "per-instance", "keyRequired": true }` | Needs a licence key. `model` is informational; `per-instance` is the only model there is. |
+| `{ "sharesKeyWith": "<module key>" }` | Needs a licence, and can use the key stored for the named module: the engine sends *that module's key* with *this module's own key as the module code*. A key ticked for this module directly is tried too, which is how a plugin bought separately from its bundle is licensed. |
+
+Only a literal `true` for `keyRequired`, or a non-empty `sharesKeyWith`,
+makes a key required. Entitlement is per module: a bundle key that the
+licence server says covers `ai-ssa` and `ai-ssa-chat` licenses those two
+and not `ai-ssa-phone`, even though all three share the one key.
+
+The module code sent to the licence server is the module's `key`, not
+its `code`. Whoever issues a licence key must list the modules it covers
+by `key`.
+
+### What a module calls
+
+```php
+$licenseManager = $this->getDI()->getShared('licenseManager');
+
+if (!$licenseManager->isLicensed('your-module-key')) {
+    // restrict whatever this module restricts when unlicensed
+}
+```
+
+`isLicensed()` is a local read (a few small queries on first use in a
+request, none at all for a free module). It never touches the network and never throws, so it is
+safe in a controller, a view or a cron task. For more than yes/no:
+
+```php
+$entitlement = $licenseManager->entitlement('your-module-key');
+// ['module', 'state', 'licensed', 'required', 'sharesKeyWith', 'hasKey',
+//  'licenseKeyId', 'lastSuccessfulCheckinAt', 'lastAttemptAt',
+//  'lastResult', 'graceDaysLeft']
+```
+
+`licenseKeyId` is the id of the stored key (`license_keys.id`) that last
+validated the module. The key itself is never available to a module.
+
+**Nothing is unloaded.** The engine does not disable, unload or hide an
+unlicensed module, and `ModuleManager` treats it exactly like any other
+enabled module. Enforcement is the module's own: it asks, and restricts
+what it chooses. What the engine does by itself is tell the admin (see
+"What the admin sees").
+
+### States
+
+| `state` | `licensed` | Meaning |
+|---|---|---|
+| `not_required` | yes | The module needs no key. |
+| `valid` | yes | The most recent check-in succeeded, and that was within the last 120 days. |
+| `grace` | yes | A check-in has succeeded within the last 120 days, but the most recent attempt did not: the server refused the key (`lastResult` `rejected`) or could not be reached (`unreachable`). |
+| `expired` | no | The last successful check-in is more than 120 days old. |
+| `unvalidated` | no | A key is stored for the module, but no check-in has ever succeeded. |
+| `no_key` | no | The module needs a key and none is stored for it. |
+| `not_installed` | no | No module with that key is installed (so a mistyped key never reads as licensed). |
+
+The grace period is 120 days from `lastSuccessfulCheckinAt`
+(`LicenseManager::GRACE_DAYS`), evaluated locally every time the state
+is read: `now - lastSuccessfulCheckinAt > 120 days` is `expired`, and
+exactly 120 days is still `grace`. Only a successful check-in moves that
+timestamp. A check-in that is refused, times out or cannot connect
+records the attempt and changes nothing else, so an outage at either end
+never costs a licensed module its licence; a revoked key likewise keeps
+working until the 120 days are up.
+
+Check-in history belongs to the key that earned it. Removing a key
+returns every module it had validated to `no_key` (or `unvalidated`, if
+another key is stored for it) at once. Replacing a key in place keeps
+the history, and the new key is what is sent from then on.
+
+### When a check-in happens
+
+One `POST <licence server>/api/lice/checkin` per module, body
+`{"key": "...", "module": "<module key>"}`. The server answers
+`{"valid": true}` or a 403 `{"valid": false}` that is deliberately the
+same for an unknown key, a revoked key and a module the key does not
+cover. Nothing else is ever sent. The exact exchange is under "The
+check-in contract", below.
+
+- **Usage-gated, not on a calendar.** The first authenticated request of
+  each calendar day (a signed-in page or an API-key call; the engine
+  asks `currentPrincipal`, so a keyed request, which has no session,
+  counts) triggers one check-in of every enabled module that needs a
+  key, after the response has been sent. What that check-in changes is
+  audited with no actor: it is the instance's doing, not the caller's. An instance nobody uses makes no calls. The day is
+  marked as taken before anything is sent, so a failed check-in is not
+  retried until the next day. There is no cron job. Under PHP-FPM (the
+  Docker image) and LiteSpeed the response is finished before the call
+  is made. On a SAPI that cannot do that (PHP's built-in server,
+  mod_php) the page is flushed to the browser first, but its connection
+  stays open until the check-in returns, which the timeouts below bound.
+- **When a key is saved**, for the modules it is tried for, and **when a
+  module is enabled** (Configuration page or `./run modules enable`).
+  Enabling is never refused or delayed over the result.
+- **On demand:** "Check now" on the Licences screen, or
+  `./run license checkin [<module-key>]` (which can be scheduled by an
+  instance that wants to). `./run license status` prints the local state.
+
+The licence server is `licensing.server_url` in `config.local.php`
+(`LICENSE_SERVER_URL` in a Docker `.env`); empty means XTen's own. It
+must be `https://`. Timeouts are short (3 s to connect, 6 s in all), a
+redirect is not followed, and once the server proves unreachable the
+remaining modules of that run are recorded as unreachable without being
+tried.
+
+**An instance with no paid module installed does nothing.** The
+after-response hook returns once it has looked at the module manifests
+(already in memory): no query, no principal or session lookup, no
+settings row, no outbound request. No notice or modal is rendered. All
+that shows is the *Licences* menu entry, with an empty screen behind it,
+and a *Licence* column on Configuration reading "No key needed".
+
+### The check-in contract
+
+What `LicenseCheckinClient` sends and accepts. The server side is the
+`licensing` module in the private internal-modules repo
+(`XtenLicensing\Controllers\Api\CheckinController`), which is installed
+on XTen's own instance only.
+
+| | |
+|---|---|
+| Request | `POST /api/lice/checkin`, `Content-Type: application/json`, no cookie, no API key: the licence key in the body is the only credential. |
+| Body | `{"key": "<licence key>", "module": "<module key>"}`. One module per request. |
+| Covered | `200` with `{"valid": true}`. The only answer that moves `last_successful_checkin_at`. |
+| Not covered | `403` with `{"valid": false}`: unknown key, key not active, key that does not cover that module, or an empty `key` or `module`. Recorded as `rejected`. |
+| Anything else | A timeout, a refused connection, a `5xx`, a `405` (the server's answer to a non-POST), a redirect, a body that is not that JSON, or a `valid` that does not match its status. Recorded as `unreachable`: the question was not answered, which is not a no. |
+
+The answer carries nothing else. In particular the server does not say
+which other modules the key covers or when the licence ends, so the
+engine asks per module and keeps no expiry date: a licence ends when the
+server stops answering `valid` for it, and 120 days after that locally.
+
+### The `license:changed` event
+
+Fired on `eventsBus` whenever a module's saved state changes, after the
+new state is in the database:
+
+```php
+$di->getShared('eventsBus')->attach('license:changed', function ($event, $licenseManager, array $data) {
+    // $data = [
+    //     'module'       => 'ai-ssa-chat',
+    //     'state'        => 'valid',        // the new state, as in the table above
+    //     'previous'     => 'unvalidated',  // null the first time a state is recorded
+    //     'licensed'     => true,
+    //     'licenseKeyId' => 3,              // key that last validated it, or null
+    // ]
+});
+```
+
+Ids and states only; the key is never in the payload. Attach the
+listener in `registerSharedServices()` (see Shared services): changes
+are saved from web requests, from the CLI and from the check-in that
+runs after a response. A listener that throws is logged and does not
+undo the change, but listeners queued after it do not see that event, so
+catch your own exceptions.
+
+A module that keeps its own copy of licence state (AI SSA's per-channel
+licence rows, for one) feeds it from this event and from
+`entitlement()`, read-only, rather than having staff type it in.
+
+One caveat: a state that changes with the passage of time alone
+(`valid` or `grace` becoming `expired`) is always *read* correctly, but
+the event for it fires at the next check-in run, which is the next day
+the instance is used, or the next `./run license checkin`.
+
+### What the admin sees
+
+On every backend page, admins only:
+
+- **In grace:** a warning naming the module, why the last check-in did
+  not succeed, and the days of grace left. Nothing is restricted.
+- **Not licensed** (`expired`, `unvalidated` or `no_key`, for an enabled
+  module): a modal on every page load that has to be closed to carry on,
+  and a standing alert in the page (which is also what shows with
+  JavaScript off). The module is not disabled. The modal is not shown
+  on the Licences screen itself.
+
+These are rendered by the backend layout. A module with its own layout
+can show the same thing from `$licenseManager->adminNotice()`.
+
+### Storage
+
+Core tables, migration `024`: `license_keys` (the key encrypted with
+`App_skeleton\Crypto`, plus its last four characters for display;
+included in `./run crypto rekey`), `license_key_modules` (which modules
+a key is tried for) and `license_entitlements` (the local record:
+state, last successful check-in, last attempt and its result, and the
+key that validated the module). They belong to the engine. A module
+reads licence state through `licenseManager`, not from these tables.
+
+The audit log records that a key was added, replaced or removed, never
+the key itself, encrypted or not (`LicenseKeys::auditRedactedFields()`),
+so removing a key leaves no copy of it on the instance.
+
+### Bundles
+
+A module that's *bundled* by another (its Composer package named in the
+bundling module's own `require` — see "Bundling" in the `module.json`
+table above) declares `{ "sharesKeyWith": "<bundling module's key>" }`
+instead of its own `model`/`keyRequired` pair. `ai-ssa-application` is
+the first real case: `ai-ssa-chat`/`ai-ssa-phone`/`ai-ssa-email` each
+declare `sharesKeyWith: "ai-ssa"`, so a client who bought the bundle
+enters one key, ticked for `ai-ssa`, and each channel is validated with
+that key under its own module key. A channel bought without the bundle
+gets a key of its own, ticked for that channel; no change to its
+`module.json` is needed for that.
+
+Catalogue modules ship under a short proprietary EULA; bespoke
+client-delivered modules ship MIT once delivered — see the design
+brief's licensing sections for the reasoning.
 
 ## What's still genuinely open
 

@@ -138,6 +138,14 @@ class ModulesTask extends \Phalcon\Cli\Task
         foreach ($changed as $enabledKey) {
             echo '  ' . $enabledKey . ': enabled' . ($enabledKey === $key ? '' : ' (bundled with ' . $key . ')') . PHP_EOL;
         }
+
+        // Same as the Configuration page: validated on enable, flagged
+        // rather than refused if the licence is not in place.
+        foreach ($this->licenseManager->checkInModules($changed) as $checkedKey => $entitlement) {
+            if (!$entitlement['licensed']) {
+                echo "  {$checkedKey}: not licensed yet, see './run license status'" . PHP_EOL;
+            }
+        }
     }
 
     public function disableAction($key = null): void

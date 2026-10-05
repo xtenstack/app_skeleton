@@ -15,6 +15,8 @@ use Phalcon\Mvc\ModelInterface;
  */
 class Audit extends Injectable
 {
+    public const REDACTED = '[redacted]';
+
     public function afterCreate(Event $event, ModelInterface $model): void
     {
         $this->record($model, 'insert', null, $model->toArray());
@@ -54,6 +56,8 @@ class Audit extends Injectable
             $log->entity_type = $model->getSource();
             $log->entity_id   = (int) $model->readAttribute('id');
             $log->action      = $action;
+            $old              = $this->redact($model, $old);
+            $new              = $this->redact($model, $new);
             $log->old_values  = $old !== null ? json_encode($old) : null;
             $log->new_values  = $new !== null ? json_encode($new) : null;
 
@@ -61,6 +65,28 @@ class Audit extends Injectable
         } catch (\Throwable $e) {
             self::logFailure($action, $e);
         }
+    }
+
+    /**
+     * A column the model lists in auditRedactedFields() is logged as
+     * having changed, never with its value: a secret that is blanked or
+     * re-keyed in its own table must not live on in audit_log (see
+     * LicenseKeys). Not for a table in REVERSIBLE_TABLES, since a
+     * reversal writes old_values straight back.
+     */
+    private function redact(ModelInterface $model, ?array $values): ?array
+    {
+        if ($values === null || !method_exists($model, 'auditRedactedFields')) {
+            return $values;
+        }
+
+        foreach ($model->auditRedactedFields() as $field) {
+            if (($values[$field] ?? '') !== '') {
+                $values[$field] = self::REDACTED;
+            }
+        }
+
+        return $values;
     }
 
     /**

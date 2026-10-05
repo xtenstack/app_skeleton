@@ -82,6 +82,14 @@ return [
         'group'      => 'Settings',
     ],
     [
+        'label'      => 'Licences',
+        'icon'       => 'fas fa-certificate',
+        'controller' => 'licenses',
+        'url'        => 'backend/licenses',
+        'roles'      => [1],
+        'group'      => 'Settings',
+    ],
+    [
         'label'      => 'Cron',
         'icon'       => 'fas fa-clock',
         'controller' => 'cron',

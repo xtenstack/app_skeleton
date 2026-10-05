@@ -40,6 +40,11 @@ return [
         // directory-module authors claims as Tim (user 8), MAA-20260925-007
         'tim_api_token' => '${DOLIBARR_TIM_TOKEN:-}',
     ],
+    // Licence server for paid modules (App_skeleton\LicenseManager).
+    // Empty means XTen's own; set LICENSE_SERVER_URL only to use another.
+    'licensing' => [
+        'server_url' => '${LICENSE_SERVER_URL:-}',
+    ],
     'database' => [
         'host'     => '${DB_HOST}',
         'port'     => (int) '${DB_PORT:-5432}',

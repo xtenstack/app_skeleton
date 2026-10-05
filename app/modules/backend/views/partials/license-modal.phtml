@@ -1,0 +1,36 @@
+<?php
+/**
+ * The past-grace modal: shown to an admin on every backend page while an
+ * enabled paid module is not licensed, except on the Licences screen
+ * itself, where it would sit on top of the form that fixes it. Opened by
+ * public/assets/js/license-notice.js (no inline script: the CSP is
+ * script-src 'self'); without JavaScript the alert in
+ * partials/license-notice carries the same message.
+ *
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var array<string, array<string, mixed>> $unlicensed
+ */
+?>
+<div class="modal fade" id="license-modal" tabindex="-1" role="dialog" aria-labelledby="license-modal-title" aria-modal="true" data-backdrop="static" data-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-danger">
+        <h5 class="modal-title" id="license-modal-title"><i class="fas fa-ban"></i> Licence required</h5>
+      </div>
+      <div class="modal-body">
+        <p>These modules are enabled on this instance without a current licence:</p>
+        <ul>
+<?php foreach ($unlicensed as $moduleKey => $entitlement): ?>
+          <li class="mb-2"><strong><?= $this->escaper->escapeHtml($moduleKey) ?></strong> &mdash; <?= $this->partial('partials/license-state', ['entitlement' => $entitlement]) ?></li>
+<?php endforeach; ?>
+        </ul>
+        <p class="mb-0">Enter a licence key, or check in again if the key is already here, on the Licences screen. This message appears on every page until then.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Close for now</button>
+        <a href="<?= $this->url->get('backend/licenses') ?>" class="btn btn-primary">Open Licences</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/assets/js/license-notice.js"></script>
