@@ -9,13 +9,16 @@ use Phalcon\Di\FactoryDefault;
  * Auth (browser session) and ApiKeyAuth (API key) both set, and from
  * nowhere else. Covered here against a real database, with no HTTP: the
  * no-principal case every CLI task is in, a principal with and without an
- * API key.
+ * API key, and an actor whose users row no longer exists, which must be
+ * recorded as no actor instead of failing the insert on the foreign key.
  */
 final class AuditActorTest extends TestCase
 {
     private static \Phalcon\Di\DiInterface $di;
 
     private static int $userId;
+
+    private static string $previousErrorLog = '';
 
     /** @var int[] */
     private static array $ticketIds = [];
@@ -28,6 +31,10 @@ final class AuditActorTest extends TestCase
 
         self::$di = $di;
         \Phalcon\Di\Di::setDefault($di);
+
+        // Audit logs every actor it has to drop; keep that out of the
+        // test run's own output, where the web bootstrap also sends it.
+        self::$previousErrorLog = (string) ini_set('error_log', BASE_PATH . '/logs/app.log');
 
         $user                = new \Users();
         $user->email         = 'phpunit-auditactor-' . bin2hex(random_bytes(6)) . '@example.invalid';
@@ -44,6 +51,7 @@ final class AuditActorTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         self::$di->getShared('currentPrincipal')->clear();
+        ini_set('error_log', self::$previousErrorLog);
 
         foreach (self::$ticketIds as $ticketId) {
             \Tickets::findFirstWithTrashed(['conditions' => 'id = :id:', 'bind' => ['id' => $ticketId]])?->delete();
@@ -135,6 +143,33 @@ final class AuditActorTest extends TestCase
         } finally {
             $apiKey->delete();
         }
+    }
+
+    public function testPrincipalWhoseUserRowIsGoneIsRecordedAsNoActor(): void
+    {
+        self::$di->getShared('currentPrincipal')->set(2000000000, 2);
+
+        $audit = $this->auditedTicketInsert();
+
+        $this->assertNull($audit->actor_user_id);
+    }
+
+    public function testEventForAUserWhoseRowIsGoneKeepsTheIdInItsDetail(): void
+    {
+        $action = 'phpunit_' . bin2hex(random_bytes(4));
+
+        \App_skeleton\Audit::recordEvent($action, 2000000000, ['ip' => '192.0.2.1']);
+
+        $audit = $this->latestEvent($action);
+
+        $this->assertNull($audit->actor_user_id);
+        $this->assertSame(2000000000, (int) $audit->entity_id);
+        $this->assertSame(
+            ['ip' => '192.0.2.1', 'missing_actor_user_id' => 2000000000],
+            json_decode((string) $audit->new_values, true)
+        );
+
+        $audit->delete();
     }
 
     public function testEventRecordsTheApiKeyOnlyWhenTheActorIsThePrincipal(): void

@@ -49,17 +49,18 @@ class Audit extends Injectable
             return;
         }
 
-        $principal = self::principal();
+        try {
+            $log              = new \AuditLog();
+            $log->entity_type = $model->getSource();
+            $log->entity_id   = (int) $model->readAttribute('id');
+            $log->action      = $action;
+            $log->old_values  = $old !== null ? json_encode($old) : null;
+            $log->new_values  = $new !== null ? json_encode($new) : null;
 
-        $log                   = new \AuditLog();
-        $log->entity_type      = $model->getSource();
-        $log->entity_id        = (int) $model->readAttribute('id');
-        $log->action           = $action;
-        $log->actor_user_id    = $principal?->userId();
-        $log->actor_api_key_id = $principal?->apiKeyId();
-        $log->old_values       = $old !== null ? json_encode($old) : null;
-        $log->new_values       = $new !== null ? json_encode($new) : null;
-        $log->save();
+            self::write($log, self::existingUser(self::principal()?->userId()));
+        } catch (\Throwable $e) {
+            self::logFailure($action, $e);
+        }
     }
 
     /**
@@ -69,20 +70,69 @@ class Audit extends Injectable
      */
     public static function recordEvent(string $action, ?int $actorUserId, array $meta = []): void
     {
+        try {
+            $actor = self::existingUser($actorUserId);
+
+            if ($actor === null && $actorUserId !== null) {
+                $meta['missing_actor_user_id'] = $actorUserId;
+            }
+
+            $log              = new \AuditLog();
+            $log->entity_type = 'auth';
+            $log->entity_id   = $actorUserId;
+            $log->action      = $action;
+            $log->new_values  = $meta ? json_encode($meta) : null;
+
+            self::write($log, $actor);
+        } catch (\Throwable $e) {
+            self::logFailure($action, $e);
+        }
+    }
+
+    /**
+     * actor_user_id is a foreign key to users, and a session outlives the
+     * row it names: the user can be removed, or the database restored or
+     * recreated, while the browser still holds the cookie. Such an actor is
+     * recorded as none (and logged) instead of failing the insert.
+     */
+    private static function existingUser(?int $userId): ?int
+    {
+        if ($userId === null) {
+            return null;
+        }
+
+        if (\Users::findFirstWithTrashed(['conditions' => 'id = :id:', 'bind' => ['id' => $userId]]) !== null) {
+            return $userId;
+        }
+
+        error_log(sprintf('Audit: user #%d no longer exists; entry recorded with no actor', $userId));
+
+        return null;
+    }
+
+    private static function write(\AuditLog $log, ?int $actorUserId): void
+    {
         $principal = self::principal();
 
-        $log                = new \AuditLog();
-        $log->entity_type   = 'auth';
-        $log->entity_id     = $actorUserId;
-        $log->action        = $action;
         $log->actor_user_id = $actorUserId;
-        $log->new_values    = $meta ? json_encode($meta) : null;
 
         if ($actorUserId !== null && $principal?->userId() === $actorUserId) {
             $log->actor_api_key_id = $principal->apiKeyId();
         }
 
-        $log->save();
+        if (!$log->save()) {
+            error_log('Audit: entry not saved: ' . implode('; ', array_map('strval', $log->getMessages())));
+        }
+    }
+
+    /**
+     * An audit entry describes an action that has already happened or is
+     * about to; failing to write one must not turn that action into an
+     * error page.
+     */
+    private static function logFailure(string $action, \Throwable $e): void
+    {
+        error_log(sprintf('Audit: %s entry not written: %s: %s', $action, get_class($e), $e->getMessage()));
     }
 
     /**
@@ -174,10 +224,10 @@ class Audit extends Injectable
         $log->entity_type           = $table;
         $log->entity_id             = $entry->entity_id;
         $log->action                = 'reversal';
-        $log->actor_user_id         = self::principal()?->userId();
         $log->new_values            = json_encode($restored);
         $log->reversed_audit_log_id = $entry->id;
-        $log->save();
+
+        self::write($log, self::existingUser(self::principal()?->userId()));
 
         return true;
     }
