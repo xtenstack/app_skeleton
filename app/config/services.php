@@ -27,6 +27,18 @@ $di->setShared('session', function () {
     $files = new SessionStream(['savePath' => BASE_PATH . '/sessions']);
     $session->setAdapter($files);
 
+    // A request that presents an API key is stateless: its session is
+    // never started, so it gets no cookie, reads no identity from a
+    // session cookie sent alongside the key, and has nothing to write one
+    // to (set() on an unstarted session does nothing). A controller that
+    // copies the key's user into the session hands back a PHPSESSID that
+    // opens the backend as that user with no key at all; refusing here,
+    // in the service, means no controller in this repo or in a module can
+    // do that.
+    if ($this->has('request') && $this->getShared('apiKeyAuth')->tokenFromRequest($this->getShared('request')) !== null) {
+        return $session;
+    }
+
     // PHP's defaults send the session cookie bare: "PHPSESSID=…; path=/",
     // with no HttpOnly, Secure or SameSite attribute (seen on the live
     // instance 2026-10-05). HttpOnly keeps page script away from it,

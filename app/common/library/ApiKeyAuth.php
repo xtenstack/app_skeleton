@@ -22,7 +22,7 @@ class ApiKeyAuth extends Injectable
     {
         $authHeader = (string) $request->getHeader('Authorization');
 
-        if ($authHeader !== '' && stripos($authHeader, 'Bearer ') === 0) {
+        if ($authHeader !== '' && stripos($authHeader, 'Bearer ') === 0 && trim(substr($authHeader, 7)) !== '') {
             return trim(substr($authHeader, 7));
         }
 
