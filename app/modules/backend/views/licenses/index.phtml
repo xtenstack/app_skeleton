@@ -55,7 +55,7 @@ foreach ($licenseKeys as $licenseKey) {
                 <div class="small text-muted"><?= $this->escaper->escapeHtml(sprintf('Can use the key of %s', $entitlement['sharesKeyWith'])) ?></div>
 <?php endif; ?>
               </td>
-              <td><?= $this->partial('partials/license-state', ['entitlement' => $entitlement]) ?></td>
+              <td><?= $this->partial('partials/license-state', ['entitlement' => $entitlement]) ?> <?= $this->partial('partials/license-expiry', ['entitlement' => $entitlement]) ?></td>
               <td class="small">
 <?php if ($entitlement['licenseKeyId'] !== null && isset($keyLabels[$entitlement['licenseKeyId']])): ?>
                 <?= $this->escaper->escapeHtml($keyLabels[$entitlement['licenseKeyId']]) ?>

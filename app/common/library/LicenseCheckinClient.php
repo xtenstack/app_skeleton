@@ -21,6 +21,8 @@ class LicenseCheckinClient
     public const REJECTED    = 'rejected';
     public const UNREACHABLE = 'unreachable';
 
+    private ?string $lastExpiresOn = null;
+
     public const DEFAULT_SERVER_URL = 'https://stack-internal.xten.au';
 
     private const CHECKIN_PATH = '/api/lice/checkin';
@@ -71,8 +73,20 @@ class LicenseCheckinClient
     /**
      * @return string one of VALID, REJECTED, UNREACHABLE
      */
+    /**
+     * The last day the module is covered (Y-m-d), as the server gave it in
+     * the most recent VALID answer; null when it gave none (no expiry, or
+     * an older server).
+     */
+    public function lastExpiresOn(): ?string
+    {
+        return $this->lastExpiresOn;
+    }
+
     public function checkIn(string $key, string $moduleKey): string
     {
+        $this->lastExpiresOn = null;
+
         if (!$this->serverUrlIsAllowed()) {
             error_log("LicenseCheckinClient: licence server URL '{$this->serverUrl}' is not HTTPS, not checking in");
 
@@ -115,6 +129,12 @@ class LicenseCheckinClient
         $valid  = is_array($answer) ? ($answer['valid'] ?? null) : null;
 
         if ($status === 200 && $valid === true) {
+            $expiresAt = $answer['expires_at'] ?? null;
+
+            if (is_string($expiresAt) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiresAt) === 1) {
+                $this->lastExpiresOn = $expiresAt;
+            }
+
             return self::VALID;
         }
 

@@ -29,6 +29,11 @@ class CronTask extends \Phalcon\Cli\Task
     {
         $results = $this->getDI()->get('cronRunner')->runDueJobs();
 
+        // Scheduled work counts as the instance being in use: the day's
+        // licence check-in rides on the first cron pass if no signed-in
+        // request has made it yet. Nothing happens without a paid module.
+        $this->getDI()->getShared('licenseManager')->checkInIfDue();
+
         if (!$results) {
             echo 'No jobs due.' . PHP_EOL;
 

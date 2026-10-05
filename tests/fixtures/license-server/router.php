@@ -91,10 +91,17 @@ $covered = is_array($record)
     && ($record['status'] ?? '') === 'active'
     && in_array($module, $record['modules'] ?? [], true);
 
+$expiresOn = is_array($record) ? ($record['expires_on'] ?? null) : null;
+
+// As the real endpoint: past its last day, a module answers like an unknown key.
+if ($covered && $expiresOn !== null && $expiresOn < ($state['today'] ?? gmdate('Y-m-d'))) {
+    $covered = false;
+}
+
 if ($key === '' || $module === '' || !$covered) {
     $json(403, ['valid' => false]);
 
     return;
 }
 
-$json(200, ['valid' => true]);
+$json(200, ['valid' => true, 'expires_at' => $expiresOn]);

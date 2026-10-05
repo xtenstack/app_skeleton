@@ -25,6 +25,9 @@ class LicenseManager extends Injectable
 {
     public const GRACE_DAYS = 120;
 
+    /** A licence that ends within this many days is pointed out to admins. */
+    public const EXPIRY_NOTICE_DAYS = 30;
+
     /** No module.json for that key on this instance. */
     public const STATE_NOT_INSTALLED = 'not_installed';
 
@@ -84,9 +87,14 @@ class LicenseManager extends Injectable
      *     lastSuccessfulCheckinAt: ?string,
      *     lastAttemptAt: ?string,
      *     lastResult: ?string,
-     *     graceDaysLeft: ?int
+     *     graceDaysLeft: ?int,
+     *     expiresOn: ?string,
+     *     expiresInDays: ?int
      * } licenseKeyId is the key that last validated the module;
      *   graceDaysLeft is null unless the state is valid or grace.
+     *   expiresOn is the last day covered (Y-m-d) as the licence server
+     *   last gave it, null when it gave none; expiresInDays counts from
+     *   today (0 on the last day, negative once past).
      */
     public function entitlement(string $moduleKey): array
     {
@@ -104,6 +112,8 @@ class LicenseManager extends Injectable
             'lastAttemptAt'           => null,
             'lastResult'              => null,
             'graceDaysLeft'           => null,
+            'expiresOn'               => null,
+            'expiresInDays'           => null,
         ];
 
         if ($declaration === null) {
@@ -118,6 +128,7 @@ class LicenseManager extends Injectable
         $hasKey  = (bool) $this->candidateKeyIds($moduleKey);
         $success = $row?->last_successful_checkin_at ? (string) $row->last_successful_checkin_at : null;
         $state   = $this->state($hasKey, $success, $row?->last_result ? (string) $row->last_result : null);
+        $expires = $row?->expires_on ? substr((string) $row->expires_on, 0, 10) : null;
 
         return [
             'state'                   => $state,
@@ -131,6 +142,10 @@ class LicenseManager extends Injectable
             'lastResult'              => $row?->last_result ? (string) $row->last_result : null,
             'graceDaysLeft'           => in_array($state, [self::STATE_VALID, self::STATE_GRACE], true)
                 ? $this->graceDaysLeft((string) $success)
+                : null,
+            'expiresOn'               => $expires,
+            'expiresInDays'           => $expires !== null
+                ? (int) round((strtotime($expires . ' 00:00:00 UTC') - strtotime(gmdate('Y-m-d', $this->now()) . ' 00:00:00 UTC')) / 86400)
                 : null,
         ] + $entitlement;
     }
@@ -308,6 +323,24 @@ class LicenseManager extends Injectable
     }
 
     /**
+     * The same daily check-in for the cron runner: an instance that only
+     * ever runs scheduled jobs is in use too (REQ-234), and would
+     * otherwise never check in and run out of grace. Shares the one-per-
+     * day claim with checkInAfterResponse(), so whichever comes first
+     * that day does it.
+     */
+    public function checkInIfDue(): void
+    {
+        try {
+            if ($this->dailyCheckInDue()) {
+                $this->checkInAll();
+            }
+        } catch (\Throwable $e) {
+            error_log('LicenseManager: scheduled check-in failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * True for one caller per calendar day, who then owes the day's
      * check-in: the day is marked as taken before anything is sent, so a
      * check-in that fails is not retried until tomorrow. Always false on
@@ -330,11 +363,14 @@ class LicenseManager extends Injectable
      * (a notice) and enabled modules that are not licensed at all (the
      * modal). Entitlements, by module key.
      *
-     * @return array{grace: array<string, array<string, mixed>>, unlicensed: array<string, array<string, mixed>>}
+     * Also 'expiring': licensed modules whose licence ends within
+     * EXPIRY_NOTICE_DAYS.
+     *
+     * @return array{grace: array<string, array<string, mixed>>, unlicensed: array<string, array<string, mixed>>, expiring: array<string, array<string, mixed>>}
      */
     public function adminNotice(): array
     {
-        $notice = ['grace' => [], 'unlicensed' => []];
+        $notice = ['grace' => [], 'unlicensed' => [], 'expiring' => []];
 
         try {
             $needingAKey = $this->modulesNeedingAKey();
@@ -350,6 +386,10 @@ class LicenseManager extends Injectable
                     $notice['grace'][$moduleKey] = $entitlement;
                 } elseif (!$entitlement['licensed']) {
                     $notice['unlicensed'][$moduleKey] = $entitlement;
+                }
+
+                if ($entitlement['licensed'] && $entitlement['expiresInDays'] !== null && $entitlement['expiresInDays'] <= self::EXPIRY_NOTICE_DAYS) {
+                    $notice['expiring'][$moduleKey] = $entitlement;
                 }
             }
         } catch (\Throwable $e) {
@@ -626,6 +666,7 @@ class LicenseManager extends Injectable
                 $changes = [
                     'last_successful_checkin_at' => date('Y-m-d H:i:s', $this->now()),
                     'license_key_id'             => $keyId,
+                    'expires_on'                 => $this->client()->lastExpiresOn(),
                 ];
             }
 
@@ -664,7 +705,7 @@ class LicenseManager extends Injectable
         $keyIds   = $this->candidateKeyIds($moduleKey);
 
         if ($row->license_key_id !== null && !in_array((int) $row->license_key_id, $keyIds, true)) {
-            $changes += ['license_key_id' => null, 'last_successful_checkin_at' => null, 'last_result' => null];
+            $changes += ['license_key_id' => null, 'last_successful_checkin_at' => null, 'last_result' => null, 'expires_on' => null];
         }
 
         foreach ($changes as $column => $value) {

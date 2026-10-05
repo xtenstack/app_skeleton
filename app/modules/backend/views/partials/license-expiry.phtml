@@ -1,0 +1,28 @@
+<?php
+/**
+ * When a module's licence ends, in plain words. Empty when the licence
+ * server gave no end date.
+ *
+ * @var \Phalcon\Mvc\View\Engine\Php $this
+ * @var array<string, mixed> $entitlement from LicenseManager::entitlement()
+ */
+$expiresOn = $entitlement['expiresOn'] ?? null;
+$days      = $entitlement['expiresInDays'] ?? null;
+
+if ($expiresOn === null || $days === null) {
+    return;
+}
+
+$date = date('j M Y', strtotime($expiresOn));
+
+if ($days < 0) {
+    $text = sprintf('The licence ended on %s.', $date);
+} elseif ($days === 0) {
+    $text = sprintf('The licence ends today (%s).', $date);
+} elseif ($days === 1) {
+    $text = sprintf('The licence ends tomorrow (%s).', $date);
+} else {
+    $text = sprintf('The licence ends on %s, in %d days.', $date, $days);
+}
+?>
+<span class="license-expiry-text"><?= $this->escaper->escapeHtml($text) ?></span>

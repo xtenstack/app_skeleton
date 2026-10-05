@@ -48,6 +48,27 @@ final class LicenseCheckinClientTest extends TestCase
         unlink($this->errorLog);
     }
 
+    public function testAValidAnswerCarriesTheLastDayCoveredWhenTheServerGivesOne(): void
+    {
+        $client = $this->client();
+
+        self::assertSame(LicenseCheckinClient::VALID, $client->checkIn('good-key', 'lictest_app'));
+        self::assertNull($client->lastExpiresOn(), 'no expiry on the key');
+
+        $lastDay = gmdate('Y-m-d', time() + 20 * 86400);
+        self::$server->know(['good-key' => ['lictest_app']], [], 'normal', ['good-key' => $lastDay]);
+
+        self::assertSame(LicenseCheckinClient::VALID, $client->checkIn('good-key', 'lictest_app'));
+        self::assertSame($lastDay, $client->lastExpiresOn());
+
+        // Past its last day the server answers as for an unknown key, and
+        // the date of an earlier answer is not kept.
+        self::$server->know(['good-key' => ['lictest_app']], [], 'normal', ['good-key' => gmdate('Y-m-d', time() - 2 * 86400)]);
+
+        self::assertSame(LicenseCheckinClient::REJECTED, $client->checkIn('good-key', 'lictest_app'));
+        self::assertNull($client->lastExpiresOn());
+    }
+
     public function testAnActiveKeyThatCoversTheModuleIsValidAndOneRequestIsSent(): void
     {
         self::assertSame(LicenseCheckinClient::VALID, $this->client()->checkIn('good-key', 'lictest_chat'));
