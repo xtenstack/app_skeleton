@@ -7,7 +7,7 @@
  * into the modal.
  *
  * @var \Phalcon\Mvc\View\Engine\Php $this
- * @var array{grace: array<string, array<string, mixed>>, unlicensed: array<string, array<string, mixed>>} $licenseNotice
+ * @var array{grace: array<string, array<string, mixed>>, unlicensed: array<string, array<string, mixed>>, expiring: array<string, array<string, mixed>>} $licenseNotice
  */
 $licensesUrl = $this->url->get('backend/licenses');
 ?>
@@ -32,6 +32,17 @@ $licensesUrl = $this->url->get('backend/licenses');
 <?php endforeach; ?>
   </ul>
   <p class="mb-2">Nothing has been switched off. The module keeps working while the grace period lasts.</p>
+  <a href="<?= $licensesUrl ?>" class="alert-link">Open Licences</a>
+</div>
+<?php endif; ?>
+<?php if ($licenseNotice['expiring'] ?? []): ?>
+<div class="alert alert-info" id="license-expiry-notice" role="alert">
+  <h5 class="alert-heading"><i class="icon fas fa-calendar-alt"></i> Licence ending soon</h5>
+  <ul class="mb-2">
+<?php foreach ($licenseNotice['expiring'] as $moduleKey => $entitlement): ?>
+    <li><strong><?= $this->escaper->escapeHtml($moduleKey) ?></strong> &mdash; <?= $this->partial('partials/license-expiry', ['entitlement' => $entitlement]) ?></li>
+<?php endforeach; ?>
+  </ul>
   <a href="<?= $licensesUrl ?>" class="alert-link">Open Licences</a>
 </div>
 <?php endif; ?>

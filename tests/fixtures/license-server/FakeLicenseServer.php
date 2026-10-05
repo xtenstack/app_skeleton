@@ -80,13 +80,15 @@ final class FakeLicenseServer
     /**
      * @param array<string, string[]> $keys active key => module codes it covers
      * @param string[]                $revoked keys the server knows but has revoked
+     * @param array<string, string>   $expires key => last day covered (Y-m-d), for every module on it
+     * @param string|null             $today   the server's idea of today (Y-m-d), for a test with its own clock
      */
-    public function know(array $keys, array $revoked = [], string $mode = 'normal'): void
+    public function know(array $keys, array $revoked = [], string $mode = 'normal', array $expires = [], ?string $today = null): void
     {
-        $state = ['mode' => $mode, 'keys' => []];
+        $state = ['mode' => $mode, 'keys' => [], 'today' => $today];
 
         foreach ($keys as $key => $modules) {
-            $state['keys'][$key] = ['status' => in_array($key, $revoked, true) ? 'revoked' : 'active', 'modules' => $modules];
+            $state['keys'][$key] = ['status' => in_array($key, $revoked, true) ? 'revoked' : 'active', 'modules' => $modules, 'expires_on' => $expires[$key] ?? null];
         }
 
         file_put_contents($this->dir . '/state.json', json_encode($state, JSON_THROW_ON_ERROR), LOCK_EX);

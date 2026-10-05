@@ -15,6 +15,7 @@ class LicenseEntitlements extends \Phalcon\Mvc\Model
     public $last_successful_checkin_at;
     public $last_attempt_at;
     public $last_result;
+    public $expires_on;
     public $created_at;
     public $updated_at;
 

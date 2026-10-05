@@ -300,6 +300,58 @@ final class LicenseManagerTest extends TestCase
         self::assertSame([], self::$server->requests(), 'reading the licence state must not touch the network');
     }
 
+    public function testTheLastDayCoveredIsKeptAndPointedOutWhenItIsClose(): void
+    {
+        $licenseManager = $this->licenseManager();
+        $licenseManager->addKey(self::BUNDLE_KEY, 'lictest bundle', ['lictest_app']);
+
+        // No end date from the server: nothing to say.
+        $entitlement = $licenseManager->checkIn('lictest_app');
+        self::assertNull($entitlement['expiresOn']);
+        self::assertNull($entitlement['expiresInDays']);
+
+        // Far off: kept, shown on the Licences screen, no notice.
+        $far = gmdate('Y-m-d', $this->now + 200 * self::DAY);
+        self::$server->know([self::BUNDLE_KEY => ['lictest_app']], [], 'normal', [self::BUNDLE_KEY => $far], gmdate('Y-m-d', $this->now));
+        $entitlement = $licenseManager->checkIn('lictest_app');
+        self::assertSame($far, $entitlement['expiresOn']);
+        self::assertSame(200, $entitlement['expiresInDays']);
+
+        // Close: a second manager reads it back from the database.
+        $near = gmdate('Y-m-d', $this->now + 12 * self::DAY);
+        self::$server->know([self::BUNDLE_KEY => ['lictest_app']], [], 'normal', [self::BUNDLE_KEY => $near], gmdate('Y-m-d', $this->now));
+        $licenseManager->checkIn('lictest_app');
+
+        $entitlement = $this->licenseManager()->entitlement('lictest_app');
+        self::assertSame($near, $entitlement['expiresOn']);
+        self::assertSame(12, $entitlement['expiresInDays']);
+        self::assertTrue($entitlement['licensed'], 'a licence that is about to end is still a licence');
+
+        $this->enable(['lictest_app']);
+        self::assertSame(['lictest_app'], array_keys($this->licenseManager()->adminNotice()['expiring']), 'within 30 days: admins are told');
+
+        // The server drops the end date again (renewed with no expiry).
+        self::$server->know([self::BUNDLE_KEY => ['lictest_app']]);
+        self::assertNull($licenseManager->checkIn('lictest_app')['expiresOn']);
+    }
+
+    public function testTheCronRunnerMakesTheDaysCheckInOnceWithNobodySignedIn(): void
+    {
+        $licenseManager = $this->licenseManager();
+        $licenseManager->addKey(self::BUNDLE_KEY, 'lictest bundle', ['lictest_app']);
+        $this->enable(['lictest_app']);
+        self::$server->forgetRequests();
+
+        $licenseManager->checkInIfDue();
+        self::assertSame(['lictest_app'], array_column(self::$server->requests(), 'module'), 'the first cron pass of the day checks in');
+        self::assertTrue($licenseManager->isLicensed('lictest_app'));
+
+        self::$server->forgetRequests();
+        $licenseManager->checkInIfDue();
+        $this->licenseManager()->checkInIfDue();
+        self::assertSame([], self::$server->requests(), 'later passes the same day send nothing');
+    }
+
     public function testSharesKeyWithUsesTheNamedModulesKeyForTheSharingModulesOwnCode(): void
     {
         $licenseManager = $this->licenseManager();
@@ -802,7 +854,7 @@ final class LicenseManagerTest extends TestCase
 
             $licenseManager->checkInAfterResponse();
 
-            self::assertSame(['grace' => [], 'unlicensed' => []], $licenseManager->adminNotice(), 'no notice and no modal');
+            self::assertSame(['grace' => [], 'unlicensed' => [], 'expiring' => []], $licenseManager->adminNotice(), 'no notice and no modal');
             self::assertSame([], $licenseManager->entitlements());
             self::assertSame([], $licenseManager->modulesNeedingAKey());
             self::assertFalse($licenseManager->dailyCheckInDue());

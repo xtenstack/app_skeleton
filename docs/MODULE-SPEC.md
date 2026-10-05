@@ -472,7 +472,7 @@ check-in contract", below.
   asks `currentPrincipal`, so a keyed request, which has no session,
   counts) triggers one check-in of every enabled module that needs a
   key, after the response has been sent. What that check-in changes is
-  audited with no actor: it is the instance's doing, not the caller's. An instance nobody uses makes no calls. The day is
+  audited with no actor: it is the instance's doing, not the caller's. A cron pass (`./run cron run`) counts as use too and makes the day's check-in if no request has yet, so an instance that only runs scheduled jobs does not run out of grace. An instance nobody uses and nothing runs on makes no calls. The day is
   marked as taken before anything is sent, so a failed check-in is not
   retried until the next day. There is no cron job. Under PHP-FPM (the
   Docker image) and LiteSpeed the response is finished before the call
@@ -511,14 +511,24 @@ on XTen's own instance only.
 |---|---|
 | Request | `POST /api/lice/checkin`, `Content-Type: application/json`, no cookie, no API key: the licence key in the body is the only credential. |
 | Body | `{"key": "<licence key>", "module": "<module key>"}`. One module per request. |
-| Covered | `200` with `{"valid": true}`. The only answer that moves `last_successful_checkin_at`. |
-| Not covered | `403` with `{"valid": false}`: unknown key, key not active, key that does not cover that module, or an empty `key` or `module`. Recorded as `rejected`. |
+| Covered | `200` with `{"valid": true, "expires_at": "YYYY-MM-DD"}`, or `"expires_at": null` when the licence has no end date. The only answer that moves `last_successful_checkin_at`. `expires_at` is the last day the module is covered (UTC); a server that omits it is read as no end date. |
+| Not covered | `403` with `{"valid": false}`: unknown key, key not active, key that does not cover that module, a module past its `expires_at`, or an empty `key` or `module`. Recorded as `rejected`. |
 | Anything else | A timeout, a refused connection, a `5xx`, a `405` (the server's answer to a non-POST), a redirect, a body that is not that JSON, or a `valid` that does not match its status. Recorded as `unreachable`: the question was not answered, which is not a no. |
 
 The answer carries nothing else. In particular the server does not say
-which other modules the key covers or when the licence ends, so the
-engine asks per module and keeps no expiry date: a licence ends when the
-server stops answering `valid` for it, and 120 days after that locally.
+which other modules the key covers, so the engine asks per module.
+
+**Expiry.** The end date lives on the licence server, per module on the
+key, and the server is the authority: past that day it answers `valid:
+false`, and the instance then runs out its 120 days of grace like any
+other refusal. The instance keeps a copy of the date
+(`license_entitlements.expires_on`, `entitlement()['expiresOn']` and
+`['expiresInDays']`) only to tell admins: the Licences screen shows it,
+and from `LicenseManager::EXPIRY_NOTICE_DAYS` (30) days out every backend
+page carries a "Licence ending soon" notice for admins. The copy never
+switches a module off by itself. Reminder emails to the customer are the
+licence server's job (it knows the client and the invoice); none are sent
+yet.
 
 ### The `license:changed` event
 
