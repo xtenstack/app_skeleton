@@ -103,6 +103,13 @@ class ConfigurationController extends ControllerBase
      */
     public function enableAction($key = null)
     {
+        // State changes are POST-only: CSRF is enforced on POST, so a GET
+        // here would flip a module (and, on disable, everything that
+        // depends on it) for a logged-in admin with no token at all.
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
+        }
+
         try {
             $changed = $key ? $this->moduleManager->enableModule($key) : [];
         } catch (ModuleDependencyException $e) {
@@ -131,6 +138,13 @@ class ConfigurationController extends ControllerBase
      */
     public function disableAction($key = null)
     {
+        // State changes are POST-only: CSRF is enforced on POST, so a GET
+        // here would flip a module (and, on disable, everything that
+        // depends on it) for a logged-in admin with no token at all.
+        if (!$this->request->isPost()) {
+            return $this->dispatcher->forward(['controller' => 'configuration', 'action' => 'index']);
+        }
+
         $changed = $key ? $this->moduleManager->disableModule($key) : [];
 
         if (!$changed) {
