@@ -24,6 +24,9 @@ set -e
 # however this was invoked.
 cd "$(dirname "$(readlink -f "$0")")/.."
 git pull origin main
+# The build's additional contexts must exist even when a repo isn't
+# checked out on this host (see docs/INTERNAL-MODULES.md).
+mkdir -p ../internal ../plugins ../applications
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build app
 # Best-effort, not fatal: fails on the xten-marketing instance (its db
 # config doesn't resolve the same way through this task) and `set -e`

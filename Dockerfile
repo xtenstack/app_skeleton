@@ -35,7 +35,10 @@
 # `plugin-modules` context is the same mechanism for the public
 # XTenDeploy/plugins monorepo (`../plugins/*` path repositories, landing
 # at /plugins) — a private repo of several packages in one tree can't be
-# a `vcs` Composer repository, so it needs a build context too.
+# a `vcs` Composer repository, so it needs a build context too. The
+# `application-modules` context does the same for the
+# XTenDeploy/applications monorepo (`../applications/*`, landing at
+# /applications).
 FROM composer:2 AS vendor
 
 WORKDIR /app
@@ -43,6 +46,7 @@ WORKDIR /app
 COPY composer.json composer.lock composer.local.jso[n] ./
 COPY --from=internal-modules . /internal
 COPY --from=plugin-modules . /plugins
+COPY --from=application-modules . /applications
 
 # composer.lock (committed, public) deliberately does NOT include any
 # private/internal module — a plain `install` from it is what keeps a

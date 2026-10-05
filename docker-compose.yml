@@ -35,6 +35,10 @@ services:
         # composer.local.json — see docs/INTERNAL-MODULES.md, "Plugin
         # modules"). Also must exist even if empty (`mkdir -p ../plugins`).
         plugin-modules: ../plugins
+        # And for the application-module monorepo
+        # (github.com/XTenDeploy/applications, `../applications/*`), same
+        # rule: `mkdir -p ../applications` if there is no checkout.
+        application-modules: ../applications
     restart: unless-stopped
     # Container logs default to unbounded — on a long-running droplet
     # that fills the disk eventually. Capped the same way on all three
