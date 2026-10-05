@@ -89,6 +89,10 @@ one doesn't require a deploy.
 **Configuration.** The module management screen — lists every discovered
 module package with its tier, version, and enabled state, and toggles
 them per-instance. The CLI equivalent is `./run modules sync|list|enable|disable`.
+A module can declare other modules it depends on: the list shows what
+each module requires and what requires it, a module can't be enabled
+until its dependencies are, and disabling a module also disables the
+modules that depend on it (see MODULE-SPEC.md's "Dependencies").
 
 **Items.** A small, complete CRUD resource kept in the base product as a
 worked reference — list, create, edit, and soft delete on one plain
