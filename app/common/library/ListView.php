@@ -39,7 +39,7 @@ class ListView
         string $defaultDir = 'desc',
         array $searchOr = []
     ): array {
-        $q = trim((string) $request->getQuery('q', 'string', ''));
+        $q = trim(self::stringParam($request, 'q', ''));
 
         if ($q !== '' && ($searchable || $searchOr)) {
             $orParts = [];
@@ -58,13 +58,13 @@ class ListView
         }
 
         $sortKeys = array_keys($sortable);
-        $sort     = (string) $request->getQuery('sort', 'string', $sortKeys[0] ?? 'id');
+        $sort     = self::stringParam($request, 'sort', $sortKeys[0] ?? 'id');
 
         if (!isset($sortable[$sort])) {
             $sort = $sortKeys[0] ?? 'id';
         }
 
-        $dir = strtolower((string) $request->getQuery('dir', 'string', $defaultDir));
+        $dir = strtolower(self::stringParam($request, 'dir', $defaultDir));
         $dir = $dir === 'asc' ? 'asc' : 'desc';
 
         $params = [];
@@ -125,6 +125,18 @@ class ListView
             'perPage'    => $perPage,
             'preserve'   => $preserve,
         ];
+    }
+
+    /**
+     * A query parameter as a string, or $default when it is absent or not a
+     * string: `?q[]=x` arrives as an array, which (string) turns into a
+     * warning and the search term "Array".
+     */
+    private static function stringParam(\Phalcon\Http\Request $request, string $name, string $default): string
+    {
+        $value = $request->getQuery($name, 'string', $default);
+
+        return is_string($value) ? $value : $default;
     }
 
     /**
