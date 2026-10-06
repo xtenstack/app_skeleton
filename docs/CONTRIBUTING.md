@@ -88,6 +88,11 @@ docker compose up -d app` (or `docker compose up -d --build`) — a plain
 restart proves nothing about whether your change works. Don't treat "still
 fails after a restart" as evidence against staleness; it isn't one.
 
+`tests/Feature/SessionFilesTest.php` counts the files in `sessions/`
+before and after each request, so it has to run where it can see the same
+`sessions/` directory the app writes to (inside the `app` container, as
+above) and with no other traffic hitting the stack.
+
 Coverage beyond those three patterns is thin — this is a baseline, not
 comprehensive coverage, and growing it is a legitimate contribution.
 `.github/workflows/build.yml` ("Build" badge on the README) runs this

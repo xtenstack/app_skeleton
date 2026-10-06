@@ -62,6 +62,21 @@ docker compose up -d --build
 Full install options (Docker, Composer-only, plain download) are in
 [docs/INSTALL.md](docs/INSTALL.md).
 
+## Sessions
+
+Login sessions are files in `sessions/` (in Docker, bind-mounted from the
+host's `data/sessions`). A session starts only when something writes to it
+(login, a form's CSRF token, a flash message) or the request brings a
+session cookie, so a crawler or a public API call leaves no file behind. A
+session file is rewritten on every request that uses it, and the daily
+**Session clean-up** cron job (`./run session gc`, seeded by `./run seed
+run`) deletes files untouched for longer than `session.lifetime` in
+`app/config/config.php` (7 days by default; override it in
+`config.local.php`). PHP's own collection is off in the Docker image
+(`session.gc_probability = 0`) and isn't relied on, so the cron job must be
+running: either `cron_mode` is `auto` with the one-minute `./run cron run`
+entry, or someone presses "Run now" on the backend Cron page.
+
 ## Known limitations
 
 - **File uploads picked directly from Photos in Safari on macOS can
