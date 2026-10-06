@@ -39,8 +39,10 @@ $licenseNotice = !$isAuthPage && $isAdmin ? $this->licenseManager->adminNotice()
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?> — Backend</title>
+<?php if (!$isGuestLanding): // A guest on the index controller is looking at the 404 page, which has no form; a token there would start a session for every crawler's mistyped URL (see App_skeleton\LazySession). The login, signup and password pages still get one. ?>
     <meta name="csrf-key" content="<?= $this->escaper->escapeHtml($this->security->getTokenKey()) ?>">
     <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
+<?php endif; ?>
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">

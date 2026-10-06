@@ -93,6 +93,7 @@ class SeedTask extends \Phalcon\Cli\Task
         $defaults = [
             ['name' => 'Archive audit log', 'task' => 'audit', 'task_action' => 'archive', 'frequency' => '+1 day'],
             ['name' => 'Database backup', 'task' => 'backup', 'task_action' => 'run', 'frequency' => '+1 day'],
+            ['name' => 'Session clean-up', 'task' => 'session', 'task_action' => 'gc', 'frequency' => '+1 day'],
         ];
 
         foreach ($defaults as $data) {

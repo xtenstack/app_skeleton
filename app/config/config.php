@@ -62,6 +62,19 @@ $base = [
     ],
 
     /**
+     * Session files (BASE_PATH/sessions) not touched for this many seconds
+     * are deleted by the daily "Session clean-up" cron job (./run session
+     * gc, see App_skeleton\SessionGc). A session is rewritten on every
+     * request that uses it, so this is how long someone can stay away
+     * before they have to log in again. PHP's own garbage collection is
+     * off in the Docker image (session.gc_probability = 0) and is not
+     * relied on.
+     */
+    'session' => [
+        'lifetime' => 7 * 24 * 60 * 60,
+    ],
+
+    /**
      * if true, then we print a new line at the end of each CLI execution
      *
      * If we dont print a new line,

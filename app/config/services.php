@@ -5,13 +5,13 @@ use Phalcon\Events\Manager as EventsManager;
 use Phalcon\Mvc\Model\Manager as ModelsManager;
 use Phalcon\Mvc\Model\Metadata\Memory as MetaDataAdapter;
 use Phalcon\Mvc\View\Engine\Volt as VoltEngine;
-use Phalcon\Session\Manager as SessionManager;
 use Phalcon\Session\Adapter\Stream as SessionStream;
 use App_skeleton\ApiKeyAuth;
 use App_skeleton\Audit;
 use App_skeleton\Auth;
 use App_skeleton\CronRunner;
 use App_skeleton\CurrentPrincipal;
+use App_skeleton\LazySession;
 use App_skeleton\LicenseManager;
 use App_skeleton\Mailer;
 use App_skeleton\ModuleManager;
@@ -19,49 +19,31 @@ use App_skeleton\Pdf;
 use App_skeleton\SettingsRegistry;
 
 $di->setShared('session', function () {
-    $session = new SessionManager();
+    $session = new LazySession();
     // Not sys_get_temp_dir() (was, until 2026-08-01) — that's the
     // container's own ephemeral filesystem, wiped on every recreate
     // (every `docker compose up -d --build`), silently logging everyone
     // out and invalidating any in-flight CSRF token on every deploy. See
     // BASE_PATH . '/sessions' bind-mounted in docker-compose.yml, same
     // reasoning as logs/public/files.
-    $files = new SessionStream(['savePath' => BASE_PATH . '/sessions']);
+    $files = new SessionStream(['savePath' => LazySession::savePath()]);
     $session->setAdapter($files);
 
     // A request that presents an API key is stateless: its session is
     // never started, so it gets no cookie, reads no identity from a
     // session cookie sent alongside the key, and has nothing to write one
-    // to (set() on an unstarted session does nothing). A controller that
-    // copies the key's user into the session hands back a PHPSESSID that
-    // opens the backend as that user with no key at all; refusing here,
-    // in the service, means no controller in this repo or in a module can
-    // do that.
+    // to. A controller that copies the key's user into the session hands
+    // back a PHPSESSID that opens the backend as that user with no key at
+    // all; refusing here, in the service, means no controller in this repo
+    // or in a module can do that.
     if ($this->has('request') && $this->getShared('apiKeyAuth')->tokenFromRequest($this->getShared('request')) !== null) {
-        return $session;
+        $session->setStateless(true);
     }
 
-    // PHP's defaults send the session cookie bare: "PHPSESSID=…; path=/",
-    // with no HttpOnly, Secure or SameSite attribute (seen on the live
-    // instance 2026-10-05). HttpOnly keeps page script away from it,
-    // SameSite=Lax keeps it off cross-site POSTs, and Secure keeps it off
-    // plain HTTP. Secure is only set when this request arrived over HTTPS
-    // (directly, or as the reverse proxy reports it), so a local
-    // http://localhost install can still log in.
-    if (PHP_SAPI !== 'cli' && !headers_sent()) {
-        $https = ($_SERVER['HTTPS'] ?? '') === 'on'
-            || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-
-        session_set_cookie_params([
-            'lifetime' => 0,
-            'path'     => '/',
-            'secure'   => $https,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-    }
-
-    $session->start();
+    // Not started here: LazySession starts on the first write, or on a read
+    // when the request carries a session cookie, so a request that never
+    // needs a session (a crawler, a public endpoint) leaves no file behind.
+    // The cookie's HttpOnly/Secure/SameSite attributes are set there too.
     return $session;
 });
 

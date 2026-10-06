@@ -54,8 +54,10 @@ $this->flash->clear();
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $this->escaper->escapeHtml($this->settings->get('site_name', 'App Skeleton')) ?></title>
+<?php if (!$isGuestLanding): // The guest landing page has no form to protect, and emitting a token would start a session for every visitor (see App_skeleton\LazySession). ?>
     <meta name="csrf-key" content="<?= $this->escaper->escapeHtml($this->security->getTokenKey()) ?>">
     <meta name="csrf-token" content="<?= $this->escaper->escapeHtml($this->security->getToken()) ?>">
+<?php endif; ?>
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
