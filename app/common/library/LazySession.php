@@ -22,12 +22,16 @@ use Phalcon\Session\ManagerInterface;
  *   empty and writes are dropped, as before.
  *
  * Once started it behaves exactly like Phalcon's own manager.
+ *
+ * @psalm-suppress MethodSignatureMismatch Phalcon's stubs type these
+ * parameters as mixed; the real signatures are the narrower ones used here.
  */
 class LazySession extends Manager
 {
     private bool $stateless = false;
 
     /** Where session files live (bind-mounted from the host in docker-compose.yml). */
+    /** @psalm-suppress UndefinedConstant BASE_PATH is defined by the bootstrap, not by a file Psalm reads. */
     public static function savePath(): string
     {
         return BASE_PATH . '/sessions';
