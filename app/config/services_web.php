@@ -76,6 +76,32 @@ $di->setShared('dispatcher', function () {
     $dispatcher->setDefaultNamespace('App_skeleton\Modules\Backend\Controllers');
 
     $eventsManager = new EventsManager();
+    // The URL left out a parameter the action needs (/backend/users/edit
+    // with no id). Left alone, Phalcon calls editAction() with nothing to
+    // pass and PHP throws ArgumentCountError, an \Error, which Phalcon's
+    // dispatcher doesn't hand to beforeException below: it escapes to the
+    // bootstrap's last-resort 500. A URL that is missing its id is a page
+    // that doesn't exist, so it is answered like any other unknown page,
+    // for every module. This runs after the controller is constructed, so
+    // the controller's own login/role gate still decides first. Decided
+    // from the action's signature before it runs, so an ArgumentCountError
+    // raised deeper inside an action's own code is still a logged 500.
+    $eventsManager->attach('dispatch:beforeExecuteRoute', function ($event, $dispatcher) {
+        try {
+            $required = (new \ReflectionMethod($dispatcher->getActiveController(), $dispatcher->getActiveMethod()))
+                ->getNumberOfRequiredParameters();
+        } catch (\ReflectionException $e) {
+            return true;
+        }
+
+        if ($required > count($dispatcher->getParams())) {
+            $dispatcher->forward(['controller' => 'index', 'action' => 'notFound']);
+
+            return false;
+        }
+
+        return true;
+    });
     $eventsManager->attach('dispatch:beforeException', function ($event, $dispatcher, $exception) {
         $alreadyOnErrorPage = $dispatcher->getControllerName() === 'index'
             && in_array($dispatcher->getActionName(), ['notFound', 'serverError'], true);
