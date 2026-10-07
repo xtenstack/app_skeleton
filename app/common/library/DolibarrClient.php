@@ -38,6 +38,20 @@ class DolibarrClient extends Injectable
     // secondary/different agent wired in for any part of it (2026-09-13).
     // Found unwired on every one of Watson's real production closes so far
     // (thirdparties 13-15) before this fix.
+    /**
+     * XTen is registered for GST from 7 October 2026 (MAA-20261007-008): every
+     * published price is GST-inclusive and unchanged, so a Dolibarr line carries
+     * the ex-GST unit price (subprice, HT) at this rate and the order, invoice and
+     * template totals stay at the published amount with the GST inside.
+     */
+    public const GST_RATE_PERCENT = 10;
+
+    /** Dolibarr unit price (ex-GST, 5 dp like Dolibarr's product prices) for a published GST-inclusive price: 59.00 -> 53.63636. */
+    public static function exGstUnitPrice(float $incGstAud): float
+    {
+        return round($incGstAud / (1 + self::GST_RATE_PERCENT / 100), 5);
+    }
+
     private const WATSON_USER_ID = 10;
 
     private string $baseUrl;
@@ -165,9 +179,9 @@ class DolibarrClient extends Injectable
             'lines'        => [array_filter([
                 'desc'         => "{$offerName} — {$customerName} <{$customerIdentifier}>",
                 'qty'          => 1,
-                'subprice'     => $priceAud,
+                'subprice'     => self::exGstUnitPrice($priceAud),
                 'product_type' => 1,
-                'tva_tx'       => 0, // 0% GST statutory policy for XTen
+                'tva_tx'       => self::GST_RATE_PERCENT, // GST-inclusive published price, GST inside (registered 7 Oct 2026)
                 'fk_product'   => $productId,
             ], static fn ($v) => $v !== null)],
             'array_options' => [
