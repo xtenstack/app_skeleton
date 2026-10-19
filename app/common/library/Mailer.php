@@ -71,7 +71,20 @@ class Mailer extends Injectable
      *
      * @param array<int, array{filename: string, content: string, content_type?: string}> $attachments
      */
-    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null, bool $isHtml = false, array $attachments = []): string|bool
+    /**
+     * $options overrides the instance-wide sender for one message:
+     *   from      a different From address (plain or "Name <addr>"); it
+     *             must be on a domain the provider has verified for this
+     *             account, the same rule as mail_from itself
+     *   reply_to  a Reply-To for this message, '' for none
+     *   bcc       addresses to blind-copy
+     * Added for directory-module's held-enquiry notices (MAA-20261020-001),
+     * which go out as directory@xten.au, signed by Tim, with the enquirer
+     * as Reply-To on the release; an instance's mail_from is deploy@.
+     *
+     * @param array{from?: string, reply_to?: string, bcc?: list<string>} $options
+     */
+    public function send(string $to, string $subject, string $body, ?string $unsubscribeUrl = null, bool $isHtml = false, array $attachments = [], array $options = []): string|bool
     {
         $attached = self::attachmentsPayload($attachments);
 
@@ -103,8 +116,8 @@ class Mailer extends Injectable
             return true;
         }
 
-        $from    = $this->settings->get('mail_from', 'no-reply@localhost');
-        $replyTo = $this->settings->get('mail_reply_to', '');
+        $from    = trim((string) ($options['from'] ?? '')) !== '' ? trim((string) $options['from']) : $this->settings->get('mail_from', 'no-reply@localhost');
+        $replyTo = array_key_exists('reply_to', $options) ? trim((string) $options['reply_to']) : $this->settings->get('mail_reply_to', '');
 
         $payload = [
             'from'    => $from,
@@ -123,6 +136,12 @@ class Mailer extends Injectable
         // an instance has actually configured one.
         if ($replyTo !== '') {
             $payload['reply_to'] = $replyTo;
+        }
+
+        $bcc = array_values(array_filter(array_map('trim', (array) ($options['bcc'] ?? [])), static fn (string $a): bool => $a !== ''));
+
+        if ($bcc !== []) {
+            $payload['bcc'] = $bcc;
         }
 
         if ($attached) {
