@@ -19,14 +19,10 @@ class SessionController extends ControllerBase
         $password = (string) $this->request->getPost('password');
 
         if ($this->auth->check($email, $password)) {
-            // Admin/operator/agent land in the backend admin UI; 'member'
-            // lands in the frontend module's own dashboard (REQ-020/031)
-            // — same role check frontend/IndexController uses for '/'.
-            $roleId       = $this->session->get('auth')['role_id'] ?? null;
-            $memberRoleId = \Roles::idsByNames(['member']);
-            $home         = in_array($roleId, $memberRoleId, true) ? 'frontend/dashboard' : 'backend';
-
-            return $this->response->redirect($this->url->get($home));
+            // A member-only user lands in the frontend module's own dashboard
+            // (REQ-020/031); anyone holding another role lands in the backend
+            // — the one rule in Auth::homePath(), shared with '/' and My Profile.
+            return $this->response->redirect($this->url->get($this->auth->homePath()));
         }
 
         $this->view->error = 'Invalid email or password';

@@ -47,7 +47,7 @@ trait TicketTriageActions
         // ticket for itself via the API's selfAssignAction() (see
         // Tickets model docblock) — this human-driven action just never
         // lets someone else hand a ticket to an agent.
-        if (!$assignee || ($agentRoleId !== null && (int) $assignee->role_id === $agentRoleId)) {
+        if (!$assignee || ($agentRoleId !== null && in_array($agentRoleId, $assignee->roleIds(), true))) {
             $this->flash->error('Choose a valid human assignee');
 
             return $this->dispatcher->forward(['controller' => 'tickets', 'action' => 'view', 'params' => [$id]]);

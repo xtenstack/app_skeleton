@@ -106,7 +106,7 @@ class RolesController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'roles', 'action' => 'index']);
         }
 
-        $usersWithRole = \Users::count(['role_id = :role_id:', 'bind' => ['role_id' => $role->id]]);
+        $usersWithRole = \Roles::holderCount((int) $role->id);
 
         if ($usersWithRole > 0) {
             $this->flash->error("Cannot delete a role that is still assigned to {$usersWithRole} user(s)");
@@ -158,7 +158,7 @@ class RolesController extends ControllerBase
         $skipped = 0;
 
         foreach ($roles as $role) {
-            $usersWithRole = \Users::count(['role_id = :role_id:', 'bind' => ['role_id' => $role->id]]);
+            $usersWithRole = \Roles::holderCount((int) $role->id);
 
             if ($usersWithRole > 0) {
                 $skipped++;

@@ -21,14 +21,25 @@ class CurrentPrincipal extends Injectable
 
     private ?int $roleId = null;
 
+    /** @var int[] */
+    private array $roleIds = [];
+
     private ?int $apiKeyId = null;
 
     private bool $resolved = false;
 
-    public function set(int $userId, int $roleId, ?int $apiKeyId = null): void
+    /**
+     * $roleIds is every role the user holds (Users::roleIds()); $roleId is
+     * the primary. An empty $roleIds means "just the primary", so a caller
+     * that knows only the one role (an older module) still sets a usable set.
+     *
+     * @param int[] $roleIds
+     */
+    public function set(int $userId, int $roleId, ?int $apiKeyId = null, array $roleIds = []): void
     {
         $this->userId   = $userId;
         $this->roleId   = $roleId;
+        $this->roleIds  = array_values(array_unique(array_map('intval', $roleIds ?: [$roleId])));
         $this->apiKeyId = $apiKeyId;
         $this->resolved = true;
     }
@@ -37,6 +48,7 @@ class CurrentPrincipal extends Injectable
     {
         $this->userId   = null;
         $this->roleId   = null;
+        $this->roleIds  = [];
         $this->apiKeyId = null;
         $this->resolved = true;
     }
@@ -48,11 +60,38 @@ class CurrentPrincipal extends Injectable
         return $this->userId;
     }
 
+    /**
+     * The primary role (users.role_id). Gates want roleIds()/hasAnyRole();
+     * this is for what still needs one role, such as the Users list.
+     */
     public function roleId(): ?int
     {
         $this->resolve();
 
         return $this->roleId;
+    }
+
+    /**
+     * Every role the principal holds, or [] with no principal.
+     *
+     * @return int[]
+     */
+    public function roleIds(): array
+    {
+        $this->resolve();
+
+        return $this->roleIds;
+    }
+
+    /**
+     * Whether the principal holds at least one of $roleIds — the one
+     * question every $allowedRoles gate, menu item and tile asks.
+     *
+     * @param int[] $roleIds
+     */
+    public function hasAnyRole(array $roleIds): bool
+    {
+        return array_intersect(array_map('intval', $roleIds), $this->roleIds()) !== [];
     }
 
     /**

@@ -18,8 +18,8 @@ class Auth extends Injectable
 
     /**
      * Verifies credentials against the users table and, on success, stores
-     * the authenticated user's id/email/role_id in the session and makes
-     * that user this request's principal.
+     * the authenticated user's id/email/role_id/role_ids in the session and
+     * makes that user this request's principal.
      */
     public function check(string $email, string $password): bool
     {
@@ -36,16 +36,19 @@ class Auth extends Injectable
             'bind'       => ['email' => $email],
         ]);
 
-        if (!$user || !password_verify($password, $user->password_hash)) {
+        if (!$user instanceof \Users || !password_verify($password, $user->password_hash)) {
             Audit::recordEvent('login_failed', $user?->id, ['email' => $email, 'ip' => $ip]);
 
             return false;
         }
 
+        $roleIds = $user->roleIds();
+
         $this->session->set('auth', [
             'id'         => $user->id,
             'email'      => $user->email,
             'role_id'    => $user->role_id,
+            'role_ids'   => $roleIds,
             'first_name' => $user->first_name,
             'last_name'  => $user->last_name,
         ]);
@@ -57,7 +60,7 @@ class Auth extends Injectable
         }
 
         $this->session->set('user_settings', $userSettings);
-        $this->currentPrincipal->set((int) $user->id, (int) $user->role_id);
+        $this->currentPrincipal->set((int) $user->id, (int) $user->role_id, null, $roleIds);
 
         Audit::recordEvent('login', (int) $user->id);
 
@@ -78,9 +81,43 @@ class Auth extends Injectable
             return false;
         }
 
-        $this->currentPrincipal->set((int) $auth['id'], (int) ($auth['role_id'] ?? 0));
+        $this->currentPrincipal->set((int) $auth['id'], (int) ($auth['role_id'] ?? 0), null, self::roleIdsFrom($auth));
 
         return true;
+    }
+
+    /**
+     * The role set in a session's `auth` array. A session written before
+     * role_ids existed has only role_id, and is read as that one role, so
+     * nobody is logged out or refused by a deploy.
+     *
+     * @param array<string, mixed> $auth
+     *
+     * @return int[]
+     */
+    public static function roleIdsFrom(array $auth): array
+    {
+        $roleIds = $auth['role_ids'] ?? null;
+
+        if (!is_array($roleIds) || $roleIds === []) {
+            $roleIds = isset($auth['role_id']) ? [$auth['role_id']] : [];
+        }
+
+        return array_values(array_unique(array_map('intval', $roleIds)));
+    }
+
+    /**
+     * Where the logged-in user lands: the member dashboard when `member` is
+     * the only role they hold, the backend when they hold any other role
+     * (whatever the primary is — the backend is where every staff,
+     * instructor and agent role works). One rule for login, '/' and the
+     * profile page's home link, so they cannot drift.
+     */
+    public function homePath(): string
+    {
+        $otherRoles = array_diff($this->currentPrincipal->roleIds(), \Roles::idsByNames(['member']));
+
+        return $otherRoles === [] ? 'frontend/dashboard' : 'backend';
     }
 
     public function logout(): void

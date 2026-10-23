@@ -21,7 +21,14 @@ class UsersController extends ControllerBase
             'asc'
         );
 
+        $roleNames = [];
+
+        foreach (\Roles::find() as $role) {
+            $roleNames[(int) $role->id] = (string) $role->name;
+        }
+
         $this->view->users        = $list['results'];
+        $this->view->roleNames    = $roleNames;
         $this->view->listState    = $list;
         $this->view->preserveQuery = $list['preserve'];
     }
@@ -60,11 +67,17 @@ class UsersController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'new']);
         }
 
+        $roles = $this->postedRoles();
+
+        if ($roles === null) {
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'new']);
+        }
+
         $user                = new \Users();
         $user->email         = (string) $this->request->getPost('email', 'email');
         $user->first_name    = (string) $this->request->getPost('first_name');
         $user->last_name     = (string) $this->request->getPost('last_name');
-        $user->role_id       = (int) $this->request->getPost('role_id', 'int');
+        $user->role_id       = $roles['primary'];
         $user->operator_code = (string) $this->request->getPost('operator_code') ?: null;
         $user->is_active     = $this->request->getPost('is_active') ? 1 : 0;
         $user->password_hash = password_hash($password, PASSWORD_DEFAULT);
@@ -75,6 +88,12 @@ class UsersController extends ControllerBase
             }
 
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'new']);
+        }
+
+        if (!\UserRoles::syncForUser((int) $user->id, $roles['all'])) {
+            $this->flash->error('User was created but the role set could not be saved — edit the user to retry');
+
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
         }
 
         $this->flash->success('User was created successfully');
@@ -97,10 +116,16 @@ class UsersController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
         }
 
+        $roles = $this->postedRoles();
+
+        if ($roles === null) {
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'edit', 'params' => [$id]]);
+        }
+
         $user->email          = (string) $this->request->getPost('email', 'email');
         $user->first_name     = (string) $this->request->getPost('first_name');
         $user->last_name      = (string) $this->request->getPost('last_name');
-        $user->role_id        = (int) $this->request->getPost('role_id', 'int');
+        $user->role_id        = $roles['primary'];
         $user->operator_code  = (string) $this->request->getPost('operator_code') ?: null;
         $user->is_active      = $this->request->getPost('is_active') ? 1 : 0;
 
@@ -124,9 +149,56 @@ class UsersController extends ControllerBase
             return $this->dispatcher->forward(['controller' => 'users', 'action' => 'edit', 'params' => [$id]]);
         }
 
+        if (!\UserRoles::syncForUser((int) $user->id, $roles['all'])) {
+            $this->flash->error('The role set could not be saved — please try again');
+
+            return $this->dispatcher->forward(['controller' => 'users', 'action' => 'edit', 'params' => [$id]]);
+        }
+
         $this->flash->success('User was updated successfully');
 
         return $this->dispatcher->forward(['controller' => 'users', 'action' => 'index']);
+    }
+
+    /**
+     * The role set from the form: role_ids[] (the ticked roles) and role_id
+     * (the primary, which must be one of them). A form that posts only
+     * role_id — the shape before user_roles existed, which the API-less
+     * callers and older tests still send — means a set of just that role.
+     * Null, with the error already flashed, when the input is not usable.
+     *
+     * @return array{primary: int, all: int[]}|null
+     */
+    private function postedRoles(): ?array
+    {
+        $primary = (int) $this->request->getPost('role_id', 'int');
+        $all     = array_values(array_unique(array_filter(array_map('intval', (array) $this->request->getPost('role_ids', null, [])))));
+
+        if ($all === []) {
+            $all = $primary > 0 ? [$primary] : [];
+        }
+
+        if ($all === []) {
+            $this->flash->error('Select at least one role');
+
+            return null;
+        }
+
+        if (!in_array($primary, $all, true)) {
+            $this->flash->error('The primary role must be one of the selected roles');
+
+            return null;
+        }
+
+        $known = \Roles::count(['id IN ({ids:array})', 'bind' => ['ids' => $all]]);
+
+        if ((int) $known !== count($all)) {
+            $this->flash->error('Unknown role selected');
+
+            return null;
+        }
+
+        return ['primary' => $primary, 'all' => $all];
     }
 
     public function deleteAction($id)
@@ -156,15 +228,26 @@ class UsersController extends ControllerBase
         // (audit_log.actor_user_id, tickets.reporter_user_id, api_keys,
         // etc.), and those references need to keep resolving to a real
         // row for history to stay readable.
-        if (in_array((int) $user->role_id, \Roles::idsByNames(['admin']), true)) {
+        $adminRoleId = \Roles::idsByNames(['admin'])[0] ?? 0;
+
+        if (in_array($adminRoleId, $user->roleIds(), true)) {
             // count() isn't covered by SoftDeletes (only find()/findFirst()
             // exclude trashed rows automatically), so deleted_at IS NULL
             // has to be explicit here — without it, every admin ever
             // soft-deleted keeps counting as "another active admin"
             // forever, silently defeating this guard the moment one exists.
+            // Admin held as a primary or in user_roles both count.
+            $secondaryAdminIds = \UserRoles::userIdsForRole($adminRoleId);
+            $holdsAdmin        = $secondaryAdminIds === [] ? 'role_id = :role_id:' : '(role_id = :role_id: OR id IN ({ids:array}))';
+            $bind              = ['role_id' => $adminRoleId, 'id' => $user->id];
+
+            if ($secondaryAdminIds !== []) {
+                $bind['ids'] = $secondaryAdminIds;
+            }
+
             $otherActiveAdmins = \Users::count([
-                'role_id = :role_id: AND is_active = 1 AND deleted_at IS NULL AND id != :id:',
-                'bind' => ['role_id' => $user->role_id, 'id' => $user->id],
+                $holdsAdmin . ' AND is_active = 1 AND deleted_at IS NULL AND id != :id:',
+                'bind' => $bind,
             ]);
 
             if ($otherActiveAdmins === 0) {

@@ -4,8 +4,8 @@
 
 // Hand-written menu.php, not ModuleManager::mergedMenu('frontend') — see
 // config/menu.php's own comment for why.
-$menu   = include __DIR__ . '/../../config/menu.php';
-$roleId = $this->session->get('auth')['role_id'] ?? null;
+$menu      = include __DIR__ . '/../../config/menu.php';
+$principal = $this->currentPrincipal;
 ?>
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
   <a href="<?= $this->url->get('frontend/dashboard') ?>" class="brand-link">
@@ -15,7 +15,7 @@ $roleId = $this->session->get('auth')['role_id'] ?? null;
     <nav class="mt-2">
       <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
 <?php foreach ($menu as $item): ?>
-<?php if ($item['roles'] !== null && !in_array($roleId, $item['roles'], true)) continue; ?>
+<?php if ($item['roles'] !== null && !$principal->hasAnyRole($item['roles'])) continue; ?>
         <li class="nav-item">
           <a href="<?= $this->url->get($item['url']) ?>" class="nav-link <?= $controllerName === $item['controller'] ? 'active' : '' ?>">
             <i class="nav-icon <?= $item['icon'] ?>"></i>

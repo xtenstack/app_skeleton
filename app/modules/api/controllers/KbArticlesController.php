@@ -391,7 +391,7 @@ class KbArticlesController extends ControllerBase
 
     private function hasRole(array $names): bool
     {
-        return in_array((int) $this->principal['role_id'], array_map('intval', \Roles::idsByNames($names)), true);
+        return $this->currentPrincipal->hasAnyRole(\Roles::idsByNames($names));
     }
 
     private function publishedOnly(): bool
@@ -407,9 +407,7 @@ class KbArticlesController extends ControllerBase
     /** @return \Phalcon\Http\ResponseInterface|null null when the caller is allowed through */
     private function requireWriteRole()
     {
-        $allowedRoleIds = \Roles::idsByNames(self::WRITE_ROLES);
-
-        if (!in_array($this->principal['role_id'], $allowedRoleIds, true)) {
+        if (!$this->currentPrincipal->hasAnyRole(\Roles::idsByNames(self::WRITE_ROLES))) {
             $this->response->setStatusCode(403, 'Forbidden');
 
             return $this->response->setJsonContent(['error' => 'Forbidden']);

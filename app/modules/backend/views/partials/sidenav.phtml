@@ -2,12 +2,12 @@
 /** @var \Phalcon\Mvc\View\Engine\Php $this */
 /** @var string $controllerName */
 
-$menu   = $this->moduleManager->mergedMenu('backend');
-$roleId = $this->session->get('auth')['role_id'] ?? null;
+$menu      = $this->moduleManager->mergedMenu('backend');
+$principal = $this->currentPrincipal;
 
 $visible = array_values(array_filter(
     $menu,
-    fn ($item) => $item['roles'] === null || in_array($roleId, $item['roles'], true)
+    fn ($item) => $item['roles'] === null || $principal->hasAnyRole($item['roles'])
 ));
 
 // Bucket into groups, preserving each group's first-appearance position

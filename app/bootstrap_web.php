@@ -196,7 +196,7 @@ try {
             $isAdmin = false;
 
             if ($di->getShared('auth')->isLoggedIn()) {
-                $isAdmin = ((int) ($di->getShared('session')->get('auth')['role_id'] ?? 0)) === 1;
+                $isAdmin = $di->getShared('currentPrincipal')->hasAnyRole([1]);
             }
 
             if (!$isLoginRoute && !$isAdmin) {

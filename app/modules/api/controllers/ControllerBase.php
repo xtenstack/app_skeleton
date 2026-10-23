@@ -9,7 +9,9 @@ class ControllerBase extends Controller
 {
     /**
      * Role ids allowed to use this controller, or null for "any
-     * authenticated user". Set per-subclass to restrict further.
+     * authenticated user". Set per-subclass to restrict further. A caller
+     * holding any one of them passes (users hold a set of roles, see
+     * Users::roleIds()).
      */
     protected ?array $allowedRoles = null;
 
@@ -54,7 +56,12 @@ class ControllerBase extends Controller
             $this->principal = $this->apiKeyAuth->resolve($token);
         } elseif ($this->auth->isLoggedIn()) {
             $auth = $this->session->get('auth');
-            $this->principal = ['type' => 'user', 'user_id' => $auth['id'], 'role_id' => $auth['role_id']];
+            $this->principal = [
+                'type'     => 'user',
+                'user_id'  => $auth['id'],
+                'role_id'  => $auth['role_id'],
+                'role_ids' => \App_skeleton\Auth::roleIdsFrom($auth),
+            ];
         }
 
         if (!$this->principal) {
@@ -64,7 +71,7 @@ class ControllerBase extends Controller
             exit;
         }
 
-        if ($this->allowedRoles !== null && !in_array($this->principal['role_id'], $this->allowedRoles, true)) {
+        if ($this->allowedRoles !== null && !$this->currentPrincipal->hasAnyRole($this->allowedRoles)) {
             $this->response->setStatusCode(403, 'Forbidden');
             $this->response->setJsonContent(['error' => 'Forbidden']);
             $this->response->send();
@@ -77,9 +84,10 @@ class ControllerBase extends Controller
         $auth = $this->session->get('auth');
 
         return [
-            'id'      => $auth['id'] ?? null,
-            'email'   => $auth['email'] ?? null,
-            'role_id' => $auth['role_id'] ?? null,
+            'id'       => $auth['id'] ?? null,
+            'email'    => $auth['email'] ?? null,
+            'role_id'  => $auth['role_id'] ?? null,
+            'role_ids' => is_array($auth) ? \App_skeleton\Auth::roleIdsFrom($auth) : [],
         ];
     }
 

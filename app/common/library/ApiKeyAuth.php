@@ -54,20 +54,25 @@ class ApiKeyAuth extends Injectable
             'bind'       => ['id' => $apiKey->user_id],
         ]);
 
-        if (!$user) {
+        // instanceof, not a falsy check: findFirst() is typed against
+        // ModelInterface, which has no roleIds() (Psalm UndefinedInterfaceMethod).
+        if (!$user instanceof \Users) {
             return null;
         }
 
         $apiKey->last_used_at = date('Y-m-d H:i:s');
         $apiKey->save();
 
-        $this->currentPrincipal->set((int) $user->id, (int) $user->role_id, (int) $apiKey->id);
+        $roleIds = $user->roleIds();
+
+        $this->currentPrincipal->set((int) $user->id, (int) $user->role_id, (int) $apiKey->id, $roleIds);
 
         return [
             'type'       => 'user',
             'api_key_id' => (int) $apiKey->id,
             'user_id'    => (int) $user->id,
             'role_id'    => (int) $user->role_id,
+            'role_ids'   => $roleIds,
             'label'      => $apiKey->name,
         ];
     }

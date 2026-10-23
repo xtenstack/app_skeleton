@@ -62,6 +62,24 @@ class Roles extends Phalcon\Mvc\Model
      *
      * @return int[]
      */
+    /**
+     * Live (not soft-deleted) users holding this role, as the primary or
+     * in user_roles — what the delete guard counts.
+     */
+    public static function holderCount(int $roleId): int
+    {
+        $secondaryUserIds = UserRoles::userIdsForRole($roleId);
+
+        if ($secondaryUserIds === []) {
+            return (int) Users::count(['role_id = :role_id:', 'bind' => ['role_id' => $roleId]]);
+        }
+
+        return (int) Users::count([
+            'role_id = :role_id: OR id IN ({ids:array})',
+            'bind' => ['role_id' => $roleId, 'ids' => $secondaryUserIds],
+        ]);
+    }
+
     public static function idsByNames(array $names): array
     {
         if (!$names) {

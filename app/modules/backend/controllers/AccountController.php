@@ -200,9 +200,7 @@ class AccountController extends ControllerBase
     // is unchanged.
     private function homeUrl(): string
     {
-        $roleId = (int) ($this->session->get('auth')['role_id'] ?? 0);
-
-        if (in_array($roleId, \Roles::idsByNames(['member']), true)) {
+        if ($this->auth->homePath() === 'frontend/dashboard') {
             return $this->url->get('frontend/dashboard');
         }
 

@@ -11,17 +11,12 @@ class IndexController extends ControllerBase
      * frontend module rather than the landing page living inside the
      * admin module). A logged-in user landing on '/' gets bounced
      * straight to their actual home instead of seeing marketing copy —
-     * same role check SessionController::loginAction() uses.
+     * same rule SessionController::loginAction() uses (Auth::homePath()).
      */
     public function indexAction()
     {
         if ($this->auth->isLoggedIn()) {
-            $roleId       = $this->session->get('auth')['role_id'] ?? null;
-            $memberRoleId = \Roles::idsByNames(['member']);
-
-            $home = in_array($roleId, $memberRoleId, true) ? 'frontend/dashboard' : 'backend';
-
-            return $this->response->redirect($this->url->get($home));
+            return $this->response->redirect($this->url->get($this->auth->homePath()));
         }
     }
 
