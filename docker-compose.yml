@@ -133,6 +133,12 @@ services:
       # served only through an authenticated action, so app-only. Without
       # it every deploy's container recreate would lose the uploads.
       - ./data/lin-media:/app/storage/lin-media
+      # LMS course materials, library files and reference attachments
+      # (xtendeploy/lms, Lms\FileStore): PDFs, video, audio, documents,
+      # served only through the module's authenticated /lms/files/... action,
+      # so app-only, same rationale as the three mounts above. Without it
+      # every deploy's container recreate would lose the uploads.
+      - ./data/lms-files:/app/storage/lms-files
       # Same host path docker/backup-db.sh already wrote to (not under
       # data/) — BackupTask (REQ-077) reuses it so existing backups on
       # any already-deployed instance stay in one place, not split
