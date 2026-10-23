@@ -29,8 +29,7 @@ class KbArticlesController extends ControllerBase
 
         parent::onConstruct();
 
-        $roleId = $this->session->get('auth')['role_id'] ?? null;
-        $this->view->setVar('canWrite', in_array($roleId, \Roles::idsByNames(['admin']), true));
+        $this->view->setVar('canWrite', $this->currentPrincipal->hasAnyRole(\Roles::idsByNames(['admin'])));
     }
 
     public function indexAction(): void

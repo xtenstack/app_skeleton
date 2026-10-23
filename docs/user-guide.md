@@ -25,10 +25,15 @@ editor, so a member editing their own details can never reach fields
 only staff should set.
 
 **Users and roles.** `UsersController` manages every other user's
-profile, role assignment, and active/inactive state; `RolesController`
-manages the roles themselves. Access control is whole-controller
-(`$allowedRoles` on a controller class), not per-action or per-record —
-a deliberate v1 limit, documented in MODULE-SPEC.md's RBAC section.
+profile, roles, and active/inactive state; `RolesController` manages
+the roles themselves. A user may hold several roles at once (tick them on
+the user's edit screen); access is granted by any one of them, and the
+"primary role" is the one shown in lists and the one older code still
+reads. A member-only user lands on the member dashboard after login;
+anyone holding another role lands in the backend. Access control is
+whole-controller (`$allowedRoles` on a controller class), not per-action
+or per-record — a deliberate v1 limit, documented in MODULE-SPEC.md's
+RBAC section.
 
 **Tickets.** A full customer-support ticketing system: severity and type
 triage, assignment, consolidation of duplicates, attachments, QA review,

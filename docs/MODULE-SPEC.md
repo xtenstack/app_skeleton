@@ -294,6 +294,24 @@ own grain.
 Declare `$allowedRoles` per controller the same way the base engine's
 own controllers do.
 
+A user holds a **set** of roles (`user_roles`, plus `users.role_id` as the
+primary; `Users::roleIds()` is the union). A gate passes when the user
+holds *any* allowed role, so check it with the shared principal service,
+never by reading one role out of the session:
+
+```php
+if ($this->allowedRoles !== null && !$this->currentPrincipal->hasAnyRole($this->allowedRoles)) {
+    // 403
+}
+```
+
+The session's `auth.role_id` and an API principal's `role_id` are the
+primary role only — a gate that compares them lets a user in by their
+primary and ignores every other role they hold. `auth.role_ids` and
+`principal.role_ids` carry the set; `App_skeleton\Auth::roleIdsFrom($auth)`
+reads it from a session array (and from one written before the set
+existed). Menu `roles` lists mean "any of" for the same reason.
+
 ## Event bus
 
 Shared `eventsBus` service (Phalcon `EventsManager`, colon-namespaced

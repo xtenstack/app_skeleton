@@ -22,7 +22,7 @@
             <tr>
               <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Email', 'email', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
               <th><?= \App_skeleton\ListView::sortLink($baseUrl, 'Name', 'first_name', $listState['sort'], $listState['dir'], $preserveQuery) ?></th>
-              <th>Role</th>
+              <th>Roles</th>
               <th>Operator Code</th>
               <th>Active</th>
               <th></th>
@@ -33,7 +33,13 @@
             <tr>
               <td><?= $this->escaper->escapeHtml($user->email) ?></td>
               <td><?= $this->escaper->escapeHtml(trim($user->first_name . ' ' . $user->last_name)) ?></td>
-              <td><?= $this->escaper->escapeHtml($user->Roles ? $user->Roles->name : '—') ?></td>
+              <td><?php
+                $names = [];
+                foreach ($user->roleIds() as $heldRoleId) {
+                    $names[] = $roleNames[$heldRoleId] ?? ('#' . $heldRoleId);
+                }
+                echo $this->escaper->escapeHtml($names ? implode(', ', $names) : '—');
+              ?></td>
               <td><?= $user->operator_code ? $this->escaper->escapeHtml($user->operator_code) : '—' ?></td>
               <td><?= $user->is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>' ?></td>
               <td class="text-right">

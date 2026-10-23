@@ -51,8 +51,10 @@ class TicketsController extends ControllerBase
 
         parent::onConstruct();
 
+        // A Charter Agent who also holds a staff role is staff: a role set
+        // grants the union of what each role may do.
         $auth = $this->session->get('auth') ?? [];
-        $this->isCharterAgent = in_array($auth['role_id'] ?? null, $agents, true);
+        $this->isCharterAgent = $this->currentPrincipal->hasAnyRole($agents) && !$this->currentPrincipal->hasAnyRole($staff);
         $this->view->setVar('isStaff', !$this->isCharterAgent);
 
         $ticketId = (int) ($this->dispatcher->getParams()[0] ?? 0);

@@ -12,15 +12,15 @@ class IndexController extends ControllerBase
      */
     public function indexAction(): void
     {
-        $menu   = $this->moduleManager->mergedMenu('backend');
-        $roleId = $this->session->get('auth')['role_id'] ?? null;
+        $menu      = $this->moduleManager->mergedMenu('backend');
+        $principal = $this->currentPrincipal;
 
-        $this->view->tiles = array_values(array_filter($menu, function ($item) use ($roleId) {
+        $this->view->tiles = array_values(array_filter($menu, function ($item) use ($principal) {
             if ($item['controller'] === 'index') {
                 return false;
             }
 
-            return $item['roles'] === null || in_array($roleId, $item['roles'], true);
+            return $item['roles'] === null || $principal->hasAnyRole($item['roles']);
         }));
     }
 

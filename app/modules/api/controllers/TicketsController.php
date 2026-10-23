@@ -227,9 +227,7 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'POST required']);
         }
 
-        $allowedRoleIds = \Roles::idsByNames(['admin', 'operator']);
-
-        if (!in_array($this->principal['role_id'], $allowedRoleIds, true)) {
+        if (!$this->currentPrincipal->hasAnyRole(\Roles::idsByNames(['admin', 'operator']))) {
             $this->response->setStatusCode(403, 'Forbidden');
 
             return $this->response->setJsonContent(['error' => 'Forbidden']);

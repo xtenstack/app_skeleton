@@ -139,6 +139,24 @@ class Users extends Phalcon\Mvc\Model
         $this->hasOne('id', 'UserProfiles', 'user_id', ['alias' => 'Profile']);
         $this->hasMany('id', 'UserSettings', 'user_id', ['alias' => 'Settings']);
         $this->hasMany('id', 'ApiKeys', 'user_id', ['alias' => 'ApiKeys']);
+        $this->hasMany('id', 'UserRoles', 'user_id', ['alias' => 'UserRoles']);
+    }
+
+    /**
+     * Every role this user holds: role_id (the primary) plus user_roles.
+     * The union, so a row written by a path that only sets role_id still
+     * holds that role. Gates read this, never role_id alone.
+     *
+     * @return int[] sorted, unique
+     */
+    public function roleIds(): array
+    {
+        $ids = UserRoles::roleIdsForUser((int) $this->id);
+        $ids[] = (int) $this->role_id;
+        $ids = array_values(array_unique(array_filter($ids, static fn (int $id): bool => $id > 0)));
+        sort($ids);
+
+        return $ids;
     }
 
 }

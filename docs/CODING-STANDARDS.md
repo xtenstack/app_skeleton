@@ -64,10 +64,15 @@ docblocks only where the types themselves don't tell the story.
 ## Controllers
 
 - `ControllerBase::$allowedRoles` for role gating — `null` means "any
-  authenticated user," an array of role ids restricts further. Resolve
-  role ids at runtime via `Roles::idsByNames([...])`, never hardcode an
-  id. New endpoints declare their RBAC requirement explicitly —
-  "temporarily public" is not a state this project ships.
+  authenticated user," an array of role ids restricts further; a user
+  holding any one of them passes. Resolve role ids at runtime via
+  `Roles::idsByNames([...])`, never hardcode an id. New endpoints declare
+  their RBAC requirement explicitly — "temporarily public" is not a state
+  this project ships.
+- Users hold a set of roles (`Users::roleIds()`: `users.role_id`, the
+  primary, plus `user_roles`). A per-action check asks
+  `$this->currentPrincipal->hasAnyRole([...])`; never read
+  `auth.role_id` as *the* role.
 - Backend (HTML) and API (JSON) controllers are separate classes even
   when they cover the same resource (e.g. `Tickets`) — triage/admin
   actions live backend-only, machine-facing actions live api-only. Don't
