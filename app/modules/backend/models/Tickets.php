@@ -66,6 +66,7 @@ class Tickets extends \Phalcon\Mvc\Model
         $this->belongsTo('consolidated_into_ticket_id', 'Tickets', 'id', ['alias' => 'ConsolidatedInto']);
         $this->belongsTo('kb_enquiry_type_id', 'KbEnquiryTypes', 'id', ['alias' => 'KbEnquiryType']);
         $this->hasMany('id', 'TicketAttachments', 'ticket_id', ['alias' => 'Attachments']);
+        $this->hasMany('id', 'TicketMessages', 'ticket_id', ['alias' => 'Messages']);
     }
 
     public function beforeSave(): void
