@@ -108,3 +108,14 @@ game.xten.au, play.xten.au {
     header @static Cache-Control "public, max-age=3600"
     file_server
 }
+
+# forum.xten.au (Flarum 1.8, the XTen forum) -- own compose project at /opt/forum on
+# Internal Prod (flarum app + its own MariaDB, no caddy of its own), reached by
+# container name over edge_shared like the sites above. No CSP header here:
+# Flarum ships inline scripts and sets its own security headers. Flarum's DB
+# service is deliberately NOT named `db` (that alias collides with the other
+# stacks' db containers on edge_shared).
+forum.xten.au {
+    encode gzip
+    reverse_proxy forum-app-1:8000
+}
