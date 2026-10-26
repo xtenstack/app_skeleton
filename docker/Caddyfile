@@ -63,6 +63,11 @@ games.xten.au {
         X-Frame-Options "DENY"
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'none'"
     }
+    # SPA shell (GX-SPEC-04, MAA-20261026-011): the built frontend lives in public/app; the bare
+    # /app and /app/ paths would otherwise fall through to PHP and 404.
+    @appindex path /app /app/
+    rewrite @appindex /app/index.html
+
     php_fastcgi games-app-1:9000 {
         root /app/public
     }
@@ -82,6 +87,11 @@ xwar.xten.au {
         X-Frame-Options "DENY"
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'none'"
     }
+    # SPA shell (GX-SPEC-04, MAA-20261026-011): the built frontend lives in public/app; the bare
+    # /app and /app/ paths would otherwise fall through to PHP and 404.
+    @appindex path /app /app/
+    rewrite @appindex /app/index.html
+
     php_fastcgi xwar-app-1:9000 {
         root /app/public
     }
@@ -101,6 +111,11 @@ game.xten.au, play.xten.au {
         X-Frame-Options "DENY"
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'none'"
     }
+    # SPA shell (GX-SPEC-04, MAA-20261026-011): the built frontend lives in public/app; the bare
+    # /app and /app/ paths would otherwise fall through to PHP and 404.
+    @appindex path /app /app/
+    rewrite @appindex /app/index.html
+
     php_fastcgi game-app-1:9000 {
         root /app/public
     }
