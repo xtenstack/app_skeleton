@@ -23,6 +23,7 @@ class TicketsController extends ControllerBase
     // TicketTriageActions.php's own docblock (project audit, 2026-08-11,
     // Tier 2 — same file, flagged again after growing back past 500 lines).
     use TicketTriageActions;
+    use TicketMessageActions;
 
     protected ?array $allowedRoles = null; // resolved at runtime, see RBAC section — not hardcoded ids
 
@@ -215,6 +216,7 @@ class TicketsController extends ControllerBase
             return;
         }
 
+        $this->view->ticketMessages   = \TicketMessages::forTicket((int) $ticket->id, true, 0, 500);
         $this->view->assignableUsers  = $this->humanUsers();
         $this->view->otherOpenTickets = \Tickets::find([
             'conditions' => 'id != :id:',

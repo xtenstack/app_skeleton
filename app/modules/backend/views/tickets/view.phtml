@@ -116,6 +116,37 @@
       </div>
     </div>
 
+<?php if ($isStaff): ?>
+    <div class="card mb-3">
+      <div class="card-header">Conversation</div>
+      <div class="card-body">
+<?php if (empty($ticketMessages)): ?>
+        <p class="text-muted">No messages yet.</p>
+<?php else: ?>
+<?php foreach ($ticketMessages as $m): ?>
+        <div class="mb-3 pl-2 border-left <?= $m->visibility === 'public' ? 'border-primary' : 'border-warning' ?>">
+          <div class="small mb-1">
+            <span class="badge <?= $m->visibility === 'public' ? 'badge-primary' : 'badge-warning' ?>"><?= $m->visibility === 'public' ? 'Public reply (client sees this)' : 'Internal note (staff only)' ?></span>
+            <span class="text-muted"><?= $this->escaper->escapeHtml((string) $m->created_at) ?><?= $m->Author ? ' · ' . $this->escaper->escapeHtml((string) $m->Author->email) : '' ?></span>
+          </div>
+          <div><?= nl2br($this->escaper->escapeHtml($m->body)) ?></div>
+        </div>
+<?php endforeach; ?>
+<?php endif; ?>
+        <form method="post" action="<?= $this->url->get('backend/tickets/reply/' . $ticket->id) ?>" class="mb-3">
+          <label class="font-weight-bold" for="reply-body">Reply to client <span class="text-muted font-weight-normal">(public)</span></label>
+          <textarea id="reply-body" name="body" class="form-control mb-2" rows="3" maxlength="10000" required></textarea>
+          <button type="submit" class="btn btn-primary btn-sm">Send public reply</button>
+        </form>
+        <form method="post" action="<?= $this->url->get('backend/tickets/note/' . $ticket->id) ?>">
+          <label class="font-weight-bold" for="note-body">Internal note <span class="text-muted font-weight-normal">(staff only)</span></label>
+          <textarea id="note-body" name="body" class="form-control mb-2" rows="2" maxlength="10000" required></textarea>
+          <button type="submit" class="btn btn-outline-secondary btn-sm">Save internal note</button>
+        </form>
+      </div>
+    </div>
+<?php endif; ?>
+
     <div class="card mb-3">
       <div class="card-header">Retest</div>
       <div class="card-body">

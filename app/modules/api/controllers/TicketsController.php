@@ -323,6 +323,225 @@ class TicketsController extends ControllerBase
         return $this->response->setJsonContent(['ticket' => $this->serialize($ticket)]);
     }
 
+    /**
+     * Staff reply on a ticket, visible to the game/service client that
+     * raised it (GX-SPEC-05). admin/operator only. Body is a JSON
+     * {"body": "...", "external_ref": "..."}; external_ref is optional and
+     * makes a retry return the original message instead of a duplicate.
+     * Does not change the ticket's status — a reply to a closed ticket
+     * stays "closed, reply available" rather than silently reopening it.
+     */
+    public function replyAction($id)
+    {
+        return $this->createMessage($id, \TicketMessages::VISIBILITY_PUBLIC);
+    }
+
+    /**
+     * Staff-only internal note. Same shape as replyAction(), but the
+     * message is never returned to a client by messagesAction().
+     */
+    public function noteAction($id)
+    {
+        return $this->createMessage($id, \TicketMessages::VISIBILITY_INTERNAL);
+    }
+
+    /**
+     * The ticket's conversation, ascending by message id, after an
+     * optional ?after_id= cursor (and ?limit=, default 100, max 200).
+     * Staff see public and internal messages. Anyone else sees only the
+     * public ones, and only on a ticket they raised (the API key that
+     * created it, or the reporting user for a session caller); any other
+     * ticket is a 404 so a sequential id never confirms a ticket exists.
+     * An after_id that is not a message of this ticket (or, for a client,
+     * not a visible one) is a 422, never a silent skip.
+     */
+    public function messagesAction($id)
+    {
+        if (!$this->request->isGet()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'GET required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+        $staff  = $this->isStaff();
+
+        if (!$ticket || (!$staff && !$this->raisedByCaller($ticket))) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $afterRaw = $this->request->getQuery('after_id');
+        $limitRaw = $this->request->getQuery('limit');
+
+        if (($afterRaw !== null && $afterRaw !== '' && !ctype_digit((string) $afterRaw))
+            || ($limitRaw !== null && $limitRaw !== '' && (!ctype_digit((string) $limitRaw) || (int) $limitRaw < 1))) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'after_id and limit must be positive integers']);
+        }
+
+        $afterId = ($afterRaw === null || $afterRaw === '') ? 0 : (int) $afterRaw;
+        $limit   = ($limitRaw === null || $limitRaw === '') ? 100 : min((int) $limitRaw, 200);
+
+        if ($afterId > 0) {
+            $cursor = \TicketMessages::findFirst([
+                'conditions' => 'id = :id: AND ticket_id = :ticket_id:',
+                'bind'       => ['id' => $afterId, 'ticket_id' => (int) $ticket->id],
+            ]);
+
+            if (!$cursor || (!$staff && $cursor->visibility !== \TicketMessages::VISIBILITY_PUBLIC)) {
+                $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+                return $this->response->setJsonContent(['error' => 'after_id is not a message of this ticket']);
+            }
+        }
+
+        $messages = \TicketMessages::forTicket((int) $ticket->id, $staff, $afterId, $limit + 1);
+        $hasMore  = count($messages) > $limit;
+
+        if ($hasMore) {
+            array_pop($messages);
+        }
+
+        $last = $messages ? (int) end($messages)->id : $afterId;
+
+        return $this->response->setJsonContent([
+            'ticket'   => [
+                'id'           => (int) $ticket->id,
+                'status'       => $ticket->status,
+                'source_ref'   => $ticket->source_ref,
+                'closed_at'    => $ticket->closed_at,
+                'close_reason' => $ticket->close_reason,
+            ],
+            'messages' => array_map(fn (\TicketMessages $m) => $this->serializeMessage($m, $staff), $messages),
+            'last_id'  => $last,
+            'has_more' => $hasMore,
+        ]);
+    }
+
+    private function isStaff(): bool
+    {
+        return $this->currentPrincipal->hasAnyRole(\Roles::idsByNames(['admin', 'operator']));
+    }
+
+    private function raisedByCaller(\Tickets $ticket): bool
+    {
+        $apiKeyId = $this->currentPrincipal->apiKeyId();
+
+        if ($apiKeyId !== null) {
+            return $ticket->reporter_api_key_id !== null && (int) $ticket->reporter_api_key_id === $apiKeyId;
+        }
+
+        $userId = $this->currentPrincipal->userId();
+
+        return $userId !== null && $ticket->reporter_user_id !== null && (int) $ticket->reporter_user_id === $userId;
+    }
+
+    private function createMessage($id, string $visibility)
+    {
+        if (!$this->request->isPost()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'POST required']);
+        }
+
+        if (!$this->isStaff()) {
+            $this->response->setStatusCode(403, 'Forbidden');
+
+            return $this->response->setJsonContent(['error' => 'Forbidden']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+
+        if (!$ticket) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $json = $this->getJsonBody();
+        $body = trim((string) ($json['body'] ?? ''));
+        $ref  = isset($json['external_ref']) ? trim((string) $json['external_ref']) : '';
+
+        if ($body === '' || mb_strlen($body) > \TicketMessages::MAX_BODY_LENGTH) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'body is required and must be at most ' . \TicketMessages::MAX_BODY_LENGTH . ' characters']);
+        }
+
+        if (strlen($ref) > 100) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'external_ref must be 100 characters or fewer']);
+        }
+
+        $authorUserId = $this->currentPrincipal->userId();
+
+        if ($ref !== '') {
+            $existing = \TicketMessages::findFirst([
+                'conditions' => 'ticket_id = :ticket_id: AND author_user_id = :author: AND external_ref = :ref:',
+                'bind'       => ['ticket_id' => (int) $ticket->id, 'author' => $authorUserId, 'ref' => $ref],
+            ]);
+
+            if ($existing) {
+                if ($existing->visibility !== $visibility || $existing->body !== $body) {
+                    $this->response->setStatusCode(409, 'Conflict');
+
+                    return $this->response->setJsonContent(['error' => 'external_ref was already used for a different message']);
+                }
+
+                return $this->response->setJsonContent(['message' => $this->serializeMessage($existing, true), 'duplicate' => true]);
+            }
+        }
+
+        $message                    = new \TicketMessages();
+        $message->ticket_id         = (int) $ticket->id;
+        $message->author_user_id    = $authorUserId;
+        $message->author_api_key_id = $this->currentPrincipal->apiKeyId();
+        $message->visibility        = $visibility;
+        $message->body              = $body;
+        $message->external_ref      = $ref !== '' ? $ref : null;
+
+        if (!$message->save()) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => implode(', ', $message->getMessages())]);
+        }
+
+        $ticket->save(); // bumps updated_at so the ticket sorts as recently active
+
+        $this->response->setStatusCode(201, 'Created');
+
+        return $this->response->setJsonContent(['message' => $this->serializeMessage($message, true), 'duplicate' => false]);
+    }
+
+    /**
+     * Staff see authorship ids and external_ref; a client sees only what
+     * it needs. A client never sees a staff member's name or email — every
+     * public message reads as "XTen Support".
+     */
+    private function serializeMessage(\TicketMessages $message, bool $staffView): array
+    {
+        $out = [
+            'id'           => (int) $message->id,
+            'ticket_id'    => (int) $message->ticket_id,
+            'visibility'   => $message->visibility,
+            'author_label' => 'XTen Support',
+            'body'         => $message->body,
+            'created_at'   => $message->created_at,
+        ];
+
+        if ($staffView) {
+            $out['external_ref']       = $message->external_ref;
+            $out['author_user_id']     = $message->author_user_id !== null ? (int) $message->author_user_id : null;
+            $out['author_api_key_id']  = $message->author_api_key_id !== null ? (int) $message->author_api_key_id : null;
+        }
+
+        return $out;
+    }
+
     private function serialize(\Tickets $ticket): array
     {
         return [
