@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @method static ApiKeys|null findFirstById(int $id)
+ */
 class ApiKeys extends \Phalcon\Mvc\Model
 {
     /**
@@ -43,6 +46,15 @@ class ApiKeys extends \Phalcon\Mvc\Model
      * @var string
      */
     public $revoked_at;
+
+    /**
+     * When the key stops working, or null for none. Set by the provisioning
+     * API (a key issued with expires_in_days, or the old key during a
+     * rotation's grace period).
+     *
+     * @var string|null
+     */
+    public $expires_at;
 
     /**
      *
