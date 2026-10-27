@@ -107,6 +107,15 @@ final class MissingIdNotFoundTest extends TestCase
         ];
     }
 
+    /** Guest-reachable: an unknown /frontend/<controller> answers 404, not the last-resort 500. */
+    public function testUnknownFrontendControllerIs404(): void
+    {
+        $response = (new HttpClient())->get('/frontend/no-such-controller-' . bin2hex(random_bytes(4)));
+
+        $this->assertSame(404, $response['status']);
+        $this->assertStringContainsString('Page not found', $response['body']);
+    }
+
     /**
      * @dataProvider backendActionsMissingAnId
      */
