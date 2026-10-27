@@ -89,6 +89,7 @@ class Module implements ModuleDefinitionInterface
         $router->add('/api/provision/roles', $provision + ['action' => 'roles'])->via(['GET']);
         $router->add('/api/provision/users', $provision + ['action' => 'users'])->via(['POST']);
         $router->add('/api/provision/users/([0-9]+)/api-key', $provision + ['action' => 'issueKey', 'params' => 1])->via(['POST']);
+        $router->add('/api/provision/users/([0-9]+)/rotate-keys', $provision + ['action' => 'rotateKeys', 'params' => 1])->via(['POST']);
         $router->add('/api/provision/users/([0-9]+)/deactivate', $provision + ['action' => 'deactivate', 'params' => 1])->via(['POST']);
         $router->add('/api/provision/api-keys/rotate', $provision + ['action' => 'rotate'])->via(['POST']);
         $router->add('/api/provision/api-keys/confirm', $provision + ['action' => 'confirm'])->via(['POST']);

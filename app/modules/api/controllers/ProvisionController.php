@@ -15,15 +15,18 @@ use App_skeleton\Provisioning;
  * Gating is per action, not $allowedRoles: rotate and confirm are for the
  * agent's OWN key and must stay open to non-admin callers, while everything
  * else needs the admin role. Roles named in Provisioning::FORBIDDEN_ROLES
- * (admin) can never be granted here, an admin-role user cannot be changed or
- * deactivated here, and admin-role users cannot rotate: a new admin needs a
- * human at the backend. Every write goes through a model with snapshots on,
+ * (admin) can never be granted here, and an admin-role user cannot be changed
+ * or deactivated here: a new admin needs a human at the backend. Any caller,
+ * admin or not, may rotate its OWN key (rotate/confirm are self-only); only the
+ * designated users (Code and Travis) may rotate ANY user's keys (rotate-keys).
+ * Every write goes through a model with snapshots on,
  * so Audit attributes it to the calling key's user. The only secret ever
  * returned is a new key's token, once, with no-store; it is never logged.
  *
  *   GET  /api/provision/roles
  *   POST /api/provision/users                       create-or-update by email
  *   POST /api/provision/users/{id}/api-key          issue a key (token shown once)
+ *   POST /api/provision/users/{id}/rotate-keys     Code/Travis only: new key for any user
  *   POST /api/provision/users/{id}/deactivate       disable user, revoke keys
  *   POST /api/provision/api-keys/rotate             caller's own key -> new key
  *   POST /api/provision/api-keys/confirm            kill the old key now
@@ -239,6 +242,81 @@ class ProvisionController extends ControllerBase
         return $this->response->setJsonContent(['api_key' => $this->serializeKey($key), 'token' => $token, 'note' => 'The token is shown once and cannot be retrieved again.']);
     }
 
+    /**
+     * An admin rotates ANY active user's keys: issues a new key (token shown
+     * once) and schedules every other live key of that user to expire after a
+     * grace window, so an interrupted rotation never locks the user out.
+     */
+    public function rotateKeysAction($id)
+    {
+        if ($r = $this->gate('POST', false)) {
+            return $r;
+        }
+
+        // Only Code and Travis may rotate someone else's keys (Provisioning::rotateAnyEmails).
+        $caller = \Users::findFirstById((int) ($this->principal['user_id'] ?? 0));
+
+        if (!$caller instanceof \Users || !in_array(strtolower((string) $caller->email), Provisioning::rotateAnyEmails(), true)) {
+            return $this->fail(403, 'Forbidden', 'Only designated users may rotate other users\' keys');
+        }
+
+        $user = \Users::findFirstById((int) $id);
+
+        if (!$user instanceof \Users) {
+            return $this->fail(404, 'Not Found', 'Not found');
+        }
+
+        if ((int) $user->is_active !== 1) {
+            return $this->fail(422, 'Unprocessable Entity', 'User is not active');
+        }
+
+        $body  = $this->getJsonBody();
+        $grace = Provisioning::graceSeconds($body['grace_seconds'] ?? null);
+
+        if ($grace === null) {
+            return $this->fail(422, 'Unprocessable Entity', 'grace_seconds must be a whole number from ' . Provisioning::GRACE_MIN . ' to ' . Provisioning::GRACE_MAX);
+        }
+
+        $label = trim((string) ($body['label'] ?? ''));
+        $label = $label === '' ? 'rotated by admin' : $label;
+
+        if (strlen($label) > 100) {
+            return $this->fail(422, 'Unprocessable Entity', 'label must be at most 100 characters');
+        }
+
+        $liveBefore = iterator_to_array(\ApiKeys::find([
+            'conditions' => 'user_id = :u: AND revoked_at IS NULL',
+            'bind'       => ['u' => (int) $user->id],
+        ]), false);
+
+        [$new, $token] = $this->issue((int) $user->id, $label, null);
+
+        $deadline = date('Y-m-d H:i:s', time() + $grace);
+        $expiring = [];
+
+        foreach ($liveBefore as $old) {
+            if ($old->expires_at === null || $old->expires_at > $deadline) {
+                $old->expires_at = $deadline;
+
+                if (!$old->save()) {
+                    return $this->fail(500, 'Internal Server Error', 'An old key could not be scheduled to expire');
+                }
+            }
+
+            $expiring[] = ['id' => (int) $old->id, 'expires_at' => $old->expires_at];
+        }
+
+        $this->noStore();
+        $this->response->setStatusCode(201, 'Created');
+
+        return $this->response->setJsonContent([
+            'api_key'      => $this->serializeKey($new),
+            'token'        => $token,
+            'expiring_keys' => $expiring,
+            'note'         => 'Hand the new token to the user, then the old keys die at their expires_at.',
+        ]);
+    }
+
     public function deactivateAction($id)
     {
         if ($r = $this->gate('POST', true)) {
@@ -285,10 +363,6 @@ class ProvisionController extends ControllerBase
 
         if ($keyId === null) {
             return $this->fail(403, 'Forbidden', 'This endpoint needs an API key, not a session');
-        }
-
-        if ($this->currentPrincipal->hasAnyRole(\Roles::idsByNames(['admin']))) {
-            return $this->fail(403, 'Forbidden', 'Admin keys cannot be rotated through the API');
         }
 
         $key = \ApiKeys::findFirstById((int) $keyId);

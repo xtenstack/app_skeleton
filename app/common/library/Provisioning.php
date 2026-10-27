@@ -24,6 +24,9 @@ final class Provisioning
 
     public const MAX_EXPIRY_DAYS = 3650;
 
+    /** Users allowed to rotate ANY user's keys (Travis, 27 Oct 2026: Code and Travis only). */
+    public const ROTATE_ANY_DEFAULT = ['claude.code@xten.au', 'travissaron@xten.au'];
+
     /**
      * @param array<string, mixed> $body
      * @return array{errors: string[], data: array{email: string, first_name: string, last_name: string, kind: string, role_names: string[], active: bool}}
@@ -84,6 +87,20 @@ final class Provisioning
     }
 
     /** A new API key in the existing `sk_` format: 48 hex characters after the prefix. */
+    /**
+     * Emails allowed to use rotate-keys: PROVISION_ROTATE_ANY_EMAILS (comma
+     * separated) when set, else ROTATE_ANY_DEFAULT. Lowercased.
+     *
+     * @return list<string>
+     */
+    public static function rotateAnyEmails(?string $configured = null): array
+    {
+        $configured ??= (string) (getenv('PROVISION_ROTATE_ANY_EMAILS') ?: '');
+        $list = array_values(array_filter(array_map(fn ($e) => strtolower(trim($e)), explode(',', $configured))));
+
+        return $list !== [] ? $list : self::ROTATE_ANY_DEFAULT;
+    }
+
     public static function newToken(): string
     {
         return 'sk_' . bin2hex(random_bytes(24));

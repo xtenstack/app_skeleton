@@ -89,4 +89,10 @@ final class ProvisioningTest extends TestCase
         self::assertFalse(Provisioning::expiryDays(3651));
         self::assertFalse(Provisioning::expiryDays('x'));
     }
+
+    public function testRotateAnyListDefaultsToCodeAndTravisAndCanBeOverridden(): void
+    {
+        self::assertSame(['claude.code@xten.au', 'travissaron@xten.au'], Provisioning::rotateAnyEmails(''));
+        self::assertSame(['a@x.y', 'b@x.y'], Provisioning::rotateAnyEmails(' A@x.y, b@X.y ,'));
+    }
 }
