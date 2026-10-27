@@ -10,7 +10,7 @@ Authenticate with `X-Api-Key: <key>` or `Authorization: Bearer <key>`. Every end
 | `POST /api/provision/users` | admin | Create or update a user by email (idempotent). |
 | `POST /api/provision/users/{id}/api-key` | admin | Issue a key for a user. The token is returned once. |
 | `POST /api/provision/users/{id}/deactivate` | admin | Disable the user and revoke all their live keys. |
-| `POST /api/provision/users/{id}/rotate-keys` | admin; **Code and Travis** (`claude.code@xten.au`, `travissaron@xten.au`; override `PROVISION_ROTATE_ANY_EMAILS`) may target anyone, every other admin only non-admin users | Rotate **any** active user's keys: new key (token once), every other live key expires after `grace_seconds` (default 600). |
+| `POST /api/provision/users/{id}/rotate-keys` | admin; **Code and Travis** (`claude.code@xten.au`, `travissaron@xten.au`, `stack@xten.au`; override `PROVISION_ROTATE_ANY_EMAILS`) may target anyone, every other admin only non-admin users | Rotate **any** active user's keys: new key (token once), every other live key expires after `grace_seconds` (default 600). |
 | `POST /api/provision/api-keys/rotate` | the key's own user (admins included) | New key for the same user; the old one lives on for a grace window. |
 | `POST /api/provision/api-keys/confirm` | the new key's user (admins included) | Kill the old key now. |
 

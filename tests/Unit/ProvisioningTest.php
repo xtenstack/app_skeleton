@@ -92,7 +92,7 @@ final class ProvisioningTest extends TestCase
 
     public function testRotateAnyListDefaultsToCodeAndTravisAndCanBeOverridden(): void
     {
-        self::assertSame(['claude.code@xten.au', 'travissaron@xten.au'], Provisioning::rotateAnyEmails(''));
+        self::assertSame(['claude.code@xten.au', 'travissaron@xten.au', 'stack@xten.au'], Provisioning::rotateAnyEmails(''));
         self::assertSame(['a@x.y', 'b@x.y'], Provisioning::rotateAnyEmails(' A@x.y, b@X.y ,'));
     }
 }

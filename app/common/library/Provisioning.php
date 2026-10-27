@@ -24,8 +24,8 @@ final class Provisioning
 
     public const MAX_EXPIRY_DAYS = 3650;
 
-    /** Users allowed to rotate ANY user's keys (Travis, 27 Oct 2026: Code and Travis only). */
-    public const ROTATE_ANY_DEFAULT = ['claude.code@xten.au', 'travissaron@xten.au'];
+    /** Users allowed to rotate ANY user's keys (Travis, 27 Oct 2026: Code and Travis only; Travis signs in as travissaron@ and stack@). */
+    public const ROTATE_ANY_DEFAULT = ['claude.code@xten.au', 'travissaron@xten.au', 'stack@xten.au'];
 
     /**
      * @param array<string, mixed> $body
