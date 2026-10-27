@@ -78,5 +78,19 @@ class Module implements ModuleDefinitionInterface
             'controller' => 'public-kb',
             'action'     => 'faq',
         ])->via(['GET', 'OPTIONS']);
+
+        // MAA-20261027-008: provisioning API. Nested ids (users/{id}/api-key)
+        // and the hyphenated api-keys path are not what the generic
+        // /api/:controller/:action shape expresses, so they are routed here.
+        // Every one still goes through ControllerBase's principal check, and
+        // each action gates the admin role itself.
+        $provision = ['namespace' => 'App_skeleton\Modules\Api\Controllers', 'module' => 'api', 'controller' => 'provision'];
+
+        $router->add('/api/provision/roles', $provision + ['action' => 'roles'])->via(['GET']);
+        $router->add('/api/provision/users', $provision + ['action' => 'users'])->via(['POST']);
+        $router->add('/api/provision/users/([0-9]+)/api-key', $provision + ['action' => 'issueKey', 'params' => 1])->via(['POST']);
+        $router->add('/api/provision/users/([0-9]+)/deactivate', $provision + ['action' => 'deactivate', 'params' => 1])->via(['POST']);
+        $router->add('/api/provision/api-keys/rotate', $provision + ['action' => 'rotate'])->via(['POST']);
+        $router->add('/api/provision/api-keys/confirm', $provision + ['action' => 'confirm'])->via(['POST']);
     }
 }

@@ -32,7 +32,7 @@ class ApiKeyAuth extends Injectable
     }
 
     /**
-     * Null if the token doesn't match a live (non-revoked) key or its
+     * Null if the token doesn't match a live (non-revoked, unexpired) key or its
      * owning user is no longer active — otherwise the normalized
      * principal, after bumping the key's last_used_at. A resolved key's
      * user also becomes this request's principal (see CurrentPrincipal),
@@ -41,8 +41,8 @@ class ApiKeyAuth extends Injectable
     public function resolve(string $token): ?array
     {
         $apiKey = \ApiKeys::findFirst([
-            'conditions' => 'token_hash = :hash: AND revoked_at IS NULL',
-            'bind'       => ['hash' => hash('sha256', $token)],
+            'conditions' => 'token_hash = :hash: AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > :now:)',
+            'bind'       => ['hash' => hash('sha256', $token), 'now' => date('Y-m-d H:i:s')],
         ]);
 
         if (!$apiKey) {
