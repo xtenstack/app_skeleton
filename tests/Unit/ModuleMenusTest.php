@@ -78,14 +78,14 @@ final class ModuleMenusTest extends TestCase
     public function testEachModuleKeepsItsOwnMenuWithALabelAndIcon(): void
     {
         $mm = $this->manager([
-            'lms'  => $this->manifest('lms', 'application', [$this->item('Courses', 'lms/courses'), $this->item('Units', 'lms/units')], ['code' => 'LMS']),
+            'lms'  => $this->manifest('lms', 'application', [$this->item('Courses', 'lms/courses'), $this->item('Units', 'lms/units')], ['code' => 'LMS', 'name' => 'Learning Management System']),
             'forum' => $this->manifest('forum', 'plugin', [$this->item('Events', 'forum/events')], ['label' => 'Community forum', 'icon' => 'fas fa-comments']),
         ]);
 
         $menus = $mm->moduleMenus('backend');
 
         self::assertSame(['lms', 'forum'], array_keys($menus));
-        self::assertSame('LMS', $menus['lms']['label'], 'the manifest code is the label when there is no label');
+        self::assertSame('Learning Management System', $menus['lms']['label'], 'the long name beats the short code when there is no label');
         self::assertSame('Community forum', $menus['forum']['label']);
         self::assertSame('fas fa-comments', $menus['forum']['icon']);
         self::assertSame('fas fa-cube', $menus['lms']['icon'], 'the first menu item supplies the icon when the manifest has none');
