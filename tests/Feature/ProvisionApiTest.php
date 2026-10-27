@@ -181,13 +181,32 @@ final class ProvisionApiTest extends TestCase
         self::assertSame(404, $this->call('POST', '/api/provision/users/999999999/api-key', self::$adminToken, ['label' => 'x'])['status']);
     }
 
+    public function testAnAdminRotatesItsOwnKeyAndNormalUsersKeysButNotAnotherAdmins(): void
+    {
+        // A dedicated admin: confirm revokes the key it replaces, which must not be the shared fixture's.
+        [, $adminToken] = self::fixtureUser('admin', 'Admin');
+        $email = 'phpunit-prov-' . bin2hex(random_bytes(5)) . '@example.invalid';
+        $user  = $this->call('POST', '/api/provision/users', self::$adminToken, $this->agentPayload($email))['json']['user'];
+
+        $own = $this->call('POST', '/api/provision/api-keys/rotate', $adminToken, ['grace_seconds' => 60]);
+        self::assertSame(201, $own['status'], 'admins can rotate their own key: ' . json_encode($own['json']));
+        self::assertSame(200, $this->call('POST', '/api/provision/api-keys/confirm', $own['json']['token'])['status']);
+        self::assertSame(200, $this->call('GET', '/api/provision/roles', $own['json']['token'])['status'], 'the new admin key works');
+
+        // Not on the rotate-any list: may rotate a NON-admin's keys, never another admin's.
+        $rot = $this->call('POST', '/api/provision/users/' . $user['id'] . '/rotate-keys', $own['json']['token'], []);
+        self::assertSame(201, $rot['status'], 'an admin may rotate a normal user\'s keys: ' . json_encode($rot['json']));
+        self::assertNotEmpty($rot['json']['token']);
+        self::assertSame(403, $this->call('POST', '/api/provision/users/' . self::$adminId . '/rotate-keys', $own['json']['token'], [])['status'], 'not another admin');
+        self::assertSame(403, $this->call('POST', '/api/provision/users/' . self::$adminId . '/api-key', $own['json']['token'], ['label' => 'x'])['status']);
+    }
+
     public function testRotateKeepsTheOldKeyForAGraceWindowThenConfirmKillsIt(): void
     {
         $email = 'phpunit-prov-' . bin2hex(random_bytes(5)) . '@example.invalid';
         $user  = $this->call('POST', '/api/provision/users', self::$adminToken, $this->agentPayload($email))['json']['user'];
         $old   = $this->call('POST', '/api/provision/users/' . $user['id'] . '/api-key', self::$adminToken, ['label' => 'rotating'])['json']['token'];
 
-        self::assertSame(403, $this->call('POST', '/api/provision/api-keys/rotate', self::$adminToken)['status'], 'admin keys cannot rotate');
         self::assertSame(422, $this->call('POST', '/api/provision/api-keys/rotate', $old, ['grace_seconds' => 5])['status']);
 
         $rotated = $this->call('POST', '/api/provision/api-keys/rotate', $old, ['grace_seconds' => 120]);
