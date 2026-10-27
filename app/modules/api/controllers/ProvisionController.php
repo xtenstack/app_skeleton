@@ -284,10 +284,14 @@ class ProvisionController extends ControllerBase
             return $this->fail(422, 'Unprocessable Entity', 'label must be at most 100 characters');
         }
 
-        $liveBefore = iterator_to_array(\ApiKeys::find([
+        $liveBefore = [];
+
+        foreach (\ApiKeys::find([
             'conditions' => 'user_id = :u: AND revoked_at IS NULL',
             'bind'       => ['u' => (int) $user->id],
-        ]), false);
+        ]) as $old) {
+            $liveBefore[] = $old;
+        }
 
         [$new, $token] = $this->issue((int) $user->id, $label, null);
 

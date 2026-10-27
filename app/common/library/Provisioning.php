@@ -95,7 +95,7 @@ final class Provisioning
      */
     public static function rotateAnyEmails(?string $configured = null): array
     {
-        $configured ??= (string) (getenv('PROVISION_ROTATE_ANY_EMAILS') ?: '');
+        $configured ??= (getenv('PROVISION_ROTATE_ANY_EMAILS') ?: '');
         $list = array_values(array_filter(array_map(fn ($e) => strtolower(trim($e)), explode(',', $configured))));
 
         return $list !== [] ? $list : self::ROTATE_ANY_DEFAULT;
