@@ -12,16 +12,20 @@ class IndexController extends ControllerBase
      */
     public function indexAction(): void
     {
-        $menu      = $this->moduleManager->mergedMenu('backend');
         $principal = $this->currentPrincipal;
 
-        $this->view->tiles = array_values(array_filter($menu, function ($item) use ($principal) {
-            if ($item['controller'] === 'index') {
-                return false;
-            }
+        // Core screens, then one tile per module: opening a module switches the
+        // left nav to that module's own menu (sidenav.phtml).
+        $tiles = array_values(array_filter(
+            $this->moduleManager->coreMenu(),
+            fn ($item) => $item['controller'] !== 'index' && ($item['roles'] === null || $principal->hasAnyRole($item['roles']))
+        ));
 
-            return $item['roles'] === null || $principal->hasAnyRole($item['roles']);
-        }));
+        foreach ($this->moduleManager->visibleModuleMenus('backend', $principal) as $module) {
+            $tiles[] = ['label' => $module['label'], 'icon' => $module['icon'], 'url' => $module['url']];
+        }
+
+        $this->view->tiles = $tiles;
     }
 
     /**

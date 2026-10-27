@@ -229,7 +229,100 @@ class ModuleManager extends Injectable
      */
     public function mergedMenu(string $surface): array
     {
-        $menu      = include APP_PATH . '/modules/backend/config/menu.php';
+        $core    = $this->coreMenu();
+        $modules = $this->moduleMenus($surface);
+        $active  = $this->activeModuleKey($modules);
+
+        // Nav takeover (MODULE-SPEC): while a module's own pages are showing,
+        // the menu is the Dashboard link plus that module's items and nothing
+        // else, so a module's own sidebar copy gets it with no change of its own.
+        if ($active !== null) {
+            $items  = $modules[$active]['items'];
+            $groups = array_unique(array_map(fn ($item) => $item['group'] ?? null, $items));
+
+            if (count($groups) === 1) {
+                // One group around the whole menu would only hide it behind a dropdown.
+                $items = array_map(function ($item) {
+                    unset($item['group']);
+
+                    return $item;
+                }, $items);
+            }
+
+            return array_merge(array_values(array_filter($core, fn ($item) => $item['controller'] === 'index')), $items);
+        }
+
+        // Everywhere else: the core menu and one "Modules" list with a link per module.
+        foreach ($modules as $module) {
+            $core[] = [
+                'label'      => $module['label'],
+                'icon'       => $module['icon'],
+                'controller' => '',
+                'url'        => $this->moduleHomeUrl($module),
+                'roles'      => $this->moduleRoles($module),
+                'group'      => 'Modules',
+            ];
+        }
+
+        return $core;
+    }
+
+    /** The key of the module the dispatcher is serving, when it has a menu of its own. */
+    private function activeModuleKey(array $modules): ?string
+    {
+        $di = $this->getDI();
+
+        if ($di === null || !$di->has('dispatcher')) {
+            return null;
+        }
+
+        $name = $di->getShared('dispatcher')->getModuleName();
+
+        return is_string($name) && isset($modules[$name]) ? $name : null;
+    }
+
+    /** Where a link to "the module" lands: its first item open to every user, else its first item. */
+    private function moduleHomeUrl(array $module): string
+    {
+        foreach ($module['items'] as $item) {
+            if (($item['roles'] ?? null) === null) {
+                return (string) $item['url'];
+            }
+        }
+
+        return (string) $module['items'][0]['url'];
+    }
+
+    /** Roles that may see the module's entry: null (everyone) when any item is open to all, else the union of its items' roles. */
+    private function moduleRoles(array $module): ?array
+    {
+        $roles = [];
+
+        foreach ($module['items'] as $item) {
+            if (($item['roles'] ?? null) === null) {
+                return null;
+            }
+
+            $roles = array_merge($roles, $item['roles']);
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    /**
+     * Each enabled module's own menu, keyed by module key, for the left-nav
+     * takeover (MODULE-SPEC "Current behavior"): ['key', 'label', 'tier',
+     * 'icon', 'items'] where items are the module's menu.php entries in the
+     * same shape mergedMenu() uses. Modules with no menu file or an empty
+     * menu are left out. The label is the manifest's `label`, else its
+     * `code`, else the key; the icon is the manifest's `icon`, else the
+     * first menu item's.
+     *
+     * @return array<string, array{key: string, label: string, tier: string, icon: string, items: array<int, array<string, mixed>>}>
+     */
+    public function moduleMenus(string $surface): array
+    {
+        $menus     = [];
         $manifests = $this->discover();
 
         foreach ($this->loadableModuleKeys() as $key) {
@@ -255,14 +348,58 @@ class ModuleManager extends Injectable
                 continue;
             }
 
-            $moduleMenu = include $menuPath;
+            $items = include $menuPath;
 
-            if (is_array($moduleMenu)) {
-                $menu = array_merge($menu, $moduleMenu);
+            if (!is_array($items) || $items === []) {
+                continue;
             }
+
+            $items         = array_values($items);
+            $menus[$key] = [
+                'key'   => $key,
+                'label' => (string) ($manifest['label'] ?? $manifest['code'] ?? $key),
+                'tier'  => (string) $manifest['tier'],
+                'icon'  => (string) ($manifest['icon'] ?? $items[0]['icon'] ?? 'fas fa-cube'),
+                'items' => $items,
+            ];
         }
 
-        return $menu;
+        return $menus;
+    }
+
+    /**
+     * moduleMenus() cut down to what $principal may see: items filtered by
+     * role, modules left with no visible item dropped, and each module given
+     * a 'url' (its first visible item) so a link to "the module" has a place
+     * to land. Used by the sidebar (the Modules list and the takeover), the
+     * dashboard tiles and the top-nav application switcher.
+     *
+     * @return array<string, array{key: string, label: string, tier: string, icon: string, url: string, items: array<int, array<string, mixed>>}>
+     */
+    public function visibleModuleMenus(string $surface, object $principal): array
+    {
+        $visible = [];
+
+        foreach ($this->moduleMenus($surface) as $key => $module) {
+            $items = array_values(array_filter(
+                $module['items'],
+                fn ($item) => ($item['roles'] ?? null) === null || $principal->hasAnyRole($item['roles'])
+            ));
+
+            if ($items === []) {
+                continue;
+            }
+
+            $visible[$key] = ['items' => $items, 'url' => $this->moduleHomeUrl(['items' => $items])] + $module;
+        }
+
+        return $visible;
+    }
+
+    /** The built-in (core) menu without any module's contribution. */
+    public function coreMenu(): array
+    {
+        return include APP_PATH . '/modules/backend/config/menu.php';
     }
 
     private function parseManifest(string $path, string $packageName): ?array
