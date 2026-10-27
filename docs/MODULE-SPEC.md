@@ -74,6 +74,7 @@ uses internally, and the two do not need to match.
 | `className` | For application- and plugin-tier | Fully-qualified `Module` class implementing `Phalcon\Mvc\ModuleDefinitionInterface`. Required for `registeredPhalconModules()`/routing to pick the module up at all — omitting it silently leaves the module discovered but never actually registered with Phalcon. |
 | `surface` | No (defaults to `'backend'` in `mergedMenu()`) | `"backend"`, `"frontend"`, or `"both"` — which nav surface(s) the module's menu contribution applies to. |
 | `menu` | No | Relative path (from the module's install root) to a PHP file returning an array in the same `{label, icon, controller, url, roles}` shape the built-in `menu.php` uses. No menu items → omit this field entirely, not an empty file. |
+| `name` | No | Long display name (e.g. `"Learning Management System"`); the label used in the nav Modules list, the Applications switcher and the dashboard tiles when there is no `label`. |
 | `code` | No | Short display code (e.g. `"reqs"`); not currently read by the engine, informational/reserved. |
 | `routes` | No | `false` for a headless (service-only) module with no controllers or views: the engine then adds none of the generic `/<key>/...` routes, so those URLs 404 like any other unknown path instead of dispatching into a module that cannot render. Defaults to `true`, except that a module with no `src/controllers` (or `controllers`) directory is treated as headless even without the flag. A `registerRoutes()` method is still honoured either way. See Headless modules, below. |
 | `migrations` | No | Relative path to the module's own `migrations/<adapter>/` tree, applied by the migration runner. |
@@ -287,7 +288,7 @@ core top nav has an **Applications** switcher listing application-tier modules
 own copy of `partials/topnav.phtml` does not have the switcher unless it adds
 the same few lines (`moduleManager->visibleModuleMenus('backend', $principal)`);
 the Dashboard link and the Modules list are the way out in the meantime.
-Optional manifest fields `label` (default: `code`, else the key) and `icon`
+Optional manifest fields `label` (default: `name`, else `code`, else the key) and `icon`
 (default: the first menu item's) name the module in those lists.
 
 ## RBAC

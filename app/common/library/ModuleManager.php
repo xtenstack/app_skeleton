@@ -314,8 +314,8 @@ class ModuleManager extends Injectable
      * takeover (MODULE-SPEC "Current behavior"): ['key', 'label', 'tier',
      * 'icon', 'items'] where items are the module's menu.php entries in the
      * same shape mergedMenu() uses. Modules with no menu file or an empty
-     * menu are left out. The label is the manifest's `label`, else its
-     * `code`, else the key; the icon is the manifest's `icon`, else the
+     * menu are left out. The label is the manifest's `label`, else its long
+     * `name`, else its short `code`, else the key; the icon is the manifest's `icon`, else the
      * first menu item's.
      *
      * @return array<string, array{key: string, label: string, tier: string, icon: string, items: array<int, array<string, mixed>>}>
@@ -357,7 +357,7 @@ class ModuleManager extends Injectable
             $items         = array_values($items);
             $menus[$key] = [
                 'key'   => $key,
-                'label' => (string) ($manifest['label'] ?? $manifest['code'] ?? $key),
+                'label' => (string) ($manifest['label'] ?? $manifest['name'] ?? $manifest['code'] ?? $key),
                 'tier'  => (string) $manifest['tier'],
                 'icon'  => (string) ($manifest['icon'] ?? $items[0]['icon'] ?? 'fas fa-cube'),
                 'items' => $items,
