@@ -7,12 +7,6 @@ parameters:
 			path: app/modules/backend/Module.php
 
 		-
-			message: '#^Call to an undefined static method ApiKeys\:\:findFirstById\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/modules/backend/controllers/ApiKeysController.php
-
-		-
 			message: '#^Call to an undefined static method AuditLog\:\:findFirstById\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 2
