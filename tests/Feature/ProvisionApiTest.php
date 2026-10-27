@@ -181,7 +181,7 @@ final class ProvisionApiTest extends TestCase
         self::assertSame(404, $this->call('POST', '/api/provision/users/999999999/api-key', self::$adminToken, ['label' => 'x'])['status']);
     }
 
-    public function testAnAdminMayRotateItsOwnKeyButNotOthersKeys(): void
+    public function testAnAdminRotatesItsOwnKeyAndNormalUsersKeysButNotAnotherAdmins(): void
     {
         // A dedicated admin: confirm revokes the key it replaces, which must not be the shared fixture's.
         [, $adminToken] = self::fixtureUser('admin', 'Admin');
@@ -193,8 +193,12 @@ final class ProvisionApiTest extends TestCase
         self::assertSame(200, $this->call('POST', '/api/provision/api-keys/confirm', $own['json']['token'])['status']);
         self::assertSame(200, $this->call('GET', '/api/provision/roles', $own['json']['token'])['status'], 'the new admin key works');
 
-        // Not on the rotate-any list, so it cannot rotate someone else's keys.
-        self::assertSame(403, $this->call('POST', '/api/provision/users/' . $user['id'] . '/rotate-keys', $own['json']['token'], [])['status']);
+        // Not on the rotate-any list: may rotate a NON-admin's keys, never another admin's.
+        $rot = $this->call('POST', '/api/provision/users/' . $user['id'] . '/rotate-keys', $own['json']['token'], []);
+        self::assertSame(201, $rot['status'], 'an admin may rotate a normal user\'s keys: ' . json_encode($rot['json']));
+        self::assertNotEmpty($rot['json']['token']);
+        self::assertSame(403, $this->call('POST', '/api/provision/users/' . self::$adminId . '/rotate-keys', $own['json']['token'], [])['status'], 'not another admin');
+        self::assertSame(403, $this->call('POST', '/api/provision/users/' . self::$adminId . '/api-key', $own['json']['token'], ['label' => 'x'])['status']);
     }
 
     public function testRotateKeepsTheOldKeyForAGraceWindowThenConfirmKillsIt(): void

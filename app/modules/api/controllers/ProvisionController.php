@@ -16,17 +16,17 @@ use App_skeleton\Provisioning;
  * agent's OWN key and must stay open to non-admin callers, while everything
  * else needs the admin role. Roles named in Provisioning::FORBIDDEN_ROLES
  * (admin) can never be granted here, and an admin-role user cannot be changed
- * or deactivated here: a new admin needs a human at the backend. Any caller,
- * admin or not, may rotate its OWN key (rotate/confirm are self-only); only the
- * designated users (Code and Travis) may rotate ANY user's keys (rotate-keys).
- * Every write goes through a model with snapshots on,
+ * or deactivated here: a new admin needs a human at the backend. Key policy
+ * (Travis, 27 Oct 2026): everyone, admin or not, rotates their OWN key
+ * (rotate/confirm are self-only); Code and Travis may rotate anybody's keys;
+ * any other admin may rotate non-admins' keys (rotate-keys, api-key). Every write goes through a model with snapshots on,
  * so Audit attributes it to the calling key's user. The only secret ever
  * returned is a new key's token, once, with no-store; it is never logged.
  *
  *   GET  /api/provision/roles
  *   POST /api/provision/users                       create-or-update by email
  *   POST /api/provision/users/{id}/api-key          issue a key (token shown once)
- *   POST /api/provision/users/{id}/rotate-keys     Code/Travis only: new key for any user
+ *   POST /api/provision/users/{id}/rotate-keys     new key for a user: Code/Travis any, other admins non-admins
  *   POST /api/provision/users/{id}/deactivate       disable user, revoke keys
  *   POST /api/provision/api-keys/rotate             caller's own key -> new key
  *   POST /api/provision/api-keys/confirm            kill the old key now
@@ -95,6 +95,26 @@ class ProvisionController extends ControllerBase
     private function holdsAdmin(\Users $user): bool
     {
         return array_intersect(\Roles::idsByNames(['admin']), $user->roleIds()) !== [];
+    }
+
+    /**
+     * Policy (Travis, 27 Oct 2026): Code and Travis (Provisioning::rotateAnyEmails) manage anybody's
+     * keys; any other administrator manages non-administrators' keys only; nobody else manages
+     * anyone's keys (everyone rotates their OWN through rotate/confirm).
+     */
+    private function mayManageKeysOf(\Users $target): bool
+    {
+        $caller = \Users::findFirstById((int) ($this->principal['user_id'] ?? 0));
+
+        if (!$caller instanceof \Users) {
+            return false;
+        }
+
+        if (in_array(strtolower((string) $caller->email), Provisioning::rotateAnyEmails(), true)) {
+            return true;
+        }
+
+        return $this->currentPrincipal->hasAnyRole(\Roles::idsByNames(['admin'])) && !$this->holdsAdmin($target);
     }
 
     private function issue(int $userId, string $label, ?string $expiresAt): array
@@ -217,6 +237,10 @@ class ProvisionController extends ControllerBase
             return $this->fail(404, 'Not Found', 'Not found');
         }
 
+        if (!$this->mayManageKeysOf($user)) {
+            return $this->fail(403, 'Forbidden', 'Only Code and Travis can manage an administrator\'s keys');
+        }
+
         if ((int) $user->is_active !== 1) {
             return $this->fail(422, 'Unprocessable Entity', 'User is not active');
         }
@@ -253,17 +277,14 @@ class ProvisionController extends ControllerBase
             return $r;
         }
 
-        // Only Code and Travis may rotate someone else's keys (Provisioning::rotateAnyEmails).
-        $caller = \Users::findFirstById((int) ($this->principal['user_id'] ?? 0));
-
-        if (!$caller instanceof \Users || !in_array(strtolower((string) $caller->email), Provisioning::rotateAnyEmails(), true)) {
-            return $this->fail(403, 'Forbidden', 'Only designated users may rotate other users\' keys');
-        }
-
         $user = \Users::findFirstById((int) $id);
 
         if (!$user instanceof \Users) {
             return $this->fail(404, 'Not Found', 'Not found');
+        }
+
+        if (!$this->mayManageKeysOf($user)) {
+            return $this->fail(403, 'Forbidden', 'Only Code and Travis can rotate an administrator\'s keys; administrators may rotate non-administrators\' keys and their own');
         }
 
         if ((int) $user->is_active !== 1) {

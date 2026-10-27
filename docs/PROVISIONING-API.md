@@ -10,7 +10,7 @@ Authenticate with `X-Api-Key: <key>` or `Authorization: Bearer <key>`. Every end
 | `POST /api/provision/users` | admin | Create or update a user by email (idempotent). |
 | `POST /api/provision/users/{id}/api-key` | admin | Issue a key for a user. The token is returned once. |
 | `POST /api/provision/users/{id}/deactivate` | admin | Disable the user and revoke all their live keys. |
-| `POST /api/provision/users/{id}/rotate-keys` | **only** the designated users (default `claude.code@xten.au`, `travissaron@xten.au`; override with `PROVISION_ROTATE_ANY_EMAILS`) | Rotate **any** active user's keys: new key (token once), every other live key expires after `grace_seconds` (default 600). |
+| `POST /api/provision/users/{id}/rotate-keys` | admin; **Code and Travis** (`claude.code@xten.au`, `travissaron@xten.au`; override `PROVISION_ROTATE_ANY_EMAILS`) may target anyone, every other admin only non-admin users | Rotate **any** active user's keys: new key (token once), every other live key expires after `grace_seconds` (default 600). |
 | `POST /api/provision/api-keys/rotate` | the key's own user (admins included) | New key for the same user; the old one lives on for a grace window. |
 | `POST /api/provision/api-keys/confirm` | the new key's user (admins included) | Kill the old key now. |
 
@@ -56,7 +56,7 @@ An agent rotates its **own** key without a human:
 2. The agent stores the new token (for example in its Infisical project).
 3. `POST /api/provision/api-keys/confirm` **with the new key** revokes the old key at once. If the agent never confirms, the old key still dies at its expiry.
 
-Admins may rotate their own key this way (decision 27 Oct 2026); nobody can rotate another user's key with these two, which are self-only. Neither endpoint accepts a browser session. Only Code and Travis rotate anyone's keys, with `rotate-keys`; every other admin can rotate only its own.
+Admins may rotate their own key this way (decision 27 Oct 2026); nobody can rotate another user's key with these two, which are self-only. Neither endpoint accepts a browser session. Policy: everyone rotates their own key; Code and Travis rotate anybody's with `rotate-keys`; any other admin rotates only non-admins' keys. `POST /users/{id}/api-key` follows the same rule (an admin's account cannot be given a new key by another admin).
 
 ## Deactivate
 
