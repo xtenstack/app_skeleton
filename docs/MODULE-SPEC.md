@@ -271,17 +271,24 @@ return [
 get a real route namespace (`registeredPhalconModules()`) and a menu
 contribution (`mergedMenu()`) — fixed 2026-08-12, Modules Session #1,
 verified with a throwaway plugin-tier module (routed correctly, showed
-up in the merged menu output). Today this still merges every enabled
-module's menu into one combined sidebar — no per-module nav *switching*
-yet. **Planned** (see design brief "v1.2 direction"): a left-nav
-"Modules >" collapsible listing every enabled module (app or plugin
-tier), where selecting a module name does a full nav takeover
-(everything but Dashboard replaced by that module's own menu), and a
-top-nav shortcut does the same for application-tier modules
-specifically — plugin-tier modules are reachable via the left-nav route
-only, never the top-nav switcher. The takeover UI itself is not yet
-implemented in code; only the underlying routing/menu-eligibility fix
-is.
+up in the merged menu output). Left-nav takeover (27 Oct 2026):
+`ModuleManager::mergedMenu('backend')`, the one menu every sidebar (the
+core's and each module's own copy of `partials/sidenav.phtml`) renders,
+now depends on where the user is. On a core page it is the core menu plus a
+collapsible **Modules** list with one link per enabled module that has a menu
+(application and plugin tier alike; the link lands on the module's first item
+open to everyone, else its first item). Once a module's own pages are showing
+(the dispatcher is serving that module) it is the **Dashboard link plus that
+module's menu and nothing else**; a module whose items share a single `group`
+is shown flat rather than behind a dropdown. No module needs to change.
+The dashboard tiles show the core screens and one tile per module, and the
+core top nav has an **Applications** switcher listing application-tier modules
+(plugin-tier modules are reachable only through the Modules list). A module's
+own copy of `partials/topnav.phtml` does not have the switcher unless it adds
+the same few lines (`moduleManager->visibleModuleMenus('backend', $principal)`);
+the Dashboard link and the Modules list are the way out in the meantime.
+Optional manifest fields `label` (default: `code`, else the key) and `icon`
+(default: the first menu item's) name the module in those lists.
 
 ## RBAC
 
