@@ -49,6 +49,20 @@ class TicketsController extends ControllerBase
             $bind['reporter_user_id'] = (int) $reporterUserId;
         }
 
+        // Anyone who is not admin/operator/agent (a member account, a game's
+        // service key) lists only the tickets they raised themselves.
+        if (!$this->canSeeAllTickets()) {
+            $apiKeyId = $this->currentPrincipal->apiKeyId();
+
+            if ($apiKeyId !== null) {
+                $conditions[]       = 'reporter_api_key_id = :own_key:';
+                $bind['own_key']    = $apiKeyId;
+            } else {
+                $conditions[]       = 'reporter_user_id = :own_user:';
+                $bind['own_user']   = (int) $this->currentPrincipal->userId();
+            }
+        }
+
         $params = ['order' => 'id DESC'];
 
         if ($conditions) {
@@ -139,7 +153,8 @@ class TicketsController extends ControllerBase
     {
         $ticket = \Tickets::findFirstById($id);
 
-        if (!$ticket) {
+        // Not found rather than forbidden for someone else's ticket, so ids cannot be probed.
+        if (!$ticket || (!$this->canSeeAllTickets() && !$this->raisedByCaller($ticket))) {
             $this->response->setStatusCode(404, 'Not Found');
 
             return $this->response->setJsonContent(['error' => 'Not found']);
@@ -154,6 +169,12 @@ class TicketsController extends ControllerBase
             $this->response->setStatusCode(405, 'Method Not Allowed');
 
             return $this->response->setJsonContent(['error' => 'POST required']);
+        }
+
+        if (!$this->canSeeAllTickets()) {
+            $this->response->setStatusCode(403, 'Forbidden');
+
+            return $this->response->setJsonContent(['error' => 'Forbidden']);
         }
 
         $ticket = \Tickets::findFirstById($id);
@@ -296,6 +317,12 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'POST required']);
         }
 
+        if (!$this->canSeeAllTickets()) {
+            $this->response->setStatusCode(403, 'Forbidden');
+
+            return $this->response->setJsonContent(['error' => 'Forbidden']);
+        }
+
         $ticket = \Tickets::findFirstById($id);
 
         if (!$ticket) {
@@ -419,6 +446,12 @@ class TicketsController extends ControllerBase
             'last_id'  => $last,
             'has_more' => $hasMore,
         ]);
+    }
+
+    /** admin, operator and agent callers work every ticket; anyone else sees only what they raised. */
+    private function canSeeAllTickets(): bool
+    {
+        return $this->currentPrincipal->hasAnyRole(\Roles::idsByNames(['admin', 'operator', 'agent']));
     }
 
     private function isStaff(): bool
