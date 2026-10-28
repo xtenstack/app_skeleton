@@ -1,0 +1,10 @@
+<link rel="stylesheet" href="<?= $this->url->get('assets/api-docs/swagger-ui.css') ?>">
+<div class="row mb-2">
+  <div class="col-12">
+    <h1>API Docs</h1>
+    <p class="text-muted">The Stack API (OpenAPI 3). Agents fetch the same description from <code>GET /api/docs/openapi</code> with their API key. "Try it out" is off here: use your own key from the command line or <code>xten-secrets</code>.</p>
+  </div>
+</div>
+<div id="swagger-ui" data-spec="<?= $this->url->get('api/docs/openapi') ?>"></div>
+<script src="<?= $this->url->get('assets/api-docs/swagger-ui-bundle.js') ?>"></script>
+<script src="<?= $this->url->get('assets/api-docs/init.js') ?>"></script>

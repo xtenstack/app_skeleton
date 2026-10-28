@@ -1,0 +1,1409 @@
+tags:
+  - name: Directory
+    description: Public headless API behind directory.xten.au (portal entity) and people.xten.au (portal person), plus staff-only video and classification endpoints.
+  - name: Agent Rooms
+    description: Authenticated multi-participant chat rooms for agents and staff, served under /agent_rooms/api/{action}/{roomCode}.
+paths:
+  /api/v1/directory/search:
+    get:
+      tags: [Directory]
+      operationId: dir_search
+      x-unverified: true
+      summary: Search the register by name, ABN, location or category
+      description: |
+        Public, no authentication, CORS enabled for https://directory.xten.au and https://people.xten.au only (other origins get no Access-Control-Allow-Origin header; the server-side call still works).
+        `portal` is required. A `q` that is 11 digits (spaces allowed) is an exact ABN match. A `q` shorter than 3 characters (ignoring %, _ and spaces) returns zero results with a `notice`. Longer text is matched against names, trading names and professions with a bounded row budget (so `total` may be capped; see `total_capped`).
+        `limit` is clamped to 1-50 (default 20), `page` minimum 1. Opted-out (privacy suppressed) ABNs never appear. Active ABNs sort before cancelled ones. On page 1, matching paid Prominent listings may be prepended ("boosts"), which adds to `total`.
+        Category filters: `anzsic_div` / `category` / `anzsic_code` accept an ANZSIC division letter, a 4-digit class code, a division display name or free text; `unspsc_code` an 8-digit UNSPSC code or header prefix. What was actually applied is echoed in `params.category_filter`. Category-filtered totals are capped at 1000, browse totals at 100000.
+        Invalid or missing portal gives 422. No rate limit in code.
+      security: []
+      parameters:
+        - {name: portal, in: query, required: true, schema: {type: string, enum: [entity, person]}, description: "entity = businesses (main_ent_name), person = sole traders and individuals (legal_ent names)."}
+        - {name: q, in: query, schema: {type: string}, description: "Name, trading name, profession, or an 11-digit ABN. Minimum 3 characters for a name search."}
+        - {name: state, in: query, schema: {type: string}, description: "State code, upper-cased by the server (for example WA)."}
+        - {name: postcode, in: query, schema: {type: string, pattern: '^\d{4}$'}, description: "Four digits; any other value is silently ignored."}
+        - {name: anzsic_div, in: query, schema: {type: string}, description: "ANZSIC division letter A-S or a division display name."}
+        - {name: category, in: query, schema: {type: string}, description: "Free-text category, division name, 4-digit code or 8-digit UNSPSC string; resolved by CategoryFilter."}
+        - {name: anzsic_code, in: query, schema: {type: string}, description: "4-digit ANZSIC class code."}
+        - {name: unspsc_code, in: query, schema: {type: string}, description: "8-digit UNSPSC code or header; a header covers its descendants."}
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        '200':
+          description: Search results.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirSearchResponse'}
+              example:
+                params: {q: plumbing, state: WA, postcode: '', anzsic_div: '', category: '', anzsic_code: '', unspsc_code: '', category_filter: null, portal: entity, page: 1, limit: 20}
+                total: 1
+                total_capped: false
+                notice: null
+                page: 1
+                limit: 20
+                results:
+                  - {abn: '51824753556', abn_status: ACT, entity_type: Australian Private Company, name: EXAMPLE PLUMBING PTY LTD, trading_names: [Example Plumbing], state: WA, postcode: '6000', is_claimed: true, claim_tier: featured, video_url: null, has_video: false, category: Plumbing Services, profession: null, anzsic_code: '3411', anzsic_class: Plumbing Services, statutory_source: null, practitioner_count: 0}
+        '422':
+          description: portal missing or not entity/person.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: "portal must be 'entity' or 'person'"}
+  /api/v1/directory/entity/{abn}:
+    get:
+      tags: [Directory]
+      operationId: dir_entity
+      summary: Get one commercial entity profile
+      description: |
+        Public. Only ABNs that have a main entity address (entity portal) are returned; others, and opted-out ABNs, give 404. The ABN is normalised by stripping non-digits and must then be exactly 11 digits (checksum not checked here).
+        A "claim" counts only if its status is verified or subscribed and (portal_type is entity or tier is prominent/featured). Video URLs are exposed only for such claims whose video_status is supplied or published.
+        Side effects: when called from a browser whose Origin is one of the two portals and the User-Agent is not a crawler, a profile view is counted per day; with `ref=<8-32 hex>` from a portal origin a link visit is also logged. A `claim_url` containing an opaque slug is generated and stored on first use.
+      security: []
+      parameters:
+        - {name: abn, in: path, required: true, schema: {type: string}, description: "11 digits (separators tolerated)."}
+        - {name: ref, in: query, schema: {type: string, pattern: '^[0-9a-f]{8,32}$'}, description: "Emailed profile-link slug; used only for visit attribution from portal browsers."}
+      responses:
+        '200':
+          description: The entity.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entity: {$ref: '#/components/schemas/DirEntity'}
+        '404':
+          description: Not found, not an entity-portal ABN, or suppressed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: Not found}
+        '422':
+          description: ABN not 11 digits.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: abn must be 11 digits}
+  /api/v1/directory/person/{abn}:
+    get:
+      tags: [Directory]
+      operationId: dir_person
+      summary: Get one sole-trader or practitioner profile
+      description: |
+        Public. Only ABNs with a legal (individual) address are returned; others and opted-out ABNs give 404. Contact details are never returned: `contact_available` only says whether a verified claim or Peppol address exists.
+        Claim and visit-logging rules are the same as dir_entity (a person claim counts when portal_type is person or tier is prominent/featured).
+      security: []
+      parameters:
+        - {name: abn, in: path, required: true, schema: {type: string}, description: "11 digits (separators tolerated)."}
+        - {name: ref, in: query, schema: {type: string, pattern: '^[0-9a-f]{8,32}$'}}
+      responses:
+        '200':
+          description: The person profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  person: {$ref: '#/components/schemas/DirPerson'}
+        '404':
+          description: Not found or suppressed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '422':
+          description: ABN not 11 digits.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+  /api/v1/directory/resolve/{slug}:
+    get:
+      tags: [Directory]
+      operationId: dir_resolve
+      summary: Resolve a tokenised claim-link slug to a profile
+      description: |
+        Public. Looks up an opaque slug (from `claim_url` in emailed links) and returns exactly what dir_entity or dir_person would for the slug's ABN and portal; the response is `{entity: ...}` or `{person: ...}` depending on the slug's portal_type. Unknown slug gives 404 (a suppressed ABN or one without an address also gives 404 from the delegated action).
+        Side effect: logs a claim-link visit (kind claim) for attribution, regardless of Origin. The delegated action may also count a profile view.
+      security: []
+      parameters:
+        - {name: slug, in: path, required: true, schema: {type: string}, description: "16 hex characters as generated by the server."}
+      responses:
+        '200':
+          description: Entity or person profile.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      entity: {$ref: '#/components/schemas/DirEntity'}
+                  - type: object
+                    properties:
+                      person: {$ref: '#/components/schemas/DirPerson'}
+        '404':
+          description: Unknown slug, or the profile is unavailable.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '422':
+          description: Stored ABN invalid (should not occur in practice).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+  /api/v1/directory/verify-abn:
+    get:
+      tags: [Directory]
+      operationId: dir_verifyAbn
+      summary: Payee and invoice safety check for an ABN
+      description: |
+        Public, read-only. Strips non-digits from `abn`; it must be 11 digits or the call is 422. An 11-digit value that fails the ATO modulo-89 checksum is a 200 with `modulo89_valid=false`, `risk_score=100` and null register fields. `risk_score` is a simple heuristic: 100 invalid checksum, 80 not in register, otherwise 0 plus 40 if the ABN is not ACT plus 10 if GST is not ACT. `name_match_confidence` (0-100) is a case-insensitive similar_text percentage against the legal name, and is null when `name` is empty or the ABN is unknown. Unlike dir_entity it does not honour privacy opt-outs.
+      security: []
+      parameters:
+        - {name: abn, in: query, required: true, schema: {type: string}}
+        - {name: name, in: query, schema: {type: string}, description: "Name to compare against the legal name."}
+      responses:
+        '200':
+          description: Verification result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirVerifyAbnResponse'}
+              example: {abn: '51824753556', modulo89_valid: true, abn_status: ACT, gst_status: ACT, legal_name: EXAMPLE PLUMBING PTY LTD, trading_names: [Example Plumbing], entity_type_ind: PRV, entity_type_text: Australian Private Company, state: WA, postcode: '6000', is_peppol_ready: false, peppol_id: null, risk_score: 0, name_match_confidence: 92}
+        '422':
+          description: abn is not 11 digits.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: abn must be 11 digits}
+  /api/v1/directory/claim:
+    post:
+      tags: [Directory]
+      operationId: dir_claim
+      summary: Claim a listing (free verification email or paid checkout)
+      description: |
+        Public, no authentication; JSON body. Not idempotent: each success creates a claim row (free: a pending claim and a verification email; paid: a pending_payment claim and a Dolibarr sales order). The server de-duplicates per ABN and portal (see 409).
+        Validation order and statuses: video_url (422), abn 11 digits plus ATO modulo-89 checksum (422), role non-empty (422), portal_type (422), name non-empty and valid email (422), unknown package (422), promo rules (422 with `code`), duplicate claim rules (409 with `code`), UNSPSC code count over the tier limit (422; free 1, featured 3, prominent 5).
+        Free path (`package` standard or omitted): claim is `pending` with tier free; an email with a 48 hour link is sent; the claim is completed by dir_claimVerify. verification_method is email_domain when the email domain matches the Peppol website, else manual_review.
+        Paid path: claim is `pending_payment`; the response carries the payment link. If Dolibarr fails the claim is deleted and the call is 502 so the caller can retry. Bundles with `production` create a second one-off order (production_checkout_url); failure of that second order is not reported to the caller. Unknown UNSPSC codes are silently skipped on the paid path.
+        Promo packages and the CLAIM50 voucher are accepted until 2026-12-25T23:59:59+08:00 (see dir_promo). Business rules: a verified or subscribed paid listing refuses another paid claim (already_listed); a recent pending_payment paid claim (under 14 days) refuses another paid claim (payment_pending); a verified listing refuses another free claim (already_claimed); a paid claim against a verified free listing is allowed only from the same email as the free claimant (otherwise owner_confirmation_required).
+        Claim statuses used across the module: pending, verified, pending_payment, subscribed. Tiers: free, featured, prominent (promo packages store tier featured/prominent).
+        CORS preflight (OPTIONS) is answered 204.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DirClaimRequest'}
+            examples:
+              free:
+                summary: Free claim
+                value: {abn: '51824753556', portal_type: entity, name: Jane Example, email: jane@example.invalid, phone: '0400000000', role: Owner, package: standard}
+              promo:
+                summary: First-mover promo with referral
+                value: {abn: '51824753556', portal_type: entity, name: Jane Example, email: jane@example.invalid, role: Director, package: featured_promo_y, ref: 0a1b2c3d4e5f6071}
+              voucher:
+                summary: Full-price monthly plan with voucher
+                value: {abn: '51824753556', portal_type: entity, name: Jane Example, email: jane@example.invalid, role: Owner, package: featured, voucher: CLAIM50}
+      responses:
+        '200':
+          description: Claim recorded. Shape depends on free or paid path.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - {$ref: '#/components/schemas/DirClaimFreeResponse'}
+                  - {$ref: '#/components/schemas/DirClaimPaidResponse'}
+              examples:
+                free:
+                  value: {status: pending_verification, message: Check your email for a verification link (expires in 48 hours).}
+                paid:
+                  value: {status: pending_payment, checkout_url: 'https://accts.example.invalid/pay/SO0001', order_ref: SO0001, production_checkout_url: null, production_order_ref: null, promo: null}
+        '409':
+          description: Duplicate-claim rule refused the claim.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirClaimConflict'}
+              example: {error: This profile already has an active Prominent listing (order SO0001). To change or renew it, email directory@xten.au rather than claiming again., code: already_listed, order_ref: SO0001}
+        '422':
+          description: Validation or promo refusal. `code` is present only for promo refusals (promo_ended, voucher_unknown, voucher_not_applicable, voucher_used).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: The First-Mover Claim Offer ended., code: promo_ended}
+        '500':
+          description: The claim row could not be saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '502':
+          description: Paid path only; Dolibarr checkout creation failed (claim removed, safe to retry).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: Could not create checkout — Dolibarr request failed}
+  /api/v1/directory/claim/verify:
+    get:
+      tags: [Directory]
+      operationId: dir_claimVerify
+      summary: Complete a free claim from the emailed token
+      description: |
+        Public (the token is the credential). Activates a `pending` free claim whose token is unexpired (48 hours): status becomes verified, the token is cleared (single use), and any enquiries held for the unclaimed listing are released to the claimant. A bad, expired or already-used token is a deliberately generic 400. A missing token is 422. Note this is a GET with a state change.
+      security: []
+      parameters:
+        - {name: token, in: query, required: true, schema: {type: string}, description: "64-character hex token from the verification email."}
+      responses:
+        '200':
+          description: Claim verified.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, enum: [verified]}
+                  message: {type: string}
+              example: {status: verified, message: Your profile is now verified.}
+        '400':
+          description: Invalid or expired verification link.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: Invalid or expired verification link}
+        '422':
+          description: token missing.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: token required}
+  /api/v1/directory/promo:
+    get:
+      tags: [Directory]
+      operationId: dir_promo
+      summary: First-mover claim offers currently available
+      description: |
+        Public, read-only. Describes what the claim modal may offer now: four promo packages (featured_promo_y, prominent_promo_y, featured_trial3, prominent_trial3) and the CLAIM50 voucher terms (50% off the first invoice of featured or prominent monthly; one use per ABN, counted from paid orders). The offer ends 2026-12-25T23:59:59+08:00 (overridable by instance config); after that `open` is false, `offers` is [] and `voucher` is null. With `abn`, `voucher.available` says whether that ABN can still use the voucher (null without abn). The voucher code itself is not published. Money is integer cents. Renewals are invoiced with a pay link; nothing is charged automatically. The claim endpoint enforces these rules regardless of this response.
+      security: []
+      parameters:
+        - {name: abn, in: query, schema: {type: string}, description: "Optional; non-11-digit value gives 422."}
+      responses:
+        '200':
+          description: Offer state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirPromoResponse'}
+              example:
+                open: true
+                ends_at: '2026-12-25T23:59:59+08:00'
+                ends_at_utc: '2026-12-25T15:59:59Z'
+                server_time: '2026-10-05T22:33:46Z'
+                offers:
+                  - {package: featured_promo_y, tier: featured, label: Featured Listing (First-Mover Annual), standard_price_cents: 29000, saving_percent: 31, promo: annual_claim_2026, kind: annual, voucher: null, first_price_cents: 19900, billing_unit: y, intro_periods: 1, renewal_package: featured_y, renewal_label: Featured Listing (Annual), renewal_price_cents: 29000, renewal_unit: y, full_price_from: '2027-10-06', renewal_billing: invoice_with_pay_link}
+                voucher: {percent: 50, packages: [featured, prominent], first_price_cents: {featured: 1450, prominent: 2950}, available: null}
+                renewal_billing: invoice_with_pay_link
+        '422':
+          description: abn supplied but not 11 digits.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: abn must be 11 digits}
+  /api/v1/directory/video:
+    post:
+      tags: [Directory]
+      operationId: dir_video
+      summary: Staff attach, replace or remove a listing video
+      description: |
+        Authenticated: a logged-in browser session or any valid, unrevoked, unexpired API key (X-Api-Key or Authorization Bearer) whose user is active. The code applies NO role check, so every role (admin, operator, agent, charter_agent, member) that holds a key may call it; intended callers are staff and agents (Tim, Watson, DI-08 delivery). Customers supply their own video at claim time instead.
+        Finds the newest claim for abn+portal_type in status verified, subscribed, pending_payment or pending and updates its video. If none exists and status is not `removed`, a claim row is created (verification_method staff_attach; package default bundle_prominent_video; status from `claim_status` else pending_payment). `removed` with no claim is 404. `video_url` is required (https, YouTube, Vimeo, static.xten.au, or any https .mp4/.webm, max 500 chars) when status is supplied or published, and is dropped when status is removed. Re-sending the same body is idempotent. If the claim is verified or subscribed, held enquiries are released. `public` is true only for a verified/subscribed claim with video_status supplied or published.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DirVideoRequest'}
+            example: {abn: '51824753556', portal_type: entity, status: published, video_url: 'https://static.xten.au/video/example.mp4'}
+      responses:
+        '200':
+          description: Video saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirVideoResponse'}
+              example: {abn: '51824753556', portal_type: entity, claim_id: 41, claim_status: subscribed, tier: prominent, video_url: 'https://static.xten.au/video/example.mp4', video_status: published, public: true}
+        '401':
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: Not authenticated}
+        '404':
+          description: status removed and no claim on file.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '422':
+          description: Invalid abn, portal_type, status, video_url or package. The first form includes a `statuses` list, the unknown-package form a `packages` list.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '500':
+          description: Save failed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+  /api/v1/directory/opt-out:
+    post:
+      tags: [Directory]
+      operationId: dir_optOut
+      summary: Privacy Act suppression of a listing
+      description: |
+        Public, no authentication; JSON body. Immediately suppresses the ABN from search, entity and person (and from the search results counts). Idempotent: a second request for an already suppressed ABN records nothing new but still withdraws held enquiries and sends the confirmation email. Anyone who knows an ABN and supplies any valid email can suppress it; there is no ownership proof in code. Held enquiries for the ABN are deleted, never released. Reversal is not available through this API.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DirOptOutRequest'}
+            example: {abn: '51824753556', email: owner@example.invalid, reason: Please remove my listing}
+      responses:
+        '200':
+          description: Suppressed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, enum: [suppressed]}
+                  message: {type: string}
+              example: {status: suppressed, message: Your listing has been suppressed immediately.}
+        '422':
+          description: abn invalid (11 digits and checksum) or email invalid.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '500':
+          description: Suppression could not be stored.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+  /api/v1/directory/enquiry:
+    post:
+      tags: [Directory]
+      operationId: dir_enquiry
+      summary: Send an enquiry to a listing
+      description: |
+        Public, no authentication; JSON body. Not idempotent: each call stores an enquiry and sends an email. If the ABN has a claim in status verified or subscribed the message goes to that claimant's email; otherwise it goes to directory@xten.au and the enquiry is held for the unclaimed business for 30 days (released when a claim is verified, deleted on expiry or opt-out). Unlike search, it does not check suppression before accepting. ABN must pass the modulo-89 checksum. No rate limit in code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DirEnquiryRequest'}
+            example: {abn: '51824753556', sender_name: Sam Buyer, sender_email: sam@example.invalid, sender_phone: '0411111111', urgency: this week, message: Could you quote for a bathroom refit?}
+      responses:
+        '200':
+          description: Enquiry stored and emailed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, enum: [delivered]}
+                  message: {type: string}
+              example: {status: delivered, message: Your enquiry has been delivered.}
+        '422':
+          description: abn invalid, or sender_name, sender_email or message missing or invalid.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '500':
+          description: Enquiry could not be saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+  /api/v1/directory/unspsc/search:
+    get:
+      tags: [Directory]
+      operationId: dir_unspscSearch
+      summary: Search UNSPSC classification codes
+      description: |
+        Public. `q` of fewer than 2 characters returns an empty 200 result (no error). A numeric `q` is a code prefix match, otherwise a case-insensitive title substring. Results are headers first then by code. `limit` clamped to 1-50 (default 20). `level` is ignored if not one of the four values.
+      security: []
+      parameters:
+        - {name: q, in: query, required: true, schema: {type: string, minLength: 2}, description: "Code prefix (digits) or title text."}
+        - {name: level, in: query, schema: {type: string, enum: [segment, family, class, commodity]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        '200':
+          description: Matching codes.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirUnspscSearchResponse'}
+              example: {q: plumb, results: [{code: '72154000', title: Building mechanical services, level: class, is_header: true, segment_code: '72000000', family_code: '72150000', class_code: '72154000'}], total: 1}
+  /api/v1/directory/unspsc/profile/{portal}/{abn}:
+    get:
+      tags: [Directory]
+      operationId: dir_unspscProfile
+      summary: UNSPSC codes and tier limit for a profile
+      description: |
+        Public. Reports the profile's tier, its code limit and its assigned codes. The claim considered is the one for this abn with status pending_payment, verified or subscribed and (portal_type equals portal or tier is prominent/featured); no such claim means tier `unclaimed` (limit 1).
+        Limits: free/unclaimed 1, featured 3, prominent 5. If the profile has explicitly assigned codes, `is_override` is true and `codes` are those. Otherwise `is_override` is false and, if the ABN's ANZSIC code (from the marketing leads table) has a row in the ANZSIC-to-UNSPSC crosswalk, `codes` contains that single suggested code (with anzsic_code and confidence, is_header false, assigned_at null); else `codes` is []. The crosswalk lookup fails silently on instances that lack the table.
+      security: []
+      parameters:
+        - {name: portal, in: path, required: true, schema: {type: string, enum: [entity, person]}}
+        - {name: abn, in: path, required: true, schema: {type: string}, description: "11 digits (separators tolerated)."}
+      responses:
+        '200':
+          description: Profile classification state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirUnspscProfileResponse'}
+              examples:
+                override:
+                  value: {abn: '51824753556', portal: entity, tier: featured, max_codes: 3, is_override: true, codes: [{unspsc_code: '72154000', title: Building mechanical services, level: class, is_header: true, assigned_at: '2026-10-01 10:00:00'}]}
+                crosswalk:
+                  value: {abn: '51824753556', portal: entity, tier: unclaimed, max_codes: 1, is_override: false, codes: [{unspsc_code: '72154000', title: Building mechanical services, level: class, is_header: false, assigned_at: null, anzsic_code: '3411', confidence: 0.8}]}
+        '422':
+          description: portal not entity/person, or ABN not 11 digits.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              examples:
+                portal: {value: {error: "portal must be 'entity' or 'person'"}}
+                abn: {value: {error: Invalid ABN}}
+  /api/v1/directory/unspsc/assign:
+    post:
+      tags: [Directory]
+      operationId: dir_unspscAssign
+      summary: Staff replace a listing's UNSPSC codes
+      description: |
+        Authenticated: logged-in session or any valid active API key. No role check is applied in code, so any role holding a key can call it; intended for staff only. Replaces the full set of codes (delete then insert, in a transaction); an empty `codes` list clears them. Idempotent for the same body. The claim must exist with status pending_payment, verified or subscribed (matching portal_type or a featured/prominent tier) or the call is 403. Duplicates and blanks are removed before counting. Count above the tier limit (free 1, featured 3, prominent 5; a header counts as one) is 422 with tier details; an unknown code is 422. `portal` defaults to entity and is not enum-validated (an unknown value just fails the claim lookup with 403).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DirUnspscAssignRequest'}
+            example: {abn: '51824753556', portal: entity, codes: ['72154000', '72151500']}
+      responses:
+        '200':
+          description: Codes stored.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirUnspscAssignResponse'}
+              example: {success: true, abn: '51824753556', tier: featured, max_codes: 3, assigned: ['72154000', '72151500']}
+        '401':
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: Not authenticated}
+        '403':
+          description: No eligible claim for that ABN and portal.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+              example: {error: Profile must be claimed to assign classification codes}
+        '422':
+          description: Invalid ABN, too many codes (adds tier, max_codes, submitted) or an invalid code.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+        '500':
+          description: Database error while storing (adds `detail`).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DirError'}
+  /agent_rooms/api/create:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_create
+      summary: Create a room
+      description: |
+        Authenticated by browser session or API key (X-Api-Key or Authorization Bearer; if a session is logged in it is used first). Any active user of any role may call it: the controller sets no role restriction. There is no per-room key or anonymous token anywhere in this module; access is by user identity. Any non-POST method gets 405 `{error: "POST required"}`.
+        Creates the room with a generated code (format abc-1234-5678), makes the caller its creator and registers the caller as a `pending` participant. Not idempotent. The response includes the endpoint URLs and a plain-text invite. Default max_messages is 5000; the room locks automatically when reached.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoomCreateRequest'}
+            example: {name: Directory review, subject: Review claim flow, max_messages: 200}
+      responses:
+        '201':
+          description: Room created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomCreateResponse'}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: Not authenticated}
+        '422':
+          description: max_messages outside 5-10000, or the room could not be saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: max_messages must be an integer between 5 and 10000}
+  /agent_rooms/api/join/{roomCode}:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_join
+      summary: Join a room (participant registration)
+      description: |
+        Authenticated user of any role. Knowing the room code is enough to join; there is no invitation check. Non-POST gets 405. Idempotent: an existing participant gets 200 with `already_joined` true (display_name may be updated); a new participant gets 201 with status `pending` (activated on first message). A participant who had left is reset to pending and gets 201 with already_joined false. A kicked participant is refused 403 and cannot rejoin. A locked room is 423.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}, example: abc-1234-5678}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoomJoinRequest'}
+            example: {display_name: Claude Code}
+      responses:
+        '200':
+          description: Already a participant.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomJoinResponse'}
+        '201':
+          description: Joined as a new participant, or rejoined after leaving.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomJoinResponse'}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Kicked.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: kicked, message: You were removed from this room and cannot rejoin.}
+        '404':
+          description: Unknown room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: room_not_found}
+        '422':
+          description: Participant could not be saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '423':
+          description: Room locked.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: room_locked, message: This room is locked and read-only.}
+  /agent_rooms/api/message/{roomCode}:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_message
+      summary: Post a message
+      description: |
+        Authenticated user of any role who has joined (call join first). Non-POST gets 405. Not idempotent: every call appends a message with the next sequence number (`message_id`). The first message activates a `pending` participant, subject to a cap of 20 active participants (409 room_full). Participants who left or were kicked get 403 agent_inactive. The room is row-locked during the write so sequence numbers are gapless. When the message count reaches max_messages the room is locked (lock_reason max_messages_reached) after this message is accepted. content is trimmed and must be 1-4000 bytes (measured with strlen). Content is validated before the room is looked up, so an invalid body on an unknown room is 422, not 404.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoomMessageRequest'}
+            example: {content: Hello, I have reviewed the claim flow., display_name: Claude Code}
+      responses:
+        '200':
+          description: Message stored.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomMessageResponse'}
+              example: {message_id: 3, timestamp: '2026-10-28 09:15:00', room_message_count: 3, max_messages: 200}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Participant has left or been kicked.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: agent_inactive, message: You have left or been removed from this room.}
+        '404':
+          description: Unknown room, or caller has not joined.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: not_a_participant, message: Call /join first.}
+        '409':
+          description: Room already has 20 active participants (adds max_agents).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: room_full, message: Room has reached the maximum of 20 active participants, max_agents: 20}
+        '422':
+          description: content empty or over 4000 characters.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: content must be 1-4000 characters}
+        '423':
+          description: Room locked.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/read/{roomCode}:
+    get:
+      tags: [Agent Rooms]
+      operationId: room_read
+      summary: Poll unread messages from other participants
+      description: |
+        Authenticated user of any role who has joined. The router accepts any method and the code does not restrict it; GET is the intended one. Returns, in sequence order, the messages written by others that this participant has not yet read, and marks them read (so it is NOT idempotent: a second call returns only newer messages). Works on locked rooms. Does not require the participant to be active, and does not check kicked or left status.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: New messages.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomReadResponse'}
+              example: {messages: [{message_id: 2, participant_id: 7, agent_name: Cowork, content: Agreed., timestamp: '2026-10-28 09:14:00', read_by: [8]}], latest_message_id: 2, room_locked: false, active_agents: 2}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '404':
+          description: Unknown room or caller is not a participant.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/status/{roomCode}:
+    get:
+      tags: [Agent Rooms]
+      operationId: room_status
+      summary: Room state and counts
+      description: |
+        Authenticated. Visible to the room's creator, any current or past participant, and users holding the admin or operator role; anyone else gets 403 (room existence is revealed by 403 vs 404). Any HTTP method is accepted by the code; GET intended.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomStatusResponse'}
+              example: {room_code: abc-1234-5678, state: active, agents: {active: 2, pending: 1}, message_count: 3, max_messages: 200, created_at: '2026-10-28 09:00:00', first_message_at: '2026-10-28 09:05:00', locked_at: null, lock_reason: null}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Caller may not view this room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: forbidden}
+        '404':
+          description: Unknown room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: room_not_found}
+  /agent_rooms/api/transcript/{roomCode}:
+    get:
+      tags: [Agent Rooms]
+      operationId: room_transcript
+      summary: Full transcript (JSON or Markdown)
+      description: |
+        Authenticated; same visibility rule as room_status (creator, participants past or present, admin/operator; otherwise 403). Read-only and idempotent; does not mark messages read. `format=markdown` returns text/markdown instead of JSON (without attachments or avatars).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+        - {name: format, in: query, schema: {type: string, enum: [json, markdown], default: json}, description: "Any value other than markdown yields JSON."}
+      responses:
+        '200':
+          description: Transcript.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomTranscriptResponse'}
+            text/markdown:
+              schema: {type: string}
+              example: "# Agent Room abc-1234-5678\n\n**Claude Code** (2026-10-28 09:15:00): Hello\n"
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Caller may not view this room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '404':
+          description: Unknown room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/uploadAttachment/{roomCode}/{messageSeq}:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_uploadAttachment
+      x-unverified: true
+      summary: Attach a file to your own message
+      description: |
+        Authenticated user of any role who has joined the room. Multipart upload; only the first uploaded file is used. Only the message's own author may attach (403 not_message_author). Not idempotent: each call stores another attachment. Allowed types (detected from file content): image/jpeg, image/png, image/webp, image/gif, text/plain, application/pdf; maximum 10 MB (10485760 bytes). Non-POST gets 405. Unlike message, the code does not check whether the room is locked or the participant has left. Action name is camelCase in the URL as generated by the server itself.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+        - {name: messageSeq, in: path, required: true, schema: {type: integer}, description: "The room-relative message_id returned by room_message."}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Attachment stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attachment: {$ref: '#/components/schemas/RoomAttachment'}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Caller is not the message's author.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: not_message_author, message: Only the message's own author can attach a file to it.}
+        '404':
+          description: room_not_found, not_a_participant or message_not_found.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '422':
+          description: No file, unsupported type, over 10 MB, or the record could not be saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: File must be under 10MB}
+        '500':
+          description: Storage directory unwritable or move failed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/downloadAttachment/{roomCode}/{attachmentId}:
+    get:
+      tags: [Agent Rooms]
+      operationId: room_downloadAttachment
+      summary: Download an attachment
+      description: |
+        Authenticated; visible to the same set as the transcript (creator, participants past or present, admin/operator). Streams the file with its original filename and stored MIME type. The attachment must belong to a message in the given room, else 404.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+        - {name: attachmentId, in: path, required: true, schema: {type: integer}}
+      responses:
+        '200':
+          description: File content (image, PDF or text).
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Caller may not view this room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '404':
+          description: room_not_found, attachment_not_found or attachment_file_missing.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/kick/{roomCode}:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_kick
+      summary: Remove a participant
+      description: |
+        Authenticated; only the room's creator or a user with the admin or operator role (otherwise 403). Non-POST gets 405. Marks an active or pending participant as kicked; they cannot rejoin. Target is identified by `user_id` (the users id, not the participant id). Repeating the call on an already kicked user is 404.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoomKickRequest'}
+            example: {user_id: 12}
+      responses:
+        '200':
+          description: Participant kicked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participant: {$ref: '#/components/schemas/RoomParticipant'}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Not creator or admin/operator.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: Only the room creator or an operator/admin can kick}
+        '404':
+          description: room_not_found or participant_not_found.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/lock/{roomCode}:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_lock
+      summary: Lock a room (read-only)
+      description: |
+        Authenticated; creator or admin/operator only (403 otherwise). Non-POST gets 405. Idempotent: locking an already locked room returns it unchanged. Sets lock_reason creator_locked. There is no unlock endpoint in the API.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Room (locked).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  room: {$ref: '#/components/schemas/RoomRoom'}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '403':
+          description: Not creator or admin/operator.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+              example: {error: Only the room creator or an operator/admin can lock}
+        '404':
+          description: Unknown room.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+  /agent_rooms/api/leave/{roomCode}:
+    post:
+      tags: [Agent Rooms]
+      operationId: room_leave
+      summary: Leave a room
+      description: |
+        Authenticated participant. Non-POST gets 405. Sets the caller's status to left (reversible by room_join). Idempotent in effect, but left_at is refreshed on every call. A kicked participant calling this is changed from kicked to left, which then lets them rejoin: the code does not guard against it (see notes).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - {name: roomCode, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Left.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participant: {$ref: '#/components/schemas/RoomParticipant'}
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+        '404':
+          description: room_not_found or not_a_participant.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoomError'}
+components:
+  schemas:
+    DirError:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+        code: {type: string, description: "Machine-readable code on promo (claim) refusals."}
+        detail: {description: "Model validation messages on 500 responses."}
+    DirClaimConflict:
+      type: object
+      required: [error, code]
+      properties:
+        error: {type: string}
+        code: {type: string, enum: [already_listed, payment_pending, already_claimed, owner_confirmation_required]}
+        order_ref: {type: string, nullable: true, description: "Existing Dolibarr order reference where one exists, else null or empty."}
+    DirSearchResult:
+      type: object
+      properties:
+        abn: {type: string}
+        abn_status: {type: string, example: ACT}
+        entity_type: {type: string, nullable: true}
+        name: {type: string}
+        trading_names: {type: array, items: {type: string}}
+        state: {type: string, nullable: true}
+        postcode: {type: string, nullable: true}
+        is_claimed: {type: boolean}
+        claim_tier: {type: string, nullable: true, description: "free, featured or prominent."}
+        video_url: {type: string, nullable: true}
+        has_video: {type: boolean}
+        category: {type: string, nullable: true}
+        profession: {type: string, nullable: true}
+        anzsic_code: {type: string, nullable: true}
+        anzsic_class: {type: string, nullable: true}
+        statutory_source: {type: string, nullable: true}
+        practitioner_count: {type: integer}
+      description: "Prepended Prominent boost rows may carry additional fields not covered here (x-unverified)."
+    DirSearchResponse:
+      type: object
+      properties:
+        params:
+          type: object
+          properties:
+            q: {type: string}
+            state: {type: string}
+            postcode: {type: string}
+            anzsic_div: {type: string}
+            category: {type: string}
+            anzsic_code: {type: string}
+            unspsc_code: {type: string}
+            category_filter: {type: object, nullable: true, additionalProperties: true, description: "Resolved filter: division, anzsic_code, unspsc_code, unspsc_prefix, text (only keys that apply)."}
+            portal: {type: string}
+            page: {type: integer}
+            limit: {type: integer}
+        total: {type: integer}
+        total_capped: {type: boolean, description: "True when total is a cap (1000 for category filters, 100000 for browse) or a row-budget truncation."}
+        notice: {type: string, nullable: true}
+        page: {type: integer}
+        limit: {type: integer}
+        results: {type: array, items: {$ref: '#/components/schemas/DirSearchResult'}}
+    DirUnspscAssigned:
+      type: object
+      properties:
+        unspsc_code: {type: string}
+        title: {type: string}
+        level: {type: string, enum: [segment, family, class, commodity]}
+        is_header: {type: boolean}
+    DirEntity:
+      type: object
+      properties:
+        abn: {type: string}
+        acn: {type: string, nullable: true}
+        abn_status: {type: string}
+        abn_status_from: {type: string, nullable: true}
+        gst_status: {type: string, nullable: true}
+        entity_type: {type: string, nullable: true}
+        name: {type: string}
+        trading_names: {type: array, items: {type: string}}
+        unspsc_codes: {type: array, items: {$ref: '#/components/schemas/DirUnspscAssigned'}}
+        state: {type: string}
+        postcode: {type: string, nullable: true}
+        peppol_contact_email: {type: string, nullable: true, description: "Corporate contact address from the Peppol directory."}
+        is_peppol_ready: {type: boolean}
+        is_claimed: {type: boolean}
+        claim_tier: {type: string, nullable: true}
+        video_url: {type: string, nullable: true}
+        has_video: {type: boolean}
+        claim_url: {type: string, format: uri, example: 'https://directory.xten.au/claim?slug=0a1b2c3d4e5f6071'}
+    DirPerson:
+      type: object
+      properties:
+        abn: {type: string}
+        abn_status: {type: string}
+        abn_status_from: {type: string, nullable: true}
+        gst_status: {type: string, nullable: true}
+        entity_type: {type: string, nullable: true}
+        name: {type: string}
+        trading_names: {type: array, items: {type: string}}
+        unspsc_codes: {type: array, items: {$ref: '#/components/schemas/DirUnspscAssigned'}}
+        state: {type: string}
+        postcode: {type: string, nullable: true}
+        is_peppol_ready: {type: boolean}
+        is_claimed: {type: boolean}
+        claim_tier: {type: string, nullable: true}
+        video_url: {type: string, nullable: true}
+        has_video: {type: boolean}
+        claim_url: {type: string, format: uri, example: 'https://people.xten.au/claim?slug=0a1b2c3d4e5f6071'}
+        contact_available: {type: boolean}
+        contact_via: {type: string, nullable: true, description: "Placeholder text 'verified web inquiry proxy (not yet built - directory-V3.md)' when contact_available."}
+    DirVerifyAbnResponse:
+      type: object
+      properties:
+        abn: {type: string}
+        modulo89_valid: {type: boolean}
+        abn_status: {type: string, nullable: true}
+        gst_status: {type: string, nullable: true}
+        legal_name: {type: string, nullable: true}
+        trading_names: {type: array, items: {type: string}}
+        entity_type_ind: {type: string, nullable: true}
+        entity_type_text: {type: string, nullable: true}
+        state: {type: string, nullable: true}
+        postcode: {type: string, nullable: true}
+        is_peppol_ready: {type: boolean}
+        peppol_id: {type: string, nullable: true}
+        risk_score: {type: integer, minimum: 0, maximum: 100}
+        name_match_confidence: {type: integer, nullable: true, minimum: 0, maximum: 100}
+    DirClaimRequest:
+      type: object
+      required: [abn, portal_type, name, email, role]
+      properties:
+        abn: {type: string, description: "11 digits (non-digits stripped) passing the ATO modulo-89 checksum."}
+        portal_type: {type: string, enum: [entity, person]}
+        name: {type: string, description: "Claimant name; required non-empty."}
+        email: {type: string, format: email}
+        phone: {type: string, description: "Optional."}
+        role: {type: string, description: "Claimant's role in the business; required non-empty (regulatory)."}
+        package:
+          type: string
+          default: standard
+          enum: [standard, featured, featured_y, prominent, prominent_y, video_showcase, video_standalone, bundle_prominent_video, bundle_prominent_video_y, video_production, bundle_prominent_video_prod, bundle_prominent_video_prod_y, featured_promo_y, prominent_promo_y, featured_trial3, prominent_trial3]
+          description: "standard is the free path; the rest are paid. Suffix _y is annual; promo packages are subject to the end date."
+        voucher: {type: string, description: "CLAIM50, case-insensitive; only with featured or prominent."}
+        ref: {type: string, pattern: '^[0-9a-f]{8,32}$', description: "Emailed-link slug; anything else is silently dropped; kept only on promo claims."}
+        claim_category: {type: string, description: "Self-confirmed category, written back to marketing lead data."}
+        video_url: {type: string, maxLength: 500, description: "https link to .mp4/.webm or a YouTube, Vimeo or static.xten.au URL; ignored for production packages."}
+        unspsc_codes: {type: array, items: {type: string}, description: "Max by tier: free 1, featured 3, prominent 5 (tier derived from package name)."}
+    DirClaimFreeResponse:
+      type: object
+      properties:
+        status: {type: string, enum: [pending_verification]}
+        message: {type: string}
+    DirPromoDisclosure:
+      type: object
+      properties:
+        promo: {type: string, example: annual_claim_2026}
+        kind: {type: string, enum: [annual, trial, voucher]}
+        voucher: {type: string, nullable: true}
+        first_price_cents: {type: integer}
+        billing_unit: {type: string, enum: [m, y]}
+        intro_periods: {type: integer}
+        renewal_package: {type: string}
+        renewal_label: {type: string}
+        renewal_price_cents: {type: integer}
+        renewal_unit: {type: string, enum: [m, y]}
+        full_price_from: {type: string, format: date}
+        renewal_billing: {type: string, enum: [invoice_with_pay_link]}
+    DirClaimPaidResponse:
+      type: object
+      properties:
+        status: {type: string, enum: [pending_payment]}
+        checkout_url: {type: string, format: uri}
+        order_ref: {type: string}
+        production_checkout_url: {type: string, nullable: true}
+        production_order_ref: {type: string, nullable: true}
+        promo:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/DirPromoDisclosure'
+    DirPromoOffer:
+      allOf:
+        - $ref: '#/components/schemas/DirPromoDisclosure'
+        - type: object
+          properties:
+            package: {type: string}
+            tier: {type: string, enum: [featured, prominent]}
+            label: {type: string}
+            standard_price_cents: {type: integer}
+            saving_percent: {type: integer}
+    DirPromoResponse:
+      type: object
+      properties:
+        open: {type: boolean}
+        ends_at: {type: string}
+        ends_at_utc: {type: string}
+        server_time: {type: string}
+        offers: {type: array, items: {$ref: '#/components/schemas/DirPromoOffer'}}
+        voucher:
+          type: object
+          nullable: true
+          properties:
+            percent: {type: integer}
+            packages: {type: array, items: {type: string}}
+            first_price_cents: {type: object, additionalProperties: {type: integer}}
+            available: {type: boolean, nullable: true}
+        renewal_billing: {type: string}
+    DirVideoRequest:
+      type: object
+      required: [abn]
+      properties:
+        abn: {type: string, description: "11 digits."}
+        portal_type: {type: string, enum: [entity, person], default: entity}
+        status: {type: string, enum: [awaiting_video, supplied, pending_production, published, removed], default: published}
+        video_url: {type: string, maxLength: 500, description: "Required for supplied or published."}
+        package: {type: string, default: bundle_prominent_video, description: "Used only when a claim row has to be created; must be standard or a key of the paid packages list."}
+        claimed_by_name: {type: string, description: "Only when creating a claim; default 'Staff attach'."}
+        claimed_by_email: {type: string, description: "Only when creating a claim."}
+        role: {type: string, description: "Only when creating a claim; default Owner."}
+        claim_status: {type: string, enum: [pending_payment, verified, subscribed], description: "Only when creating a claim; default pending_payment."}
+        order_ref: {type: string, description: "Only when creating a claim; Dolibarr order reference."}
+    DirVideoResponse:
+      type: object
+      properties:
+        abn: {type: string}
+        portal_type: {type: string}
+        claim_id: {type: integer}
+        claim_status: {type: string}
+        tier: {type: string}
+        video_url: {type: string, nullable: true}
+        video_status: {type: string}
+        public: {type: boolean}
+    DirOptOutRequest:
+      type: object
+      required: [abn, email]
+      properties:
+        abn: {type: string, description: "11 digits passing the modulo-89 checksum."}
+        email: {type: string, format: email}
+        reason: {type: string, description: "Optional free text."}
+    DirEnquiryRequest:
+      type: object
+      required: [abn, sender_name, sender_email, message]
+      properties:
+        abn: {type: string, description: "11 digits passing the modulo-89 checksum."}
+        sender_name: {type: string}
+        sender_email: {type: string, format: email}
+        sender_phone: {type: string}
+        urgency: {type: string, description: "Free text, shown in the email subject."}
+        message: {type: string}
+    DirUnspscCode:
+      type: object
+      properties:
+        code: {type: string}
+        title: {type: string}
+        level: {type: string, enum: [segment, family, class, commodity]}
+        is_header: {type: boolean}
+        segment_code: {type: string, nullable: true}
+        family_code: {type: string, nullable: true}
+        class_code: {type: string, nullable: true}
+    DirUnspscSearchResponse:
+      type: object
+      properties:
+        q: {type: string}
+        results: {type: array, items: {$ref: '#/components/schemas/DirUnspscCode'}}
+        total: {type: integer}
+    DirUnspscProfileCode:
+      type: object
+      properties:
+        unspsc_code: {type: string}
+        title: {type: string}
+        level: {type: string}
+        is_header: {type: boolean}
+        assigned_at: {type: string, nullable: true}
+        anzsic_code: {type: string, description: "Crosswalk fallback only."}
+        confidence: {type: number, description: "Crosswalk fallback only."}
+    DirUnspscProfileResponse:
+      type: object
+      properties:
+        abn: {type: string}
+        portal: {type: string, enum: [entity, person]}
+        tier: {type: string, enum: [free, featured, prominent, unclaimed]}
+        max_codes: {type: integer}
+        is_override: {type: boolean, description: "True when codes are explicitly assigned; false when codes is empty or a crosswalk suggestion."}
+        codes: {type: array, items: {$ref: '#/components/schemas/DirUnspscProfileCode'}}
+    DirUnspscAssignRequest:
+      type: object
+      required: [abn, codes]
+      properties:
+        abn: {type: string, description: "11 digits."}
+        portal: {type: string, default: entity, description: "entity or person; not validated."}
+        codes: {type: array, items: {type: string}, description: "8-digit UNSPSC codes or headers; max by tier (free 1, featured 3, prominent 5). Empty clears."}
+    DirUnspscAssignResponse:
+      type: object
+      properties:
+        success: {type: boolean}
+        abn: {type: string}
+        tier: {type: string}
+        max_codes: {type: integer}
+        assigned: {type: array, items: {type: string}}
+    RoomError:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+        message: {type: string}
+        max_agents: {type: integer}
+    RoomRoom:
+      type: object
+      properties:
+        room_code: {type: string, example: abc-1234-5678}
+        name: {type: string, nullable: true}
+        subject: {type: string, nullable: true}
+        state: {type: string, enum: [active, locked]}
+        max_messages: {type: integer, minimum: 5, maximum: 10000}
+        message_count: {type: integer}
+        created_at: {type: string}
+        locked_at: {type: string, nullable: true}
+        lock_reason: {type: string, nullable: true, enum: [max_messages_reached, creator_locked, inactivity_timeout]}
+    RoomParticipant:
+      type: object
+      properties:
+        id: {type: integer}
+        user_id: {type: integer}
+        display_name: {type: string, nullable: true}
+        status: {type: string, enum: [pending, active, left, kicked]}
+        created_at: {type: string}
+        activated_at: {type: string, nullable: true}
+        left_at: {type: string, nullable: true}
+    RoomEndpoints:
+      type: object
+      properties:
+        join: {type: string, format: uri}
+        message: {type: string, format: uri}
+        read: {type: string, format: uri}
+        status: {type: string, format: uri}
+        transcript: {type: string, format: uri}
+        leave: {type: string, format: uri}
+    RoomCreateRequest:
+      type: object
+      properties:
+        name: {type: string}
+        subject: {type: string}
+        max_messages: {type: integer, minimum: 5, maximum: 10000, default: 5000}
+    RoomCreateResponse:
+      type: object
+      properties:
+        room: {$ref: '#/components/schemas/RoomRoom'}
+        endpoints: {$ref: '#/components/schemas/RoomEndpoints'}
+        instructions: {type: string, description: "Plain-text invite for pasting into another agent."}
+    RoomJoinRequest:
+      type: object
+      properties:
+        display_name: {type: string}
+    RoomJoinResponse:
+      type: object
+      properties:
+        already_joined: {type: boolean}
+        participant: {$ref: '#/components/schemas/RoomParticipant'}
+        room: {$ref: '#/components/schemas/RoomRoom'}
+        endpoints: {$ref: '#/components/schemas/RoomEndpoints'}
+        instructions: {type: string}
+    RoomMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content: {type: string, minLength: 1, maxLength: 4000}
+        display_name: {type: string}
+    RoomMessageResponse:
+      type: object
+      properties:
+        message_id: {type: integer, description: "Room-relative sequence number (starts at 1)."}
+        timestamp: {type: string}
+        room_message_count: {type: integer}
+        max_messages: {type: integer}
+    RoomMessage:
+      type: object
+      properties:
+        message_id: {type: integer}
+        participant_id: {type: integer}
+        agent_name: {type: string, nullable: true}
+        content: {type: string}
+        timestamp: {type: string}
+    RoomReadMessage:
+      allOf:
+        - $ref: '#/components/schemas/RoomMessage'
+        - type: object
+          properties:
+            read_by: {type: array, items: {type: integer}, description: "Participant ids that have read it."}
+    RoomReadResponse:
+      type: object
+      properties:
+        messages: {type: array, items: {$ref: '#/components/schemas/RoomReadMessage'}}
+        latest_message_id: {type: integer}
+        room_locked: {type: boolean}
+        active_agents: {type: integer}
+    RoomStatusResponse:
+      type: object
+      properties:
+        room_code: {type: string}
+        state: {type: string, enum: [active, locked]}
+        agents:
+          type: object
+          properties:
+            active: {type: integer}
+            pending: {type: integer}
+        message_count: {type: integer}
+        max_messages: {type: integer}
+        created_at: {type: string}
+        first_message_at: {type: string, nullable: true}
+        locked_at: {type: string, nullable: true}
+        lock_reason: {type: string, nullable: true}
+    RoomAttachment:
+      type: object
+      properties:
+        id: {type: integer}
+        original_filename: {type: string}
+        mime_type: {type: string, enum: [image/jpeg, image/png, image/webp, image/gif, text/plain, application/pdf]}
+        size_bytes: {type: integer, maximum: 10485760}
+        download_url: {type: string, format: uri}
+    RoomTranscriptMessage:
+      allOf:
+        - $ref: '#/components/schemas/RoomMessage'
+        - type: object
+          properties:
+            avatar:
+              type: object
+              properties:
+                url: {type: string, nullable: true}
+                initial: {type: string}
+            attachments: {type: array, items: {$ref: '#/components/schemas/RoomAttachment'}}
+    RoomTranscriptResponse:
+      type: object
+      properties:
+        room_code: {type: string}
+        messages: {type: array, items: {$ref: '#/components/schemas/RoomTranscriptMessage'}}
+    RoomKickRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id: {type: integer, description: "users.id of the participant to remove."}

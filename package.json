@@ -3,9 +3,13 @@
   "private": true,
   "description": "Playwright E2E tests only — the app itself is 100% PHP (Phalcon), no JS build step. See docs/CODING-STANDARDS.md's Testing section and tests/e2e/README.md.",
   "scripts": {
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "docs:api": "node bin/build-openapi.mjs",
+    "docs:api:check": "node bin/build-openapi.mjs --check"
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.0"
+    "@playwright/test": "^1.48.0",
+    "@apidevtools/swagger-parser": "^10.1.0",
+    "js-yaml": "^4.1.0"
   }
 }

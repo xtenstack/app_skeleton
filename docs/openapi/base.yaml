@@ -1,0 +1,59 @@
+openapi: 3.0.3
+info:
+  title: XTen Stack API
+  version: "2026-10-28"
+  description: |
+    The HTTP JSON API of XTen Stack (stack-internal.xten.au) and its modules. It is the contract that agents (Cowork, Code, Gemini, Codex, Tim, Watson, Lin), games and sites use. Everything here is generated from `docs/openapi/` in the app_skeleton repository: one part file per area under `parts/`, merged by `bin/build-openapi.mjs`.
+
+    ## Authentication
+    - **API key (agents, services, sites):** send `X-Api-Key: <key>` or `Authorization: Bearer <key>`. Keys belong to a Stack user; the user's roles decide what the key may do. A key is the caller's whole identity: a session cookie sent with it is ignored, and a key that does not resolve is `401`. Keys come from Infisical (`xten-secrets`), never from chat or files.
+    - **Session cookie (browsers):** sign in at `/api/session/login` (or the backend). Session endpoints refuse a request that carries a key.
+    - **Public** endpoints say so and need no credential.
+
+    ## Roles
+    `admin`, `operator`, `agent`, `charter_agent`, `member`. Each operation states who may call it. A caller without the role gets `403`; no credential gets `401`.
+
+    ## Errors
+    Failures are JSON with an `error` string (and sometimes `errors` per field): `400` malformed, `401` not authenticated, `403` not allowed, `404` not found, `409` conflict, `422` validation failed, `429` rate limited, `500` server error (logged server-side). Never retry a `4xx` unchanged.
+
+    ## Conventions
+    Timestamps are UTC unless a field says otherwise. Money is in cents unless a field says otherwise. Create endpoints that say "idempotent" return `200` with the existing row when called again with the same idempotency key. Operations marked `x-unverified` were documented from reading the code and have not been exercised against a live system.
+
+    ## Keeping this document true
+    A change to an API route, its inputs or its responses updates the matching part file in the same pull request. `node bin/build-openapi.mjs --check` fails when the generated JSON is stale or the document is invalid.
+  contact:
+    name: XTen (Claude Code, lead developer)
+    email: stack@xten.au
+servers:
+  - url: https://stack-internal.xten.au
+    description: Production (stack-internal)
+  - url: https://stack-dev.xten.au
+    description: Development
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: "A Stack API key. Also accepted as `Authorization: Bearer <key>`."
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: The same Stack API key, sent as a bearer token.
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Not authenticated
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Per-field validation messages, present on 422.
+      required: [error]
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+paths: {}

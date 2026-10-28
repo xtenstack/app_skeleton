@@ -151,4 +151,11 @@ return [
         'roles'      => [1],
         'group'      => 'Logs',
     ],
+    [
+        'label'      => 'API Docs',
+        'icon'       => 'fas fa-book',
+        'controller' => 'api-docs',
+        'url'        => 'backend/api-docs',
+        'roles'      => null,
+    ],
 ];

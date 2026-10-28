@@ -1,0 +1,3326 @@
+tags:
+  - name: Announcements
+    description: Staff, agent and customer notices (plugins/announcements). Read for any authenticated principal, filtered by audience; create/publish is admin only and idempotent on source + external_id.
+  - name: Forum
+    description: Headless Forum plugin (plugins/forum). Games push identity, alliance, membership and tutorial events to one endpoint; the plugin stores them idempotently and adapts them to Flarum asynchronously.
+  - name: Catalogue
+    description: Read-only product catalogue for external frontends (plugins/catalogue) plus an authenticated quote-request ticket intake.
+  - name: AI SSA Chat
+    description: Public chat-widget proxy to an AI SSA instance's sidecar (embed-token authenticated) and the admin-only widget configuration API (plugins/ai-ssa-chat).
+  - name: AI SSA Email
+    description: Admin-only mailbox configuration and one-time baseline pass for an AI SSA instance's email channel (plugins/ai-ssa-email).
+  - name: AI SSA Phone
+    description: Admin-only phone line configuration and call listing for an AI SSA instance (plugins/ai-ssa-phone).
+  - name: AI SSA
+    description: AI Sales and Support Agent core (applications/ai-ssa-application). Admin-only instance provisioning and audit proxy, plus the HMAC-signed escalation intake the sidecar calls.
+  - name: KPI
+    description: Key Performance Indicators module (internal/kpi-module). One endpoint lets an agent or cron push a metric actual for a period.
+  - name: Licensing
+    description: Licensing module (internal/licensing-module). Cross-instance licence check-in authenticated by the key itself.
+  - name: Transactions
+    description: Transactions module (applications/transactions). Public, CORS allow-listed quote-request intake that creates a draft quote.
+  - name: Store
+    description: XTen Commerce Storefront (applications/store). Public instant search and public quote submission that bridges into Transactions.
+  - name: Lin
+    description: Lin Review and Publish (internal/lin-module). The agent-facing door for LinkedIn post drafts; nothing here can approve or publish.
+  - name: MAAMA
+    description: Multi AI and Agent module (internal/maama-module). Handover register and agent profile lookup for staff and agents.
+  - name: Requirements
+    description: Requirements module (internal/requirements-module). JSON list/view/create/update for requirements (REQ-nnn), reached through the module's generic routing.
+
+paths:
+  /api/announcements:
+    get:
+      tags: [Announcements]
+      operationId: ann_list
+      summary: List published announcements visible to the caller
+      description: |
+        Any authenticated principal (session or API key), every role including `member`. Only published rows are returned (`published_at` set), newest first, no pagination. Audience filtering by caller role:
+        admin/operator see `everyone`, `all`, `staff`; `agent`/`charter_agent` see `everyone`, `all`; any other role (e.g. `member`) sees `everyone` only.
+        Expired rows (`expires_at` in the past) are excluded unless `include_expired=1`. An unrecognised `severity` or an unparseable `since` is silently ignored rather than rejected. Expiry events are detected and fired as a side effect of each read.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: include_expired
+          in: query
+          required: false
+          description: Only the exact value `1` includes expired announcements.
+          schema: { type: string, example: "1" }
+        - name: severity
+          in: query
+          required: false
+          description: Filter by severity. Accepts `info`, `notice`, `important` and the aliases `warning` (notice) and `critical` (important), case-insensitive. Anything else is ignored.
+          schema: { type: string, example: important }
+        - name: since
+          in: query
+          required: false
+          description: Only announcements with `published_at` on or after this date/time (anything PHP strtotime parses). Unparseable values are ignored.
+          schema: { type: string, example: "2026-10-01" }
+      responses:
+        "200":
+          description: Announcements visible to the caller.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [announcements]
+                properties:
+                  announcements:
+                    type: array
+                    items: { $ref: "#/components/schemas/AnnAnnouncement" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnError" }
+              example: { error: Not authenticated }
+    post:
+      tags: [Announcements]
+      operationId: ann_create
+      summary: Create (or idempotently update) an announcement
+      description: |
+        Admin role only. Operator, agent and charter_agent keys get 403 (Travis 27 Sep 2026: charter agents must not create or publish announcements). The body is parsed as JSON whatever the Content-Type; an unparseable or empty body behaves as `{}` and fails validation with 422.
+        Drafts by default: `publish` defaults to false, so an admin presses Publish later. `author_user_id` is always the authenticated caller, never taken from the body.
+
+        Idempotency: when `source` and `external_id` are both sent and a row with that pair exists, the call updates that row and answers 200 `created:false` with the same `id` instead of creating a duplicate. On such an update `title`, `body`, `severity`, `expires_at` and `source_url` are overwritten with the submitted values (so omitting `source_url` or `expires_at` clears them; title and body are always required); `audience` changes only when the body explicitly contains an `audience` key. `publish:true` publishes a still-draft row and never un-publishes. New rows answer 201 `created:true`.
+        Events: `announcements:created` fires when a row becomes published, `announcements:updated` when an already-published row changes. All validation problems are returned together in one 422.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnCreateRequest" }
+            example:
+              title: Planned maintenance window
+              body: Stack will be briefly unavailable on Sunday 02:00-02:15 AWST.
+              severity: notice
+              audience: all
+              publish: true
+              expires_at: "2026-11-01"
+              source: onedrive-inbox
+              external_id: maintenance-2026-11-01
+              source_url: https://example.test/inbox/maintenance.md
+      responses:
+        "200":
+          description: An existing row (same source + external_id) was updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnWriteResult" }
+        "201":
+          description: A new announcement was created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnWriteResult" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnError" }
+              example: { error: "Forbidden: requires role admin" }
+        "422":
+          description: Validation failed (`errors` is a field to message map) or the row could not be saved (`error` only, model messages joined).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnValidationError" }
+              example:
+                error: Validation failed
+                errors: { title: title is required, source: source is required when external_id is given }
+
+  /api/announcements/{id}:
+    get:
+      tags: [Announcements]
+      operationId: ann_get
+      summary: Get one announcement
+      description: |
+        Any authenticated principal. A draft is visible to admin/operator only; for everyone else (and for an announcement whose audience the caller may not read) the answer is 404, not 403, so unannounced or internal rows are not confirmed to exist. Expired rows are still returned here.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: The announcement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [announcement]
+                properties:
+                  announcement: { $ref: "#/components/schemas/AnnAnnouncement" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnError" }
+        "404":
+          description: Not found, a draft the caller may not see, or an audience the caller may not read.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnnError" }
+              example: { error: Announcement not found }
+
+  /api/forum/v1/events:
+    post:
+      tags: [Forum]
+      operationId: forum_events_create
+      summary: Submit a game event envelope
+      description: |
+        Authenticated by `Authorization: Bearer <per-game key>` (or `X-Api-Key`): the key belongs to a per-game Stack service user. Authentication happens before the body is parsed. Any role resolves, but the principal's user id must equal the registered game's `service_user_id`; otherwise 403.
+        Order of checks: 401 (no/invalid key) -> 400 (body is not a JSON object; a JSON array or empty body counts) -> 404 (`game_key` missing, unknown, or the game is disabled) -> 403 (key not authorised for that game) -> 422 (envelope or payload invalid) -> store.
+        Idempotency: `event_id` is unique. A replay of a stored `event_id` answers 202 `duplicate:true` and is not re-validated against the stored payload (the first accepted payload wins). The event is stored as pending and applied to Flarum asynchronously by the queue worker; 202 means stored, not applied. Every 4xx is permanent for the game (dead-letter), per the contract; the game treats any 2xx as delivered. Events for one lane (entity, or the player for membership events) are applied in `occurred_at` order.
+        `event_id` must equal `{game_key}:{event_type}:{entity_key}:{sequence}`; the sequence is chosen by the game, unique per emission, and kept on retry.
+        Event types: user.upsert, alliance.upsert, membership.active, membership.revoked, alliance.archived, tutorial.post.upsert. Source of truth: plugins/forum/src/Envelope.php and plugins/docs/Forum-Service-Interface-v0.1.md.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ForumEnvelope" }
+            examples:
+              user_upsert:
+                summary: user.upsert
+                value:
+                  event_id: "xwar-legacy:user.upsert:user:1:1234:202610261200000000-abc123"
+                  entity_key: "user:1:1234"
+                  sequence: "202610261200000000-abc123"
+                  event_type: user.upsert
+                  game_key: xwar-legacy
+                  universe_id: 1
+                  occurred_at: "2026-10-26T12:00:00Z"
+                  payload:
+                    user:
+                      game_key: xwar-legacy
+                      universe_id: 1
+                      game_user_id: 1234
+                      username: Commander
+                      email: commander@example.test
+                      language: en
+                      profile:
+                        avatar_url: null
+                        alliance_tag: XTEN
+                        join_date: "2026-10-26T12:00:00Z"
+              membership_active:
+                summary: membership.active
+                value:
+                  event_id: "xwar-legacy:membership.active:membership:1:1234:42:202610261201000000-def456"
+                  entity_key: "membership:1:1234:42"
+                  sequence: "202610261201000000-def456"
+                  event_type: membership.active
+                  game_key: xwar-legacy
+                  universe_id: 1
+                  occurred_at: "2026-10-26T12:01:00Z"
+                  payload:
+                    membership:
+                      game_key: xwar-legacy
+                      universe_id: 1
+                      game_user_id: 1234
+                      game_alliance_id: 42
+                      state: active
+      responses:
+        "202":
+          description: Stored (or already stored). Delivery to Flarum is asynchronous.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumAccepted" }
+              examples:
+                accepted: { value: { accepted: true, duplicate: false } }
+                replay: { value: { accepted: true, duplicate: true } }
+        "400":
+          description: Body is empty or not a JSON object.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumError" }
+              example: { error: Request body must be a JSON object }
+        "401":
+          description: No valid API key or session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumError" }
+              example: { error: Not authenticated }
+        "403":
+          description: The authenticated user is not the service user of the claimed game.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumError" }
+              example: { error: This API key is not authorised for game xwar-legacy }
+        "404":
+          description: Unknown game (or `game_key` missing, or the game is disabled).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumError" }
+              example: { error: Unknown game xwar-legacy }
+        "422":
+          description: Envelope or payload failed validation. `errors` maps a field path (for example `event_id`, `payload.user.email`) to a message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ForumInvalidEvent" }
+              example:
+                error: Invalid event
+                errors: { payload.user.email: must be a valid email address }
+
+  /api/catalogue/products:
+    get:
+      tags: [Catalogue]
+      operationId: cat_products_list
+      summary: List published products for a store
+      description: |
+        Any authenticated principal (session or API key); no role restriction, so a `member` key works. Only `published`, non-deleted products of the store are listed, ordered quote-required first then newest id first. `q` matches name or SKU case-insensitively (ILIKE, so PostgreSQL only). `limit` is capped at 100 (default 20); `offset` is clamped to 0 or more. Unknown store code answers 404.
+      x-unverified: true
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: store
+          in: query
+          required: false
+          description: Store code. Defaults to `bioldex`.
+          schema: { type: string, default: bioldex }
+        - name: q
+          in: query
+          required: false
+          description: Substring of product name or SKU.
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          description: Page size, default 20, capped at 100. A value of 0 or below is not clamped by the code (unverified behaviour).
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, default: 0, minimum: 0 }
+      responses:
+        "200":
+          description: A page of products.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatProductList" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatError" }
+        "404":
+          description: Store code not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatError" }
+              example: { error: "Store 'nosuch' not found." }
+
+  /api/catalogue/products/{slug}:
+    get:
+      tags: [Catalogue]
+      operationId: cat_products_get
+      summary: Get one published product by slug
+      description: |
+        Any authenticated principal. Slug must match `[a-z0-9-]+` or the router does not match (framework 404). Includes images (primary first). 404 for an unknown store or an unpublished/deleted/unknown product.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9-]+$" }
+        - name: store
+          in: query
+          required: false
+          description: Store code. Defaults to `bioldex`.
+          schema: { type: string, default: bioldex }
+      responses:
+        "200":
+          description: The product.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatProductDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatError" }
+        "404":
+          description: Unknown store or product.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatError" }
+              example: { error: Product not found }
+
+  /api/catalogue/quote:
+    post:
+      tags: [Catalogue]
+      operationId: cat_quote_create
+      summary: Submit a concierge quote request (creates a support ticket)
+      description: |
+        Requires authentication (any role); this is NOT a public endpoint, unlike the Transactions and Store quote intakes. Body is parsed as JSON regardless of Content-Type.
+        Creates a `Tickets` row (type `support`, severity `normal`, status `open`, project `bioldex`, title truncated to 190 characters) when the Tickets model is present; `ticket_id` is null if it is not. The SKU is not checked against the catalogue and the email address is not format-validated. Success is HTTP 200, not 201.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CatQuoteRequest" }
+            example:
+              name: Jane Smith
+              email: jane.smith@school.example.test
+              phone: "0400 000 000"
+              company: Example High School
+              sku: BDX-1001
+              notes: Please quote 10 units delivered to Perth.
+      responses:
+        "200":
+          description: Request recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatQuoteAccepted" }
+        "400":
+          description: name, email or sku missing or blank.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatError" }
+              example: { error: "Name, email, and product SKU are required." }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatError" }
+        "500":
+          description: The ticket could not be saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatQuoteFailed" }
+
+  /api/ai-ssa-chat/start:
+    post:
+      tags: [AI SSA Chat]
+      operationId: chat_start
+      summary: Open a chat session (public widget call)
+      description: |
+        Public, unauthenticated; called from a visitor's browser. The embed token is the only access control. Checks in order: `embed_token` present (422); token is 48 lowercase hex and belongs to an enabled widget (else 404, same answer for unknown and disabled); request `Origin` allowed by the widget's `allowed_origins` list (when the list is non-empty the Origin header must be present and match exactly, case-insensitively, trailing slash ignored; an empty list allows any origin including none) (403); AI SSA core available (503); rate limits (429): per client IP min(widget rate, 30/min), per session min(widget rate, 15/min, message only), per widget token (default 120/min, configurable 1-600); then the licence gate (503 "Chat is not available right now", which rule refused is only in the event log).
+        CORS: responses carry `Access-Control-Allow-Origin: *`, replaced with the request Origin when the widget has an origin list and Origin was sent. `OPTIONS` answers 204 with the CORS headers. `Cache-Control: no-store`. A visitor never learns which rule refused.
+        The returned `session_id` is `web:<32 hex>.<32 hex>`, an HMAC over the embed token and a random nonce; it is stateless and only valid with the token it was issued for.
+        The router accepts only POST and OPTIONS here, so the in-controller 405 branch is unreachable.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatStartRequest" }
+            example: { embed_token: "0123456789abcdef0123456789abcdef0123456789abcdef" }
+      responses:
+        "200":
+          description: Session opened.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatStartResponse" }
+              example:
+                session_id: "web:0123456789abcdef0123456789abcdef.fedcba9876543210fedcba9876543210"
+                greeting: "Hi, I'm Tim, Support Specialist at Example Pty Ltd. How can I help?"
+                title: Tim
+                test_mode: true
+        "204":
+          description: CORS preflight (OPTIONS) answer; empty body.
+        "403":
+          description: Origin not in the widget's allowed list.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: This site is not allowed to use this widget }
+        "404":
+          description: Invalid, malformed or disabled embed token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: Invalid or disabled embed token }
+        "422":
+          description: embed_token missing or blank.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: embed_token is required }
+        "429":
+          description: Rate limit hit (IP, session or widget).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: "Too many requests, please slow down" }
+        "503":
+          description: AI SSA core not available, or the licence/instance gate refused.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: Chat is not available right now }
+
+  /api/ai-ssa-chat/message:
+    post:
+      tags: [AI SSA Chat]
+      operationId: chat_message
+      summary: Send a visitor message to the assistant (public widget call)
+      description: |
+        Public, unauthenticated. Same access checks and CORS behaviour as `start` (token, origin, core, rate limits, licence gate), run after body validation. Validation order: `session_id` must match `^[A-Za-z0-9._:-]{8,100}$` and `message` non-empty (422 "session_id and message are required"); `session_id` must be one issued by `start` for this same token (422 "Unknown session: start a new one", which also covers a missing or wrong token); message at most 2000 characters (422); then the admit checks (404/403/503/429). `page_url` is optional, trimmed and cut to 500 characters.
+        The message is relayed to the instance's sidecar; a sidecar failure answers 502 "Chat is temporarily unavailable". `OPTIONS` answers 204. Router accepts only POST and OPTIONS.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatMessageRequest" }
+            example:
+              embed_token: "0123456789abcdef0123456789abcdef0123456789abcdef"
+              session_id: "web:0123456789abcdef0123456789abcdef.fedcba9876543210fedcba9876543210"
+              message: What are your support hours?
+              page_url: https://www.client.example/contact
+      responses:
+        "200":
+          description: The assistant's reply.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatMessageResponse" }
+              example:
+                session_id: "web:0123456789abcdef0123456789abcdef.fedcba9876543210fedcba9876543210"
+                reply: We are available 9am to 5pm AWST on weekdays.
+                escalated: false
+                closed: false
+                test_mode: true
+        "204":
+          description: CORS preflight (OPTIONS) answer; empty body.
+        "403":
+          description: Origin not allowed for this widget.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "404":
+          description: Invalid, malformed or disabled embed token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "422":
+          description: Bad session id, missing message, unknown session, or message over 2000 characters.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: session_id and message are required }
+        "429":
+          description: Rate limit hit.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "502":
+          description: The sidecar did not answer (or no sidecar credentials).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: Chat is temporarily unavailable }
+        "503":
+          description: Core unavailable or licence gate refused.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+
+  /api/ai-ssa-chat/widget.js:
+    get:
+      tags: [AI SSA Chat]
+      operationId: chat_widget_js
+      summary: Embeddable chat widget script
+      description: |
+        Public, unauthenticated static JavaScript (plugins/ai-ssa-chat/assets/widget.js), `Cache-Control: public, max-age=300`, `Access-Control-Allow-Origin: *`. `OPTIONS` answers 204. Returns 404 text/plain "Not found" if the asset file is missing from the deployment.
+      security: []
+      responses:
+        "200":
+          description: The widget script.
+          content:
+            application/javascript:
+              schema: { type: string }
+        "204":
+          description: CORS preflight (OPTIONS) answer; empty body.
+        "404":
+          description: Asset file missing.
+          content:
+            text/plain:
+              schema: { type: string, example: Not found }
+
+  /api/ai-ssa-chat/config/{instanceId}:
+    get:
+      tags: [AI SSA Chat]
+      operationId: chat_config_get
+      summary: Get an instance's chat widget settings and channel state
+      description: |
+        Admin role only (session or API key). The answer always carries the channel's licence-gate state ("Licence required" is a state, not an error), and `config` is null until a widget exists. The embed token is returned in full to admins.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Channel state and widget config.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatConfigResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+              example: { error: Forbidden }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatErrors" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatErrors" }
+    put:
+      tags: [AI SSA Chat]
+      operationId: chat_config_put
+      summary: Create or update an instance's chat widget
+      description: |
+        Admin role only. Creates the instance's one widget if none exists (a new widget is enabled, rate limit 120, with a generated 48-hex embed token), otherwise updates it. Always answers 200, including on create. Only the fields sent are changed. `instance_id` in the body is ignored on create (the path wins) and rejected on update. Send `rotate_token: true` to replace the embed token (the old one stops working). A session-cookie caller must send `Content-Type: application/json` (415 otherwise); API-key callers are not checked. `pushed` reports the config push to the sidecar: null none due, true acknowledged, false failed (the row is saved regardless).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatConfigRequest" }
+            example:
+              greeting_override: Hi, how can we help today?
+              widget_title: Support
+              allowed_origins: ["https://www.client.example"]
+              rate_limit_per_minute: 120
+              enabled: true
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatConfigSaved" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatErrors" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatError" }
+        "422":
+          description: Validation failed, instance already has a widget (cannot happen via this route), or instance missing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatErrors" }
+              example:
+                error: Rate limit must be between 1 and 600 requests a minute
+                errors: ["Rate limit must be between 1 and 600 requests a minute"]
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatErrors" }
+
+  /api/ai-ssa-email/config/{instanceId}:
+    get:
+      tags: [AI SSA Email]
+      operationId: email_config_get
+      summary: List an instance's mailboxes and channel state
+      description: Admin role only (session or API key). Passwords are never returned, only `imap_password_set`. `push_due` says the sidecar does not yet hold the current config; `push_owed` says a removed mailbox has not yet been told to the sidecar.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Mailboxes and state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailConfigResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+    put:
+      tags: [AI SSA Email]
+      operationId: email_config_put
+      summary: Add or update one mailbox
+      description: |
+        Admin role only. The mailbox is keyed by `mailbox_address` (lower-cased): if a mailbox with that address exists for the instance it is updated (200), otherwise created (201). On create `mailbox_address`, `imap_host`, `imap_user` and `imap_password` are required; on update only the fields sent change (and `instance_id` is rejected). A password is write-only and stored encrypted; send it only to set or change it. A session caller must send `Content-Type: application/json` (415). The response is the full mailbox list, same as GET.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmailMailboxRequest" }
+            example:
+              mailbox_address: support@client.example
+              imap_host: imap.client.example
+              imap_port: 993
+              imap_user: support@client.example
+              imap_password: "<write-only secret>"
+              smtp_host: smtp.client.example
+              smtp_port: 587
+              processed_folder: INBOX.Processed
+      responses:
+        "200":
+          description: Existing mailbox updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailConfigResponse" }
+        "201":
+          description: Mailbox created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailConfigResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "422":
+          description: Validation failed or the instance does not exist ("That mailbox is already configured for this instance" on a duplicate address).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+
+  /api/ai-ssa-email/baseline/{instanceId}:
+    post:
+      tags: [AI SSA Email]
+      operationId: email_baseline
+      summary: Run the one-time backlog-skip (baseline) pass
+      description: |
+        Admin role only. Asks the instance's sidecar to mark the existing mailbox backlog as seen so the assistant never answers old mail, then records `baseline_done` on every mailbox. Allowed only while the email channel is allowed by the licence gate and at least one mailbox exists. No request body. Answers the same body as GET. Router accepts only POST here.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Baseline pass completed; current state returned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailConfigResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+        "409":
+          description: Channel not available, no mailbox yet, or the sidecar did not run the pass.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+              example:
+                error: Add a mailbox first
+                errors: ["Add a mailbox first"]
+        "415":
+          description: Session caller sent a non-JSON Content-Type (the check applies to every non-GET request).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailError" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmailErrors" }
+
+  /api/ai-ssa-phone/config/{instanceId}:
+    get:
+      tags: [AI SSA Phone]
+      operationId: phone_config_get
+      summary: Get an instance's phone line, channel state and retention
+      description: Admin role only (session or API key). `config` is null until a line exists. `retention` is the core's per-instance call-recording retention, read only here.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Phone line state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneConfigResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+    put:
+      tags: [AI SSA Phone]
+      operationId: phone_config_put
+      summary: Create or update an instance's phone line
+      description: |
+        Admin role only. An instance has one line: created (201) when none exists, otherwise updated (200). On create `did_number` and `escalation_number` are required; on update only fields sent change and `instance_id` is rejected. Numbers are normalised: optional leading `+`, then 6 to 15 digits; spaces, dashes, dots and brackets are stripped. A session caller must send `Content-Type: application/json` (415).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PhoneConfigRequest" }
+            example:
+              did_number: "+61 8 9000 0000"
+              escalation_number: "0400 000 000"
+              sip_trunk_ref: crazytel-main
+      responses:
+        "200":
+          description: Existing line updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneConfigResponse" }
+        "201":
+          description: Line created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneConfigResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "422":
+          description: Validation failed or the instance does not exist.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+
+  /api/ai-ssa-phone/calls/{instanceId}:
+    get:
+      tags: [AI SSA Phone]
+      operationId: phone_calls_list
+      summary: List recent calls from the instance's sidecar
+      description: Admin role only. Proxies the sidecar's calls list live (no local mirror). `since` is passed through as given (ISO 8601 expected; not validated here). The shape of each call record is defined by the sidecar and is not fixed in this repository.
+      x-unverified: true
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: instanceId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - name: since
+          in: query
+          required: false
+          description: ISO 8601 start; omitted means the sidecar's default window.
+          schema: { type: string, example: "2026-10-27T00:00:00Z" }
+      responses:
+        "200":
+          description: Calls.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [instance_id, calls]
+                properties:
+                  instance_id: { type: integer, example: 3 }
+                  calls:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+        "502":
+          description: No sidecar credentials yet, or the sidecar did not answer.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+        "503":
+          description: The AI SSA core is not enabled or too old.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PhoneErrors" }
+
+  /api/ai-ssa/instances:
+    get:
+      tags: [AI SSA]
+      operationId: aissa_instances_list
+      summary: List AI SSA instances
+      description: Admin role only (session or API key). Newest id first, no pagination. Credentials are never returned, only whether set. The list omits the per-channel `channels` block that the single-instance GET adds.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Instances.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [instances]
+                properties:
+                  instances:
+                    type: array
+                    items: { $ref: "#/components/schemas/AiSsaInstance" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+
+  /api/ai-ssa/instances/create:
+    post:
+      tags: [AI SSA]
+      operationId: aissa_instances_create
+      summary: Provision (record) a new instance
+      description: |
+        Admin role only. Records a sidecar connection and the per-instance settings. `client_name`, `sidecar_base_url`, `sidecar_auth_user` and `sidecar_auth_pass` are required. `fulfilment_mode` is not settable via the API (going live needs the typed confirmation on the admin screen). A session caller must send `Content-Type: application/json` (415). All validation messages come back together in `errors`. Answers 201 with the instance; credentials are stored encrypted and never echoed.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiSsaInstanceRequest" }
+            example:
+              client_name: Example Pty Ltd
+              sidecar_base_url: http://ssa-agent:8000
+              sidecar_auth_user: stack
+              sidecar_auth_pass: "<write-only secret>"
+              assistant_name: Tim
+              assistant_title: Support Specialist
+              organisation_name: Example Pty Ltd
+              recording_retention_days: 30
+              fulfilment_adapter: none
+              escalation_email_recipients: ["ops@example.test"]
+      responses:
+        "201":
+          description: Instance created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [instance]
+                properties:
+                  instance: { $ref: "#/components/schemas/AiSsaInstance" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "422":
+          description: Validation failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+              example:
+                error: Client name is required
+                errors: ["Client name is required", "Sidecar auth password is required"]
+
+  /api/ai-ssa/instances/{id}:
+    get:
+      tags: [AI SSA]
+      operationId: aissa_instances_get
+      summary: Get one instance with channel states
+      description: Admin role only. Same fields as the list plus `channels`, keyed by channel module key (the licensed channel plugins), each with the licence-gate state.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: The instance.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [instance]
+                properties:
+                  instance: { $ref: "#/components/schemas/AiSsaInstanceDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+    put:
+      tags: [AI SSA]
+      operationId: aissa_instances_update
+      summary: Update instance-level settings
+      description: |
+        Admin role only. Partial update: only the fields sent change. Sending `fulfilment_mode` at all is refused with 422 (admin screen only). A blank `sidecar_auth_pass` keeps the stored one. Fulfilment rules span fields: switching `fulfilment_adapter` to `webhook` needs an https `fulfilment_endpoint_url` (plain http only for localhost) and a signing secret unless one is already stored. A session caller must send `Content-Type: application/json` (415).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiSsaInstanceRequest" }
+            example:
+              provisioning_status: active
+              recording_retention_days: 90
+      responses:
+        "200":
+          description: Updated (list-shape instance, without `channels`).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [instance]
+                properties:
+                  instance: { $ref: "#/components/schemas/AiSsaInstance" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "422":
+          description: Validation failed, or `fulfilment_mode` was sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+              example:
+                error: fulfilment_mode can only be changed on the admin screen, with confirmation
+                errors: ["fulfilment_mode can only be changed on the admin screen, with confirmation"]
+
+  /api/ai-ssa/audit:
+    get:
+      tags: [AI SSA]
+      operationId: aissa_audit_get
+      summary: Instance audit records and interactions (live sidecar proxy)
+      description: |
+        Admin role only. Proxies the instance's sidecar `/api/audit/records` and `/api/interactions` live, no local mirror. With `day` (YYYY-MM-DD, AWST / Australia/Perth calendar day) the lists are filtered to that day and the counts restated. If only one of the two sidecar calls fails its part is returned as an empty array; 502 only when both fail. The inner shapes are the sidecar's and are not fixed here.
+      x-unverified: true
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: instance_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: day
+          in: query
+          required: false
+          description: Calendar date YYYY-MM-DD, interpreted in Australia/Perth.
+          schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$', example: "2026-10-27" }
+      responses:
+        "200":
+          description: Audit data.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaAudit" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "403":
+          description: Caller is not an admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "404":
+          description: Instance not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+        "422":
+          description: instance_id missing/invalid, or day is not a calendar date.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+              example: { error: instance_id is required }
+        "502":
+          description: Instance has no sidecar credentials, or the sidecar is unreachable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaError" }
+
+  /api/ai-ssa/intake/escalations:
+    post:
+      tags: [AI SSA]
+      operationId: aissa_intake_escalations
+      summary: Sidecar reports an escalation (HMAC-signed)
+      description: |
+        Called by the instance's sidecar, not by users. No session, API key or role: each request is authenticated by an HMAC signature. Headers: `X-SSA-Instance: <instance id>` and `X-SSA-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(intake secret, "<t>.<raw body>")>`. The timestamp must be within 300 seconds. An unknown instance, a decommissioned instance and a bad signature all give the same 401. Body size is checked first: over 16384 bytes gives 413 before authentication.
+        Idempotent on `idempotency_key`: a repeat answers 200 with `duplicate:true`; a new escalation answers 201. `notified` is true only when the notification provider confirmed a send.
+      security: []
+      parameters:
+        - name: X-SSA-Instance
+          in: header
+          required: true
+          schema: { type: string, example: "3" }
+        - name: X-SSA-Signature
+          in: header
+          required: true
+          schema: { type: string, example: "t=1790000000,v1=<hex hmac>" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiSsaEscalationRequest" }
+            example:
+              channel: chat
+              reason: customer_request
+              summary: Visitor asked to speak to a person about invoice 1042.
+              idempotency_key: chat-web-20261027-0001
+              interaction_ref: sess-8f3a
+              occurred_at: "2026-10-27T10:15:00+08:00"
+              test_mode: false
+      responses:
+        "200":
+          description: Duplicate of an earlier report (same idempotency_key).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaEscalationResult" }
+        "201":
+          description: Escalation recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaEscalationResult" }
+        "401":
+          description: Not authenticated (bad or missing signature, unknown instance, stale timestamp).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+        "413":
+          description: Body larger than 16384 bytes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+        "422":
+          description: Body is not a JSON object, or validation failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+        "500":
+          description: The escalation could not be recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiSsaErrors" }
+
+  /api/kpi/entry:
+    post:
+      tags: [KPI]
+      operationId: kpi_entry_upsert
+      summary: Upsert a metric actual for a period
+      description: |
+        Any authenticated principal (session or API key); the code applies no role check and does not consult a metric's `scope_role`. Upserts one actual for the metric and the period of the metric's cadence that starts on `period_start` (exact match required; a period row must already exist). `source` is set to `api` and `entered_by` to null. Body is parsed as JSON whatever the Content-Type. Success is 200 for both create and update. The route has no HTTP method restriction; any non-POST answers 405.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KpiEntryRequest" }
+            example: { key: leads_contacted, period_start: "2026-10-26", value: 42, note: Weekly cron push }
+      responses:
+        "200":
+          description: Entry stored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KpiEntryResponse" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KpiError" }
+        "404":
+          description: Unknown or inactive metric key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KpiError" }
+              example: { error: Unknown or inactive metric key }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KpiError" }
+              example: { error: POST required }
+        "422":
+          description: Missing key, period_start or numeric value; period_start not YYYY-MM-DD; or no period of the metric's cadence starts on that date.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/KpiError" }
+              example: { error: "No weekly period starts on 2026-10-27" }
+
+  /api/lice/checkin:
+    post:
+      tags: [Licensing]
+      operationId: lice_checkin
+      summary: Validate a licence key for a module (instance check-in)
+      description: |
+        Public and unauthenticated by design: "authenticated by the key itself". No session, API key or CSRF. No-enumeration rule: a nonexistent key, a revoked/non-active key, a key that does not cover the module, an expired module cover, and missing `key` or `module` all return the identical 403 `{"valid": false}`. A valid check-in updates the key's `last_checkin_at`. The body is parsed as JSON whatever the Content-Type. The route has no HTTP method restriction; any non-POST answers 405 `{error}`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LiceCheckinRequest" }
+            example: { key: "<licence key>", module: ai-ssa }
+      responses:
+        "200":
+          description: Key is valid for the module.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiceCheckinValid" }
+              example: { valid: true, expires_at: "2027-06-30" }
+        "403":
+          description: Not valid, for any reason (deliberately indistinguishable).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LiceCheckinInvalid" }
+              example: { valid: false }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties: { error: { type: string, example: POST required } }
+
+  /transactions/public-quote/create:
+    post:
+      tags: [Transactions]
+      operationId: txn_public_quote_create
+      summary: Public quote request (creates a draft quote)
+      description: |
+        Public, unauthenticated, for a static page on another origin (the school form on bioldex.xten.au). What stands in for a login:
+        - Origin allow-list (Transactions setting `transactions_public_quote_origins`, comma-separated scheme://host[:port], max 20). A request with an Origin not on the list gets 403 `origin_not_allowed` and no CORS headers. An empty list answers no browser origin. A request with no Origin at all (curl, server-side handler) is taken only while `transactions_public_quote_allow_no_origin` is `1`, otherwise 403 `origin_required`.
+        - Honeypot: a non-empty `website` field is logged as refused and answered 200 `{"ok": true}` with no reference (a bot learns nothing).
+        - Validation (422 with per-field messages), rate limit (429: at most 5 accepted requests per IP and 2 per email address per rolling hour; refused requests do not count), and the instance must have a default internal entity to issue the quote from (503 `not_configured`).
+        Every request, accepted or refused, is logged. On success the organisation and contact are found or created in Contacts, a draft quote with one line per item is created (SKUs unknown to the catalogue are added at 0.00 and listed in `unpriced`), and staff (and optionally the requester) are emailed. `reference` is `QR-<draft document id>`; the quote number is allocated when staff post it.
+        CORS: when the Origin is allowed, `Access-Control-Allow-Origin` echoes it with `Vary: Origin`, methods POST, OPTIONS, headers Content-Type, Accept, max-age 600. `OPTIONS` always answers 204 (CORS headers only when allowed). Body may be JSON (Content-Type application/json, or a body starting with `{`) or a posted form (`items` may then be a JSON string). Answers use `{ok, error, message, errors?}`. `Cache-Control: no-store`. Router accepts only POST and OPTIONS.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TxnPublicQuoteRequest" }
+            example:
+              organisation: Example High School
+              contact_name: Jane Smith
+              email: jane.smith@school.example.test
+              phone: "0400 000 000"
+              role_title: Science Coordinator
+              delivery_suburb: Fremantle
+              postcode: "6160"
+              po_number: PO-2291
+              notes: Delivery before term 1.
+              items:
+                - { sku: BDX-1001, qty: 10 }
+                - { sku: BDX-2002, qty: 2 }
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/TxnPublicQuoteRequest" }
+      responses:
+        "200":
+          description: Honeypot field was filled; request silently discarded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties: { ok: { type: boolean, example: true } }
+        "201":
+          description: Draft quote created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxnPublicQuoteAccepted" }
+        "204":
+          description: CORS preflight (OPTIONS) answer; empty body.
+        "403":
+          description: Origin not allowed (`origin_not_allowed`) or no Origin and no-origin requests are disabled (`origin_required`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxnPublicQuoteFailure" }
+              example: { ok: false, error: origin_not_allowed, message: Quote requests are not taken from this site. }
+        "422":
+          description: Validation failed; `errors` maps field (or `items.<n>.sku` / `items.<n>.qty`) to a message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxnPublicQuoteFailure" }
+              example:
+                ok: false
+                error: validation
+                message: Please check the highlighted fields.
+                errors: { email: Not an email address, items: Add at least one item }
+        "429":
+          description: Rate limited; `errors.limit` says which limit.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxnPublicQuoteFailure" }
+              example:
+                ok: false
+                error: rate_limited
+                message: Too many quote requests in the last hour. Please try again later, or email us.
+                errors: { limit: "ip: more than 5 accepted requests in the last hour" }
+        "500":
+          description: The request could not be recorded (`failed`); nothing was saved except Contacts records.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxnPublicQuoteFailure" }
+        "503":
+          description: No default internal entity configured (`not_configured`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TxnPublicQuoteFailure" }
+
+  /store/quote/submit:
+    post:
+      tags: [Store]
+      operationId: store_quote_submit
+      summary: Public storefront quote submission (bridges into Transactions)
+      description: |
+        Public, unauthenticated. Hands a cleaned request to Transactions' QuoteRequest (same validation, rate limit, draft quote creation and notifications as /transactions/public-quote/create) when that module is installed. Differences from the Transactions endpoint:
+        - The Origin allow-list only controls whether CORS headers are sent. A disallowed or absent Origin is NOT refused on POST (no 403), and the `transactions_public_quote_allow_no_origin` setting is not consulted.
+        - Preflight `OPTIONS` answers 204 for an allowed or absent Origin, 403 (empty body, no CORS headers) for a disallowed Origin.
+        - Field aliases accepted: `name` or `contact_name`; `organization` or `organisation` (falls back to the contact name, then "Direct Customer"); `suburb` for delivery suburb; item `quantity` as well as `qty` (a missing or non-positive qty becomes 1). Items with an empty sku are dropped. `po_number` and `role_title` are not forwarded. A non-empty `website` honeypot answers 200 `{"ok": true}`.
+        - A QuoteRequestFailed is mapped to 503 only when its `error` is `no_default_issuer` (a key the Transactions module never emits), so every real failure (`not_configured` 503, `failed` 500) is answered 422 here.
+        - Any other unexpected exception during the bridged intake (for example a database fault) falls through to a standalone fallback that validates email, name and items and answers 201 with a generated `BDX-QR-xxxxxxxx` reference WITHOUT saving anything. The same fallback is used when Transactions is not installed.
+        Router accepts only POST and OPTIONS.
+      x-unverified: true
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StoreQuoteRequest" }
+            example:
+              name: Jane Smith
+              email: jane.smith@school.example.test
+              organization: Example High School
+              phone: "0400 000 000"
+              suburb: Fremantle
+              postcode: "6160"
+              notes: Delivery before term 1.
+              items:
+                - { sku: BDX-1001, qty: 10 }
+      responses:
+        "200":
+          description: Honeypot field filled; discarded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties: { ok: { type: boolean, example: true } }
+        "201":
+          description: Quote request accepted (Transactions draft, or the non-persisting fallback).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoreQuoteAccepted" }
+        "204":
+          description: CORS preflight (OPTIONS) for an allowed or absent Origin; empty body.
+        "403":
+          description: CORS preflight (OPTIONS) from a disallowed Origin; empty body.
+        "422":
+          description: Validation failed (`errors` field map), a mapped QuoteRequestFailed, or a fallback error (`invalid_email`, `missing_name`, `empty_basket`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoreQuoteFailure" }
+              example:
+                ok: false
+                error: validation
+                message: Please check the highlighted fields.
+                errors: { items: Add at least one item }
+        "429":
+          description: Rate limited (5 accepted per IP, 2 per email, per hour).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoreQuoteFailure" }
+              example: { ok: false, error: rate_limited, message: "Too many requests; please try again shortly." }
+        "503":
+          description: Only if the error key is `no_default_issuer`; not reachable with the current Transactions module (see description).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoreQuoteFailure" }
+
+  /store/search:
+    get:
+      tags: [Store]
+      operationId: store_search
+      summary: Instant product search
+      description: |
+        Public, unauthenticated. The store is resolved from the HTTP host (domain match), else the active store coded `bioldex`, else the first active store. Returns JSON when the request is an XHR or its `Accept` header contains `application/json`; otherwise it renders the HTML search page. At most 30 published products, ordered by name; matches name, sku, description, mpn or legacy keyword with LIKE. An empty `q` returns an empty list. Any lookup error is swallowed and returns an empty list.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+        - name: Accept
+          in: header
+          required: false
+          description: Send `application/json` (or X-Requested-With XMLHttpRequest) to get JSON.
+          schema: { type: string, example: application/json }
+      responses:
+        "200":
+          description: JSON results, or the HTML search page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoreSearchResponse" }
+            text/html:
+              schema: { type: string }
+
+  /lin/api/drafts:
+    get:
+      tags: [Lin]
+      operationId: lin_drafts_list
+      summary: List the caller's own LinkedIn drafts with review outcome
+      description: |
+        Roles `agent` and `admin` only (admin for testing); every other role gets 403. Returns only posts created by the calling user, newest first, `limit` default 50 clamped to 1-200. Each draft includes `review`: edit diffs, rejections, approvals, publication events. No LinkedIn token is ever returned. The route registers no method restriction (the action does not check the verb).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: The caller's drafts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [drafts]
+                properties:
+                  drafts:
+                    type: array
+                    items: { $ref: "#/components/schemas/LinDraftWithReview" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "403":
+          description: Role is not agent or admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+
+  /lin/api/drafts/create:
+    post:
+      tags: [Lin]
+      operationId: lin_drafts_create
+      summary: Create a LinkedIn draft
+      description: |
+        Roles `agent` and `admin` only. Creates a draft on an active target; `ai_generated` is forced on, the AI disclosure text defaults from settings, and `locked_text` cannot be set via the API. With `submit:true` the draft moves straight to `in_review`. There is deliberately no API route that approves, schedules, exports or publishes. The body is parsed as JSON whatever the Content-Type. Non-POST answers 405. Business-rule refusals are 422 with a message.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinDraftCreateRequest" }
+            example:
+              target_id: 1
+              body: "New: our small-business support plans start at the published price. Details on our website."
+              hashtags: "#smallbusiness #support"
+              source_ref: REQ-203
+              submit: true
+      responses:
+        "201":
+          description: Draft created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft]
+                properties:
+                  draft: { $ref: "#/components/schemas/LinDraft" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "403":
+          description: Role is not agent or admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "422":
+          description: Unknown or inactive target, empty body text, or a save/transition refusal.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+              example: { error: Post text is required }
+
+  /lin/api/drafts/update/{id}:
+    post:
+      tags: [Lin]
+      operationId: lin_drafts_update
+      summary: Edit the caller's own draft
+      description: |
+        Roles `agent` and `admin` only, and only on posts the caller created (otherwise 404). Editable fields: body, hashtags, first_comment, source_ref, target_id (other keys are ignored). The post must be draft, in_review or rejected for the agent role; editing an in_review post may clear approval. 422 for locked text, empty body, target change on a non-draft, unknown target, or a post status the role cannot edit. Non-POST answers 405.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinDraftUpdateRequest" }
+            example: { body: Revised post text after review feedback. }
+      responses:
+        "200":
+          description: Draft updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft]
+                properties:
+                  draft: { $ref: "#/components/schemas/LinDraft" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "403":
+          description: Role is not agent or admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "404":
+          description: No such post, or not created by the caller.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+              example: { error: Not found }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "422":
+          description: Business-rule refusal.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+
+  /lin/api/drafts/submit/{id}:
+    post:
+      tags: [Lin]
+      operationId: lin_drafts_submit
+      summary: Submit the caller's own draft for review
+      description: Roles `agent` and `admin` only, own posts only (404 otherwise). Moves draft or rejected to in_review; any other source status gives 422. No body. Non-POST answers 405.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: Submitted; draft returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft]
+                properties:
+                  draft: { $ref: "#/components/schemas/LinDraft" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "403":
+          description: Role is not agent or admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "404":
+          description: No such post, or not created by the caller.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "422":
+          description: The post is not in a state that can be submitted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+
+  /lin/api/drafts/media/{id}:
+    post:
+      tags: [Lin]
+      operationId: lin_drafts_media
+      summary: Attach a media file to the caller's own draft
+      description: |
+        Roles `agent` and `admin` only, own posts only (404 otherwise). Multipart upload; the first uploaded file is used. Allowed types (detected from content, not the filename): JPEG, PNG, GIF (image, max 36 MB), MP4 (video, max 500 MB), PDF, DOC, DOCX, PPT, PPTX (document, max 100 MB). 422 when the post cannot be edited, no file is sent, the type is unsupported, the file is too large or storage is not writable. Adding media to an approved post clears its approval (same as a text edit). Non-POST answers 405.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string }
+                alt_text: { type: string }
+                ai_presenter: { type: boolean, description: "Truthy marks the media as showing an AI presenter." }
+      responses:
+        "201":
+          description: Media stored; draft returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft]
+                properties:
+                  draft: { $ref: "#/components/schemas/LinDraft" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "403":
+          description: Role is not agent or admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "404":
+          description: No such post, or not created by the caller.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "422":
+          description: Cannot edit, no file, unsupported type, too large, or storage failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+              example: { error: 'Send the file as multipart field "file" (server limit 64M)' }
+
+  /lin/api/context:
+    get:
+      tags: [Lin]
+      operationId: lin_context_get
+      summary: Read-only grounding context for drafting
+      description: Roles `agent` and `admin` only. House rules, published prices, main phone, link-domain allowlist, locked texts, grounding text, the 15 most recently posted bodies (200 characters each) and the active targets. The route registers no method restriction (the action does not check the verb).
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Grounding context.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinContext" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+        "403":
+          description: Role is not agent or admin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinError" }
+
+  /maama/api/agents:
+    get:
+      tags: [MAAMA]
+      operationId: maama_agents_list
+      summary: List active agent role profiles
+      description: 'Roles admin, operator or agent (the role gate in ApiControllerBase; members and charter agents get 403). Active profiles ordered by role name; profiles whose user row is missing are skipped. Read only; creating or editing a profile is admin-only in the backend UI. A session caller sending any POST must use `Content-Type: application/json` (415); not relevant to this GET. Routed by the module''s `/maama/api/:controller` route (any method accepted).'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Agents.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agents]
+                properties:
+                  agents:
+                    type: array
+                    items: { $ref: "#/components/schemas/MaamaAgent" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+
+  /maama/api/handovers:
+    get:
+      tags: [MAAMA]
+      operationId: maama_handovers_list
+      summary: List handovers
+      description: |
+        Roles admin, operator, agent. Newest id first, no pagination, no updates trail (use the single GET). Filters combine with AND. Invalid filter values are 422. `target`/`owner` accept a user id or `me` (the caller). `since` filters on `updated_at`, so notes and status changes also surface. The same handler answers `/maama/api/handovers/index`.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/MaamaStatus" }
+        - name: priority
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/MaamaPriority" }
+        - name: target
+          in: query
+          required: false
+          description: User id or `me`.
+          schema: { type: string, example: me }
+        - name: owner
+          in: query
+          required: false
+          description: User id or `me`.
+          schema: { type: string, example: "12" }
+        - name: since
+          in: query
+          required: false
+          description: Date or date-time (strtotime-parsable).
+          schema: { type: string, example: "2026-10-27" }
+      responses:
+        "200":
+          description: Handovers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handovers]
+                properties:
+                  handovers:
+                    type: array
+                    items: { $ref: "#/components/schemas/MaamaHandover" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "422":
+          description: Invalid filter value.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+              example: { error: invalid status }
+
+  /maama/api/handovers/view/{id}:
+    get:
+      tags: [MAAMA]
+      operationId: maama_handovers_get
+      summary: Get one handover with its update trail
+      description: Roles admin, operator, agent. `id` is the numeric id (not the display id). 404 for a non-numeric or unknown id.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: The handover with `updates`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handover]
+                properties:
+                  handover: { $ref: "#/components/schemas/MaamaHandoverDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+
+  /maama/api/handovers/create:
+    post:
+      tags: [MAAMA]
+      operationId: maama_handovers_create
+      summary: Create a handover
+      description: |
+        Roles admin, operator, agent. `subject` and `target_user_id` are required; the source is always the authenticated caller. Defaults: status `open`, priority `normal`, type `handover`. A session caller must send `Content-Type: application/json` on any POST (415). Non-POST answers 405. Database column limits: subject 200, type 50, source_session 100.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaamaHandoverCreateRequest" }
+            example:
+              subject: Review the Forum plugin PR
+              target_user_id: 7
+              priority: high
+              source_session: code-2026-10-28
+              context: Branch forum-events is ready.
+              content: Please check idempotency handling.
+              related: "plugins#20"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handover]
+                properties:
+                  handover: { $ref: "#/components/schemas/MaamaHandoverDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "422":
+          description: Missing subject, unknown target/owner user, invalid priority, or a save failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+              example: { error: subject is required }
+
+  /maama/api/handovers/update/{id}:
+    post:
+      tags: [MAAMA]
+      operationId: maama_handovers_update
+      summary: Update a handover (any subset of fields) and record a trail entry
+      description: |
+        Roles admin, operator, agent. Any subset of subject, type, priority, status, owner_user_id (null clears), target_user_id, source_session, context, content, related, plus an optional `note` recorded on the trail. A text field sent as null or blank is stored as null. A trail entry is written when a note is given or the status changes. Source user is not changeable. 415 for a session caller without a JSON Content-Type; 405 for non-POST.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaamaHandoverUpdateRequest" }
+            example: { status: in_progress, owner_user_id: 7, note: Picked this up. }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handover]
+                properties:
+                  handover: { $ref: "#/components/schemas/MaamaHandoverDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "422":
+          description: Invalid field, empty subject, unknown user, or save failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+
+  /maama/api/handovers/note/{id}:
+    post:
+      tags: [MAAMA]
+      operationId: maama_handovers_note
+      summary: Append a note (optionally changing status) to a handover
+      description: Roles admin, operator, agent. `note` is required and non-blank; `status` optional (blank ignored). Answers 201 with the full handover. 415 for a session caller without a JSON Content-Type; 405 for non-POST.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MaamaNoteRequest" }
+            example: { note: Reviewed and merged., status: done }
+      responses:
+        "201":
+          description: Trail entry appended.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handover]
+                properties:
+                  handover: { $ref: "#/components/schemas/MaamaHandoverDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "415":
+          description: Session caller sent a non-JSON Content-Type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "422":
+          description: Missing note, invalid status, or save failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+
+  /requirements/api/index:
+    get:
+      tags: [Requirements]
+      operationId: req_list
+      summary: List requirements
+      description: |
+        Roles admin and operator only (agents get 403). Reached through the module's generic route `/requirements/:controller/:action/:params` with controller `api`; `/requirements/api` (no action) is the same handler. Newest id first, no pagination. Invalid `status`, `type` or `priority` filter values are silently ignored (not 422). `q` is a LIKE substring on title, description or display_id.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/ReqStatus" }
+        - name: type
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/ReqType" }
+        - name: priority
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/ReqPriority" }
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Requirements.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requirements]
+                properties:
+                  requirements:
+                    type: array
+                    items: { $ref: "#/components/schemas/ReqRequirement" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "403":
+          description: Role not admin or operator.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+
+  /requirements/api/view/{id}:
+    get:
+      tags: [Requirements]
+      operationId: req_get
+      summary: Get one requirement
+      description: Roles admin and operator only. `id` is the numeric id (not REQ-nnn). A URL without the id is answered by the framework's not-found page, not this controller.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: The requirement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requirement]
+                properties:
+                  requirement: { $ref: "#/components/schemas/ReqRequirement" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "403":
+          description: Role not admin or operator.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+
+  /requirements/api/create:
+    post:
+      tags: [Requirements]
+      operationId: req_create
+      summary: Create a requirement
+      description: |
+        Roles admin and operator only. `title` is required (422 if blank). Invalid `type` falls back to `user`, invalid `priority` to `normal`, and an invalid status or `complete` falls back to `open` (silently, not an error); create `complete` via update with a changelog decision. `display_id` is generated as REQ-nnn (next highest). Non-POST answers 405. The body is parsed as JSON whatever the Content-Type.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReqCreateRequest" }
+            example:
+              title: Add OpenAPI docs for module APIs
+              description: Document the smaller module endpoints.
+              type: internal
+              priority: normal
+              project: xten-stack
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requirement]
+                properties:
+                  requirement: { $ref: "#/components/schemas/ReqRequirement" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "403":
+          description: Role not admin or operator.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "422":
+          description: Missing title, or a save failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+              example: { error: title is required }
+
+  /requirements/api/update/{id}:
+    post:
+      tags: [Requirements]
+      operationId: req_update
+      summary: Update a requirement
+      description: |
+        Roles admin and operator only. Partial update of title, description, origin_session, project, branch, target_version, notes, changelog_note (null clears), type, priority and status. Invalid type, priority or status is 422 here (unlike create). Setting `status: complete` needs `changelog_decision` of `included` or `excluded_deliberately` (forced to `included` when the requirement is already linked to a changelog); any status other than complete clears `changelog_decision` and `changelog_id`. Delete and bulk actions are not exposed. Non-POST answers 405.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReqUpdateRequest" }
+            example: { status: complete, changelog_decision: included, changelog_note: Shipped in 1.4.0 }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requirement]
+                properties:
+                  requirement: { $ref: "#/components/schemas/ReqRequirement" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "403":
+          description: Role not admin or operator.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+        "422":
+          description: Invalid type/priority/status, complete without a valid changelog_decision, or a save failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReqError" }
+              example: { error: "status 'complete' requires a valid changelog_decision" }
+
+components:
+  schemas:
+    # ---------------------------------------------------------------- Announcements
+    AnnError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: Not authenticated }
+    AnnValidationError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: Validation failed }
+        errors:
+          type: object
+          description: Field name to message. Absent when a model save failed (then `error` carries the messages).
+          additionalProperties: { type: string }
+    AnnAnnouncement:
+      type: object
+      required: [id, title, body, audience, severity]
+      properties:
+        id: { type: integer, example: 12 }
+        title: { type: string, maxLength: 200, example: Planned maintenance window }
+        body: { type: string, example: Stack will be briefly unavailable on Sunday. }
+        author_user_id: { type: integer, nullable: true, example: 1 }
+        audience: { type: string, enum: [everyone, all, staff] }
+        severity: { type: string, enum: [info, notice, important] }
+        published_at: { type: string, nullable: true, description: "Database timestamp, null for a draft.", example: "2026-10-28 09:00:00" }
+        expires_at: { type: string, nullable: true, example: "2026-11-01 23:59:59" }
+        source: { type: string, nullable: true, example: onedrive-inbox }
+        external_id: { type: string, nullable: true, example: maintenance-2026-11-01 }
+        source_url: { type: string, nullable: true, example: "https://example.test/inbox/maintenance.md" }
+        created_at: { type: string, example: "2026-10-28 08:55:00" }
+        updated_at: { type: string, example: "2026-10-28 08:55:00" }
+    AnnCreateRequest:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, maxLength: 200, description: 'Trimmed, non-empty.' }
+        body: { type: string, description: 'Trimmed, non-empty.' }
+        severity:
+          type: string
+          default: info
+          description: "Case-insensitive. Aliases warning -> notice, critical -> important."
+          enum: [info, notice, important, warning, critical]
+        audience:
+          type: string
+          default: all
+          description: "Case-insensitive. Aliases: staff-only, staff_only (staff); staff-and-agents, all-staff-and-agents (all); public, customers (everyone). On an existing row the audience changes only when this key is present."
+          enum: [everyone, all, staff, staff-only, staff_only, staff-and-agents, all-staff-and-agents, public, customers]
+        publish:
+          type: boolean
+          default: false
+          description: "Also accepts 0/1 and boolean-like strings (true/false/yes/no/on/off/1/0)."
+        expires_at:
+          type: string
+          nullable: true
+          description: "Y-m-d (stored as end of that day, 23:59:59) or Y-m-d H:i:s, strict. Omitted or null means no expiry."
+          example: "2026-11-01"
+        source:
+          type: string
+          maxLength: 40
+          description: 'Required when external_id is given. Letters, digits and `: . _ -`, starting with a letter or digit.'
+          pattern: '^[A-Za-z0-9][A-Za-z0-9:._-]*$'
+        external_id: { type: string, maxLength: 160, description: 'Idempotency key within `source`.' }
+        source_url: { type: string, maxLength: 2000, description: "http(s) URL.", pattern: '^https?://\S+$' }
+    AnnWriteResult:
+      type: object
+      required: [announcement, created]
+      properties:
+        announcement: { $ref: "#/components/schemas/AnnAnnouncement" }
+        created: { type: boolean, description: "true on 201, false when an existing source+external_id row was updated (200)." }
+    # ---------------------------------------------------------------- Forum
+    ForumError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    ForumInvalidEvent:
+      type: object
+      required: [error, errors]
+      properties:
+        error: { type: string, example: Invalid event }
+        errors:
+          type: object
+          description: Field path to message.
+          additionalProperties: { type: string }
+    ForumAccepted:
+      type: object
+      required: [accepted, duplicate]
+      properties:
+        accepted: { type: boolean, example: true }
+        duplicate: { type: boolean, description: "true when this event_id was already stored." }
+    ForumEnvelope:
+      type: object
+      required: [event_id, entity_key, sequence, event_type, game_key, universe_id, occurred_at, payload]
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+          maxLength: 191
+          description: Idempotency key; must equal `{game_key}:{event_type}:{entity_key}:{sequence}`.
+        entity_key: { type: string, minLength: 1, maxLength: 150 }
+        sequence: { type: string, minLength: 1, maxLength: 100, description: Unique per emission; kept on retry. }
+        event_type:
+          type: string
+          minLength: 1
+          maxLength: 40
+          enum: [user.upsert, alliance.upsert, membership.active, membership.revoked, alliance.archived, tutorial.post.upsert]
+        game_key: { type: string, minLength: 1, maxLength: 50, pattern: '^[a-z0-9][a-z0-9-]*$' }
+        universe_id: { type: integer, minimum: 0, description: JSON integer (a numeric string is rejected). }
+        occurred_at:
+          type: string
+          description: "ISO 8601 UTC timestamp (any offset accepted and normalised to UTC; up to 9 fractional digits). Regex: date T/space time, optional fraction, optional Z or +hh:mm."
+          example: "2026-10-26T12:00:00Z"
+        payload:
+          description: Object whose single top-level key depends on event_type (user, alliance, membership, tutorial_post).
+          oneOf:
+            - $ref: "#/components/schemas/ForumPayloadUser"
+            - $ref: "#/components/schemas/ForumPayloadAlliance"
+            - $ref: "#/components/schemas/ForumPayloadMembership"
+            - $ref: "#/components/schemas/ForumPayloadTutorial"
+    ForumPayloadUser:
+      type: object
+      description: payload for `user.upsert`.
+      required: [user]
+      properties:
+        user:
+          type: object
+          required: [game_user_id, username, email]
+          properties:
+            game_key: { type: string, description: "Optional; must equal the envelope game_key if present." }
+            universe_id: { type: integer, description: "Optional; must equal the envelope universe_id if present." }
+            game_user_id: { type: integer, minimum: 1 }
+            username: { type: string, minLength: 1, maxLength: 100, description: Non-blank. }
+            email: { type: string, format: email, maxLength: 150 }
+            language: { type: string, maxLength: 10, nullable: true }
+            profile:
+              type: object
+              nullable: true
+              additionalProperties: true
+              properties:
+                avatar_url: { type: string, nullable: true }
+                alliance_tag: { type: string, nullable: true }
+                join_date: { type: string, nullable: true }
+    ForumPayloadAlliance:
+      type: object
+      description: payload for `alliance.upsert` and `alliance.archived`. `name` and `tag` are required for upsert only.
+      required: [alliance]
+      properties:
+        alliance:
+          type: object
+          required: [game_alliance_id]
+          properties:
+            game_key: { type: string }
+            universe_id: { type: integer }
+            game_alliance_id: { type: integer, minimum: 1 }
+            name: { type: string, minLength: 1, maxLength: 150, description: Required for alliance.upsert. }
+            tag: { type: string, minLength: 1, maxLength: 30, description: Required for alliance.upsert. }
+            state: { type: string, enum: [active, archived], description: "Optional; must be `active` for alliance.upsert and `archived` for alliance.archived." }
+    ForumPayloadMembership:
+      type: object
+      description: payload for `membership.active` and `membership.revoked`.
+      required: [membership]
+      properties:
+        membership:
+          type: object
+          required: [game_user_id, game_alliance_id]
+          properties:
+            game_key: { type: string }
+            universe_id: { type: integer }
+            game_user_id: { type: integer, minimum: 1 }
+            game_alliance_id: { type: integer, minimum: 1 }
+            state: { type: string, enum: [active, revoked], description: "Optional; must be `active` for membership.active and `revoked` for membership.revoked." }
+    ForumPayloadTutorial:
+      type: object
+      description: payload for `tutorial.post.upsert`.
+      required: [tutorial_post]
+      properties:
+        tutorial_post:
+          type: object
+          required: [slug, title, body, author]
+          properties:
+            game_key: { type: string }
+            universe_id: { type: integer }
+            area: { type: string, enum: [tutorial] }
+            slug: { type: string, minLength: 1, maxLength: 100, pattern: '^[a-z0-9][a-z0-9-]*$' }
+            title: { type: string, minLength: 1, maxLength: 200 }
+            body: { type: string, description: 'Markdown; a string, may be empty.' }
+            format: { type: string, enum: [markdown] }
+            state: { type: string, enum: [published, draft] }
+            author:
+              type: object
+              required: [game_user_id]
+              properties:
+                game_user_id: { type: integer, minimum: 1 }
+                username: { type: string, description: Not validated by the envelope. }
+    # ---------------------------------------------------------------- Catalogue
+    CatError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    CatProductSummary:
+      type: object
+      properties:
+        id: { type: integer, example: 101 }
+        name: { type: string, example: Microscope slide set }
+        slug: { type: string, example: microscope-slide-set }
+        sku: { type: string, example: BDX-1001 }
+        description: { type: string, nullable: true }
+        product_type: { type: string, nullable: true }
+        fulfilment_type: { type: string, nullable: true }
+        requires_quote: { type: boolean }
+        price_cents: { type: integer, description: "Default variant price in cents; 0 when none or quote-only.", example: 4500 }
+        price_formatted: { type: string, description: 'Dollar string, or "Quote Required" when price_cents is 0.', example: "$45.00" }
+        stock_level: { type: integer, example: 25 }
+    CatProductList:
+      type: object
+      required: [count, limit, offset, products]
+      properties:
+        count: { type: integer, description: Number of products in this page. }
+        limit: { type: integer }
+        offset: { type: integer }
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/CatProductSummary" }
+    CatProductDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string }
+        sku: { type: string }
+        description: { type: string, nullable: true }
+        product_type: { type: string, nullable: true }
+        fulfilment_type: { type: string, nullable: true }
+        requires_quote: { type: boolean }
+        price_cents: { type: integer }
+        price_formatted: { type: string }
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              path: { type: string, example: products/bdx-1001.jpg }
+              is_primary: { type: boolean }
+              alt_text: { type: string, nullable: true }
+    CatQuoteRequest:
+      type: object
+      required: [name, email, sku]
+      properties:
+        name: { type: string, description: 'Trimmed, non-empty.' }
+        email: { type: string, description: 'Trimmed, non-empty; not format-validated.' }
+        sku: { type: string, description: 'Trimmed, non-empty; not checked against the catalogue.' }
+        phone: { type: string }
+        company: { type: string }
+        notes: { type: string }
+    CatQuoteAccepted:
+      type: object
+      required: [status, message, ticket_id]
+      properties:
+        status: { type: string, enum: [success] }
+        message: { type: string }
+        ticket_id: { type: integer, nullable: true, description: Null when the Tickets model is not available. }
+    CatQuoteFailed:
+      type: object
+      required: [status, error]
+      properties:
+        status: { type: string, enum: [error] }
+        error: { type: string }
+    # ---------------------------------------------------------------- AI SSA Chat
+    ChatError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    ChatErrors:
+      type: object
+      required: [error, errors]
+      properties:
+        error: { type: string, description: First message. }
+        errors:
+          type: array
+          items: { type: string }
+    ChatStartRequest:
+      type: object
+      required: [embed_token]
+      properties:
+        embed_token: { type: string, pattern: '^[a-f0-9]{48}$', description: The widget's embed token (48 lowercase hex characters). }
+    ChatStartResponse:
+      type: object
+      required: [session_id, greeting, title, test_mode]
+      properties:
+        session_id: { type: string, pattern: '^web:[a-f0-9]{32}\.[a-f0-9]{32}$' }
+        greeting: { type: string }
+        title: { type: string }
+        test_mode: { type: boolean, description: True unless the instance's fulfilment mode is live. }
+    ChatMessageRequest:
+      type: object
+      required: [embed_token, session_id, message]
+      properties:
+        embed_token: { type: string, pattern: '^[a-f0-9]{48}$' }
+        session_id: { type: string, description: "As issued by start; must match ^[A-Za-z0-9._:-]{8,100}$ and the HMAC check." }
+        message: { type: string, maxLength: 2000, description: 'Trimmed, non-empty.' }
+        page_url: { type: string, maxLength: 500, description: Optional page the visitor is on; trimmed and truncated to 500. }
+    ChatMessageResponse:
+      type: object
+      required: [session_id, reply, escalated, closed, test_mode]
+      properties:
+        session_id: { type: string }
+        reply: { type: string }
+        escalated: { type: boolean }
+        closed: { type: boolean }
+        test_mode: { type: boolean }
+    ChatChannelState:
+      type: object
+      description: Licence-gate state of a channel for an instance (AI SSA core ChannelState).
+      properties:
+        module_key: { type: string, example: ai-ssa-chat }
+        state:
+          type: string
+          enum: [ready, installed_not_licensed, core_not_licensed, installed_disabled, instance_not_active, licensed_not_installed, not_installed, instance_not_found]
+        label: { type: string }
+        detail: { type: string }
+        installed: { type: boolean }
+        enabled: { type: boolean }
+        licensed: { type: boolean }
+        usable: { type: boolean }
+    ChatWidgetConfig:
+      type: object
+      nullable: true
+      properties:
+        id: { type: integer }
+        instance_id: { type: integer, nullable: true }
+        enabled: { type: boolean }
+        embed_token: { type: string, example: "0123456789abcdef0123456789abcdef0123456789abcdef" }
+        greeting_override: { type: string, nullable: true }
+        widget_title: { type: string, nullable: true }
+        allowed_origins: { type: array, items: { type: string }, description: Empty means any origin. }
+        rate_limit_per_minute: { type: integer }
+        token_rotated_at: { type: string, nullable: true }
+        config_pushed_at: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+    ChatConfigResponse:
+      type: object
+      required: [instance_id, channel, config]
+      properties:
+        instance_id: { type: integer }
+        channel: { $ref: "#/components/schemas/ChatChannelState" }
+        config: { $ref: "#/components/schemas/ChatWidgetConfig" }
+    ChatConfigSaved:
+      type: object
+      required: [instance_id, channel, config, pushed]
+      properties:
+        instance_id: { type: integer }
+        channel: { $ref: "#/components/schemas/ChatChannelState" }
+        config: { $ref: "#/components/schemas/ChatWidgetConfig" }
+        pushed: { type: boolean, nullable: true, description: "null: no push was due; true: pushed and acknowledged; false: push failed (row saved anyway)." }
+    ChatConfigRequest:
+      type: object
+      description: All fields optional on update; a create (no widget yet) needs none beyond what the path supplies.
+      properties:
+        greeting_override: { type: string, maxLength: 300, nullable: true, description: Blank or null clears it. }
+        widget_title: { type: string, maxLength: 60, nullable: true, description: 'One line, no `<` or `>`. Blank or null clears it.' }
+        allowed_origins:
+          description: List of origins, or a string separated by newlines, commas or semicolons. Scheme and host with optional port only, lower-cased, de-duplicated, at most 20. Empty list means any origin.
+          oneOf:
+            - type: array
+              items: { type: string, example: "https://www.client.example" }
+              maxItems: 20
+            - type: string
+        rate_limit_per_minute: { type: integer, minimum: 1, maximum: 600, default: 120 }
+        enabled: { type: boolean }
+        rotate_token: { type: boolean, description: "Exactly true replaces the embed token." }
+        instance_id: { type: integer, description: 'Ignored on create, rejected (422) on update.' }
+    # ---------------------------------------------------------------- AI SSA Email
+    EmailError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    EmailErrors:
+      type: object
+      required: [error, errors]
+      properties:
+        error: { type: string }
+        errors: { type: array, items: { type: string } }
+    EmailMailbox:
+      type: object
+      properties:
+        id: { type: integer }
+        instance_id: { type: integer, nullable: true }
+        mailbox_address: { type: string, format: email }
+        imap_host: { type: string }
+        imap_port: { type: integer, example: 993 }
+        imap_user: { type: string }
+        imap_password_set: { type: boolean }
+        smtp_host: { type: string, nullable: true }
+        smtp_port: { type: integer, example: 587 }
+        smtp_user: { type: string, nullable: true }
+        processed_folder: { type: string, example: INBOX.Processed }
+        baseline_done: { type: boolean }
+        baseline_done_at: { type: string, nullable: true }
+        credential_pushed: { type: boolean }
+        config_pushed_at: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+    EmailConfigResponse:
+      type: object
+      required: [instance_id, channel, mailboxes, push_due, push_owed]
+      properties:
+        instance_id: { type: integer }
+        channel: { $ref: "#/components/schemas/ChatChannelState" }
+        mailboxes:
+          type: array
+          items: { $ref: "#/components/schemas/EmailMailbox" }
+        push_due: { type: boolean }
+        push_owed: { type: boolean }
+    EmailMailboxRequest:
+      type: object
+      properties:
+        mailbox_address: { type: string, maxLength: 255, format: email, description: "Required on create; lower-cased; identifies the mailbox for updates." }
+        imap_host: { type: string, maxLength: 253, description: "Required on create. Host name (at least one dot) or IP; no scheme, port or path." }
+        imap_port: { type: integer, minimum: 1, maximum: 65535, default: 993 }
+        imap_user: { type: string, maxLength: 255, description: Required on create. }
+        imap_password: { type: string, maxLength: 500, description: Write-only; required on create; blank on update keeps the stored one. }
+        smtp_host: { type: string, maxLength: 253, nullable: true, description: Blank or null clears it. }
+        smtp_port: { type: integer, minimum: 1, maximum: 65535, default: 587 }
+        smtp_user: { type: string, maxLength: 255, nullable: true }
+        processed_folder:
+          type: string
+          maxLength: 120
+          default: INBOX.Processed
+          description: Letters, numbers and `. _ / -` (and spaces inside), starting with a letter or number.
+        instance_id: { type: integer, description: 'Ignored on create (the path wins), rejected (422) on update of an existing mailbox.' }
+    # ---------------------------------------------------------------- AI SSA Phone
+    PhoneError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    PhoneErrors:
+      type: object
+      required: [error, errors]
+      properties:
+        error: { type: string }
+        errors: { type: array, items: { type: string } }
+    PhoneLine:
+      type: object
+      nullable: true
+      properties:
+        id: { type: integer }
+        instance_id: { type: integer, nullable: true }
+        did_number: { type: string, example: "+6189000000" }
+        sip_trunk_ref: { type: string, nullable: true }
+        escalation_number: { type: string, example: "0400000000" }
+        config_pushed_at: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+    PhoneConfigResponse:
+      type: object
+      required: [instance_id, channel, config, retention, push_due, push_owed]
+      properties:
+        instance_id: { type: integer }
+        channel: { $ref: "#/components/schemas/ChatChannelState" }
+        config: { $ref: "#/components/schemas/PhoneLine" }
+        retention:
+          type: object
+          properties:
+            days: { type: integer, enum: [0, 7, 30, 90, 365] }
+            summary: { type: string }
+            editable_here: { type: boolean, description: Always false; set on the instance in the AI SSA core. }
+        push_due: { type: boolean }
+        push_owed: { type: boolean }
+    PhoneConfigRequest:
+      type: object
+      properties:
+        did_number: { type: string, description: "Required on create. Optional +, then 6 to 15 digits; spaces, dashes, dots, brackets stripped." }
+        escalation_number: { type: string, description: "Required on create. Same format as did_number." }
+        sip_trunk_ref: { type: string, maxLength: 120, nullable: true, description: 'One line, no `<` `>`; blank clears it.' }
+        instance_id: { type: integer, description: 'Ignored on create, rejected (422) on update.' }
+    # ---------------------------------------------------------------- AI SSA core
+    AiSsaError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    AiSsaErrors:
+      type: object
+      required: [error, errors]
+      properties:
+        error: { type: string, description: First message. }
+        errors: { type: array, items: { type: string } }
+    AiSsaInstance:
+      type: object
+      properties:
+        id: { type: integer, example: 3 }
+        client_name: { type: string }
+        sidecar_base_url: { type: string, example: "http://ssa-agent:8000" }
+        sidecar_auth_user: { type: string, nullable: true }
+        sidecar_auth_pass_set: { type: boolean }
+        provisioning_status: { type: string, enum: [pending, active, suspended, decommissioned] }
+        licence_status: { type: string, description: 'Summary derived from the core licence (exact vocabulary defined by LicenceGate::instanceSummary, not enumerated here).' }
+        fulfilment_mode: { type: string }
+        effective_fulfilment_mode: { type: string }
+        live_confirmed_at: { type: string, nullable: true }
+        last_health_status: { type: string, nullable: true }
+        last_health_message: { type: string, nullable: true }
+        last_health_checked_at: { type: string, nullable: true }
+        config_synced_at: { type: string, nullable: true }
+        assistant_name: { type: string, nullable: true }
+        assistant_title: { type: string, nullable: true }
+        organisation_name: { type: string, nullable: true }
+        assistant_introduction: { type: string }
+        recording_retention_days: { type: integer, enum: [0, 7, 30, 90, 365] }
+        fulfilment_adapter: { type: string, enum: [none, webhook] }
+        fulfilment_endpoint_url: { type: string, nullable: true }
+        fulfilment_secret_set: { type: boolean }
+        callback_base_url: { type: string, nullable: true }
+        escalation_email_recipients: { type: array, items: { type: string } }
+        created_at: { type: string }
+        updated_at: { type: string }
+    AiSsaInstanceDetail:
+      allOf:
+        - $ref: "#/components/schemas/AiSsaInstance"
+        - type: object
+          properties:
+            channels:
+              type: object
+              description: Channel module key to licence-gate state.
+              additionalProperties: { $ref: "#/components/schemas/ChatChannelState" }
+    AiSsaInstanceRequest:
+      type: object
+      description: On create `client_name`, `sidecar_base_url`, `sidecar_auth_user` and `sidecar_auth_pass` are required; on update every field is optional.
+      properties:
+        client_name: { type: string, maxLength: 200 }
+        sidecar_base_url: { type: string, maxLength: 255, description: "http(s) URL with a host; no credentials, query or fragment; trailing slash trimmed." }
+        sidecar_auth_user: { type: string, maxLength: 100, description: No colon. }
+        sidecar_auth_pass: { type: string, description: Write-only; required on create; blank on update keeps the stored one. }
+        provisioning_status: { type: string, enum: [pending, active, suspended, decommissioned], default: pending }
+        assistant_name: { type: string, nullable: true, minLength: 2, maxLength: 30, description: "Letters, spaces, hyphens, apostrophes, full stops; starts with a letter. Blank clears." }
+        assistant_title: { type: string, nullable: true, maxLength: 60, description: "Letters, numbers, spaces and & , . / ( ) - '; starts with a letter or number. Blank clears." }
+        organisation_name: { type: string, nullable: true, maxLength: 120, description: "Starts with a letter or number; no `<`, `>` or control characters. Blank clears." }
+        recording_retention_days: { type: integer, enum: [0, 7, 30, 90, 365], default: 0 }
+        fulfilment_adapter: { type: string, enum: [none, webhook], default: none }
+        fulfilment_endpoint_url: { type: string, maxLength: 255, description: "https URL (http only for localhost), no credentials, query or fragment. Required for webhook." }
+        fulfilment_secret: { type: string, minLength: 32, maxLength: 200, description: "Write-only. Printable ASCII with no spaces. Required for webhook unless one is stored." }
+        callback_base_url: { type: string, nullable: true, maxLength: 255, description: "Stack callback base URL, http(s); blank clears." }
+        escalation_email_recipients:
+          description: Email addresses, at most 10; a list or a newline-separated string.
+          oneOf:
+            - type: array
+              items: { type: string, format: email }
+              maxItems: 10
+            - type: string
+    AiSsaAudit:
+      type: object
+      required: [instance_id, client_name, day, timezone, audit_records, interactions]
+      properties:
+        instance_id: { type: integer }
+        client_name: { type: string }
+        day: { type: string, nullable: true, example: "2026-10-27" }
+        timezone: { type: string, nullable: true, example: Australia/Perth }
+        audit_records:
+          type: object
+          additionalProperties: true
+          description: 'Sidecar payload, typically {records: [...], total_closed}. Shape owned by the sidecar. May be an empty array if that call failed.'
+        interactions:
+          type: object
+          additionalProperties: true
+          description: 'Sidecar payload, typically {records: [...], total}. Shape owned by the sidecar. May be an empty array if that call failed.'
+    AiSsaEscalationRequest:
+      type: object
+      required: [channel, reason, summary, idempotency_key]
+      properties:
+        channel: { type: string, pattern: '^[a-z][a-z0-9-]{1,19}$', description: 'Lower-cased, trimmed. Typically chat, email or phone.' }
+        reason: { type: string, pattern: '^[a-z][a-z0-9_]{1,49}$', description: 'Lower-case slug. Suggested customer_request, out_of_scope, low_confidence, complaint, urgent, fulfilment_failed, other.' }
+        summary: { type: string, maxLength: 2000, description: Non-empty after trimming; control characters (except newlines) removed. }
+        idempotency_key: { type: string, pattern: '^[A-Za-z0-9._:-]{8,100}$' }
+        interaction_ref: { type: string, nullable: true, maxLength: 100 }
+        occurred_at: { type: string, nullable: true, description: "ISO 8601 date and time (must start YYYY-MM-DDTHH:MM)." }
+        test_mode: { type: boolean, default: false }
+    AiSsaEscalationResult:
+      type: object
+      required: [id, status, duplicate, notified]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        duplicate: { type: boolean }
+        notified: { type: boolean }
+    # ---------------------------------------------------------------- KPI
+    KpiError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    KpiEntryRequest:
+      type: object
+      required: [key, period_start, value]
+      properties:
+        key: { type: string, description: Active metric key. }
+        period_start: { type: string, description: "YYYY-MM-DD; must be the start date of an existing period of the metric's cadence.", example: "2026-10-26" }
+        value:
+          description: Numeric (a number or numeric string). Stored as a float.
+          oneOf:
+            - { type: number }
+            - { type: string }
+        note: { type: string, nullable: true, description: Cast to string when present. }
+    KpiEntryResponse:
+      type: object
+      required: [entry]
+      properties:
+        entry:
+          type: object
+          properties:
+            key: { type: string }
+            period_start: { type: string, example: "2026-10-26" }
+            value: { type: number }
+            note: { type: string, nullable: true }
+            source: { type: string, enum: [api] }
+    # ---------------------------------------------------------------- Licensing
+    LiceCheckinRequest:
+      type: object
+      required: [key, module]
+      properties:
+        key: { type: string, description: The licence key (never echoed back). }
+        module: { type: string, description: Module code the key must cover. }
+    LiceCheckinValid:
+      type: object
+      required: [valid, expires_at]
+      properties:
+        valid: { type: boolean, enum: [true] }
+        expires_at: { type: string, nullable: true, description: "Last day covered, Y-m-d UTC; null for no expiry.", example: "2027-06-30" }
+    LiceCheckinInvalid:
+      type: object
+      required: [valid]
+      properties:
+        valid: { type: boolean, enum: [false] }
+    # ---------------------------------------------------------------- Transactions
+    TxnPublicQuoteRequest:
+      type: object
+      required: [organisation, contact_name, email, items]
+      properties:
+        organisation: { type: string, maxLength: 200, description: "Required. Tags stripped, whitespace collapsed." }
+        contact_name: { type: string, maxLength: 200, description: Required. }
+        email: { type: string, maxLength: 255, format: email, description: "Required; must contain a dot." }
+        phone: { type: string, maxLength: 50 }
+        role_title: { type: string, maxLength: 100 }
+        delivery_suburb: { type: string, maxLength: 100 }
+        postcode: { type: string, maxLength: 10, pattern: '^\d{4}$', description: Four digits when given. }
+        po_number: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 2000, description: Line breaks kept. }
+        website: { type: string, description: "Honeypot. Leave empty (hidden on the page); anything here discards the request with a fake success." }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: At least one. On a form-encoded body this may be a JSON string.
+          items:
+            type: object
+            required: [sku, qty]
+            properties:
+              sku: { type: string, maxLength: 100 }
+              qty: { description: "Whole number 1 to 999 (integer or digit string, at most 3 digits).", oneOf: [{ type: integer, minimum: 1, maximum: 999 }, { type: string, pattern: '^\d{1,3}$' }] }
+    TxnPublicQuoteAccepted:
+      type: object
+      required: [ok, reference, message, unpriced]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        reference: { type: string, example: QR-1234, description: "QR-<draft document id>." }
+        message: { type: string }
+        unpriced:
+          type: array
+          description: SKUs the catalogue did not know; placed on the quote at 0.00 to be priced by hand.
+          items: { type: string }
+    TxnPublicQuoteFailure:
+      type: object
+      required: [ok, error, message]
+      properties:
+        ok: { type: boolean, enum: [false] }
+        error:
+          type: string
+          description: Machine key.
+          enum: [method_not_allowed, origin_not_allowed, origin_required, validation, rate_limited, not_configured, failed]
+        message: { type: string }
+        errors:
+          type: object
+          description: 'Field to message for `validation`; `{limit: ...}` for `rate_limited`.'
+          additionalProperties: { type: string }
+    # ---------------------------------------------------------------- Store
+    StoreQuoteRequest:
+      type: object
+      required: [email, items]
+      properties:
+        name: { type: string, description: "Contact name (alias contact_name). Required in practice (Transactions validation: contact_name)." }
+        contact_name: { type: string }
+        email: { type: string, format: email }
+        organization: { type: string, description: "Alias organisation. Defaults to the contact name, then 'Direct Customer'." }
+        organisation: { type: string }
+        phone: { type: string }
+        suburb: { type: string, description: Delivery suburb. }
+        postcode: { type: string, pattern: '^\d{4}$' }
+        notes: { type: string }
+        website: { type: string, description: "Honeypot; must be empty." }
+        items:
+          type: array
+          description: Items with a blank sku are dropped; qty (alias quantity) defaults to 1 and is raised to at least 1.
+          items:
+            type: object
+            properties:
+              sku: { type: string }
+              qty: { type: integer, minimum: 1 }
+              quantity: { type: integer, minimum: 1 }
+    StoreQuoteAccepted:
+      type: object
+      required: [ok, reference, itemCount, message]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        reference: { type: string, description: "QR-<id> from Transactions, or BDX-QR-<8 hex> from the non-persisting fallback.", example: QR-1234 }
+        itemCount: { type: integer }
+        message: { type: string }
+        unpriced: { type: array, items: { type: string }, description: Present only on the Transactions path. }
+    StoreQuoteFailure:
+      type: object
+      required: [ok, error, message]
+      properties:
+        ok: { type: boolean, enum: [false] }
+        error: { type: string, description: "validation, rate_limited, a Transactions QuoteRequestFailed key (not_configured, failed), or fallback keys invalid_email, missing_name, empty_basket." }
+        message: { type: string }
+        errors: { type: object, additionalProperties: { type: string }, description: Field to message (validation only). }
+    StoreSearchResponse:
+      type: object
+      required: [ok, query, count, products]
+      properties:
+        ok: { type: boolean }
+        query: { type: string }
+        count: { type: integer }
+        products:
+          type: array
+          maxItems: 30
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              sku: { type: string }
+              name: { type: string }
+              slug: { type: string }
+              brand: { type: string, example: biolDEx }
+              price_cents: { type: integer }
+              price_display: { type: string, example: "$45.00 AUD", description: 'Or "RFQ / Concierge" when price_cents is 0.' }
+              requires_quote: { type: boolean }
+              fulfilment: { type: string }
+    # ---------------------------------------------------------------- Lin
+    LinError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    LinMedia:
+      type: object
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [image, video, document] }
+        title: { type: string, nullable: true }
+        alt_text: { type: string, nullable: true }
+    LinDraft:
+      type: object
+      properties:
+        id: { type: integer }
+        display_id: { type: string, example: LIN-20261028-001 }
+        target_id: { type: integer }
+        status: { type: string, enum: [draft, in_review, approved, scheduled, publishing, published, rejected, failed, exported, posted_manually] }
+        status_label: { type: string }
+        body: { type: string }
+        hashtags: { type: string, nullable: true }
+        first_comment: { type: string, nullable: true }
+        ai_disclosure_text: { type: string, nullable: true }
+        source_ref: { type: string, nullable: true }
+        scheduled_for: { type: string, nullable: true }
+        published_at: { type: string, nullable: true }
+        rejected_reason: { type: string, nullable: true }
+        media: { type: array, items: { $ref: "#/components/schemas/LinMedia" } }
+        created_at: { type: string }
+        updated_at: { type: string }
+    LinDraftWithReview:
+      allOf:
+        - $ref: "#/components/schemas/LinDraft"
+        - type: object
+          properties:
+            review:
+              type: array
+              items:
+                type: object
+                properties:
+                  action: { type: string, enum: [edited, rejected, approved, published, unapproved_by_edit] }
+                  by: { type: string, nullable: true, description: Operator code. }
+                  note: { type: string, nullable: true }
+                  diff: { type: string, nullable: true }
+                  at: { type: string }
+    LinDraftCreateRequest:
+      type: object
+      required: [target_id, body]
+      properties:
+        target_id: { type: integer, minimum: 1, description: An active target (see /lin/api/context). }
+        body: { type: string, description: 'Post text; trimmed, non-empty. LinkedIn commentary limit is 3000 characters but this endpoint does not enforce it.' }
+        hashtags: { type: string, nullable: true, maxLength: 500, description: Longer input is trimmed with an ellipsis. }
+        first_comment: { type: string, nullable: true }
+        source_ref: { type: string, nullable: true, maxLength: 255 }
+        submit: { type: boolean, default: false, description: "Any truthy value moves the draft to in_review immediately." }
+    LinDraftUpdateRequest:
+      type: object
+      description: Only these keys are read; others are ignored.
+      properties:
+        body: { type: string }
+        hashtags: { type: string, nullable: true, maxLength: 500 }
+        first_comment: { type: string, nullable: true }
+        source_ref: { type: string, nullable: true, maxLength: 255 }
+        target_id: { type: integer, description: "Only changeable while the post is a draft (agent role)." }
+    LinContext:
+      type: object
+      properties:
+        house_rules: { type: string }
+        published_prices: { type: array, items: { type: string } }
+        main_phone: { type: string }
+        url_allowlist: { type: array, items: { type: string } }
+        locked_texts:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              body: { type: string }
+        grounding: { type: string }
+        recently_posted: { type: array, items: { type: string, maxLength: 200 } }
+        targets:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              label: { type: string }
+              kind: { type: string, enum: [member_api, company_manual] }
+    # ---------------------------------------------------------------- MAAMA
+    MaamaError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    MaamaStatus:
+      type: string
+      enum: [open, in_progress, blocked, done, closed, superseded]
+    MaamaPriority:
+      type: string
+      enum: [low, normal, high, critical]
+    MaamaUser:
+      type: object
+      nullable: true
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        name: { type: string }
+    MaamaAgent:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        email: { type: string, format: email }
+        name: { type: string }
+        role_name: { type: string }
+        description: { type: string, nullable: true }
+        persistent_context: { type: string, nullable: true }
+        attributes: { type: object, additionalProperties: true }
+        updated_at: { type: string }
+    MaamaHandover:
+      type: object
+      properties:
+        id: { type: integer }
+        display_id: { type: string, example: MAA-20261028-001 }
+        created_on: { type: string, nullable: true }
+        source: { $ref: "#/components/schemas/MaamaUser" }
+        target: { $ref: "#/components/schemas/MaamaUser" }
+        owner: { $ref: "#/components/schemas/MaamaUser" }
+        type: { type: string, example: handover }
+        priority: { $ref: "#/components/schemas/MaamaPriority" }
+        status: { $ref: "#/components/schemas/MaamaStatus" }
+        subject: { type: string, maxLength: 200 }
+        source_session: { type: string, nullable: true }
+        context: { type: string, nullable: true }
+        content: { type: string, nullable: true }
+        related: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+    MaamaHandoverDetail:
+      allOf:
+        - $ref: "#/components/schemas/MaamaHandover"
+        - type: object
+          properties:
+            updates:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  actor: { $ref: "#/components/schemas/MaamaUser" }
+                  note: { type: string, nullable: true }
+                  status_after: { $ref: "#/components/schemas/MaamaStatus" }
+                  created_at: { type: string }
+    MaamaHandoverCreateRequest:
+      type: object
+      required: [subject, target_user_id]
+      properties:
+        subject: { type: string, maxLength: 200 }
+        target_user_id: { type: integer, minimum: 1, description: An existing user id (integer or digit string). }
+        priority: { $ref: "#/components/schemas/MaamaPriority" }
+        owner_user_id: { type: integer, nullable: true }
+        type: { type: string, maxLength: 50, default: handover }
+        source_session: { type: string, maxLength: 100 }
+        context: { type: string }
+        content: { type: string }
+        related: { type: string }
+    MaamaHandoverUpdateRequest:
+      type: object
+      properties:
+        subject: { type: string, maxLength: 200, description: Cannot be blank. }
+        target_user_id: { type: integer }
+        owner_user_id: { type: integer, nullable: true }
+        priority: { $ref: "#/components/schemas/MaamaPriority" }
+        status: { $ref: "#/components/schemas/MaamaStatus" }
+        type: { type: string, maxLength: 50 }
+        source_session: { type: string, maxLength: 100, nullable: true }
+        context: { type: string, nullable: true }
+        content: { type: string, nullable: true }
+        related: { type: string, nullable: true }
+        note: { type: string, description: Recorded on the trail entry. }
+    MaamaNoteRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, description: Non-blank. }
+        status: { $ref: "#/components/schemas/MaamaStatus" }
+    # ---------------------------------------------------------------- Requirements
+    ReqError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    ReqStatus:
+      type: string
+      enum: [open, in_progress, done_pending_changelog_decision, complete, hold]
+    ReqType:
+      type: string
+      enum: [functional, user, internal, note]
+    ReqPriority:
+      type: string
+      enum: [low, normal, high]
+    ReqRequirement:
+      type: object
+      properties:
+        id: { type: integer }
+        display_id: { type: string, example: REQ-203 }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        type: { $ref: "#/components/schemas/ReqType" }
+        status: { $ref: "#/components/schemas/ReqStatus" }
+        priority: { $ref: "#/components/schemas/ReqPriority" }
+        notes: { type: string, nullable: true }
+        project: { type: string, nullable: true }
+        branch: { type: string, nullable: true }
+        target_version: { type: string, nullable: true }
+        changelog_decision: { type: string, nullable: true, enum: [included, excluded_deliberately, null] }
+        changelog_id: { type: integer, nullable: true }
+        changelog_note: { type: string, nullable: true }
+        origin_session: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+    ReqCreateRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, description: 'Trimmed, non-empty.' }
+        description: { type: string }
+        type: { $ref: "#/components/schemas/ReqType" }
+        priority: { $ref: "#/components/schemas/ReqPriority" }
+        status: { $ref: "#/components/schemas/ReqStatus" }
+        origin_session: { type: string }
+        project: { type: string }
+        branch: { type: string }
+        target_version: { type: string }
+        notes: { type: string }
+    ReqUpdateRequest:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        type: { $ref: "#/components/schemas/ReqType" }
+        priority: { $ref: "#/components/schemas/ReqPriority" }
+        status: { $ref: "#/components/schemas/ReqStatus" }
+        changelog_decision: { type: string, enum: [included, excluded_deliberately], description: "Required when status is complete (forced to included if already linked to a changelog)." }
+        changelog_note: { type: string, nullable: true }
+        origin_session: { type: string, nullable: true }
+        project: { type: string, nullable: true }
+        branch: { type: string, nullable: true }
+        target_version: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
