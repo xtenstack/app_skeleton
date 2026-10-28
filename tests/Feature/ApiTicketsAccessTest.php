@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
  * GET /api/tickets and /api/tickets/view/{id} used to answer any
  * authenticated caller with every ticket, including a self-service signup
  * member. Admin, operator and agent callers still see all; anyone else sees
- * only the tickets they raised, and retest-result / self-assign are staff-only.
+ * only the tickets they raised, and retest-result is staff-only. (self-assign stays open to any caller by design: ApiTicketsSelfAssignControllerTest.)
  * Real HTTP against the running stack.
  */
 final class ApiTicketsAccessTest extends TestCase
@@ -128,11 +128,9 @@ final class ApiTicketsAccessTest extends TestCase
         $this->assertSame(200, $this->call('GET', $path, self::$agentToken)['status']);
     }
 
-    public function testRetestResultAndSelfAssignAreStaffOnly(): void
+    public function testRetestResultIsStaffOnly(): void
     {
-        foreach (['retest-result', 'self-assign'] as $action) {
-            $r = $this->call('POST', "/api/tickets/$action/" . self::$ticketId, self::$strangerToken);
-            $this->assertSame(403, $r['status'], "$action must be refused to a member");
-        }
+        $r = $this->call('POST', '/api/tickets/retest-result/' . self::$ticketId, self::$strangerToken);
+        $this->assertSame(403, $r['status'], 'retest-result can close any ticket, so a member is refused');
     }
 }

@@ -317,12 +317,6 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'POST required']);
         }
 
-        if (!$this->canSeeAllTickets()) {
-            $this->response->setStatusCode(403, 'Forbidden');
-
-            return $this->response->setJsonContent(['error' => 'Forbidden']);
-        }
-
         $ticket = \Tickets::findFirstById($id);
 
         if (!$ticket) {
