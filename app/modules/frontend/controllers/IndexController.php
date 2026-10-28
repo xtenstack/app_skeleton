@@ -37,4 +37,21 @@ class IndexController extends ControllerBase
         $this->view->maintenanceUntilIso  = $timestamp !== false ? date('c', $timestamp) : null;
         $this->view->maintenanceUntilText = $timestamp !== false ? date('j M Y, g:i A', $timestamp) : null;
     }
+
+    /**
+     * Forwarded here by the dispatcher's beforeException listener (see
+     * services_web.php) for an unknown /frontend/<controller> or action.
+     * The forward stays inside the current module, so without this action
+     * the 404 itself failed and the visitor got the last-resort 500.
+     */
+    public function notFoundAction(): void
+    {
+        $this->response->setStatusCode(404, 'Not Found');
+    }
+
+    /** Forwarded here for any other exception an action lets escape (already logged). */
+    public function serverErrorAction(): void
+    {
+        $this->response->setStatusCode(500, 'Internal Server Error');
+    }
 }
