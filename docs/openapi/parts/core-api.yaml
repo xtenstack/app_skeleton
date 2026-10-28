@@ -1,0 +1,2902 @@
+tags:
+  - name: 'Core: Index'
+    description: Root and fallback behaviour of the core `/api` module (health probe, JSON 404 and 500 bodies).
+  - name: 'Core: Session'
+    description: Cookie-session login, whoami and logout for browser callers; these endpoints reject API keys.
+  - name: 'Core: Tickets'
+    description: Create, read, claim, close and converse on tickets ("REQ"s) through the authenticated API.
+  - name: 'Core: KB Articles'
+    description: Authenticated read and (admin-only) authoring access to Knowledge Base articles, including enquiry-type matching.
+  - name: 'Core: Public KB'
+    description: Unauthenticated read-only feed of published public FAQ articles, with CORS for XTen origins.
+  - name: 'Core: Public Intake'
+    description: Unauthenticated, token-gated, single-use intake-form submission for the Data Restore Audit landing page.
+  - name: 'Core: Provision'
+    description: Admin-oriented API for creating users with role sets, issuing, rotating and revoking API keys, and deactivating users.
+  - name: 'Core: Watson'
+    description: Watson close-offer action that creates the Dolibarr Third Party, Project and sales order(s) for a published-price offer.
+paths:
+  /api:
+    get:
+      tags:
+        - 'Core: Index'
+      operationId: core_index_index
+      summary: API root probe
+      description: |-
+        Returns a static liveness body. Reached via the generic `/api/:params` route (also `/api/index` and `/api/index/index`); any HTTP method is accepted (no method check). Who: any authenticated caller (any role, API key or session). Unauthenticated callers get 401. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. 
+
+        Fallback behaviour for the whole module: an `/api/...` URL whose controller or action does not exist (or an action missing a required id segment) is forwarded to `IndexController::notFoundAction()` and, for an authenticated caller, returns 404 `{"error":"Not Found"}` (capital N, unlike the per-record `{"error":"Not found"}`). Unauthenticated callers get 401 first. Any exception escaping an action returns 500 `{"error":"Internal server error"}`.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liveness body.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  service:
+                    type: string
+              example:
+                ok: true
+                service: app_skeleton api
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '404':
+          description: Unknown /api endpoint (authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not Found
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/session/login:
+    post:
+      tags:
+        - 'Core: Session'
+      operationId: core_session_login
+      summary: Log in with email and password (cookie session)
+      description: 'Public (no key or session required) but must NOT carry an API key: a request with `Authorization: Bearer` or `X-Api-Key` is rejected with 400. Body is JSON `{email,password}`; form fields `email`/`password` are accepted as a fallback. On success a session cookie is set and the user payload returned. Failed attempts are audited; once 5 failed logins have been recorded for the same email OR the same client IP in the last 15 minutes, further attempts are refused (password not even checked) with the same 401 body as a wrong password. Only active users can log in. Non-POST returns 405.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreLoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CoreLoginRequest'
+      responses:
+        '200':
+          description: Logged in; Set-Cookie carries the session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreSessionUserEnvelope'
+              example:
+                user:
+                  id: 12
+                  email: operator@example.invalid
+                  role_id: 2
+                  role_ids:
+                    - 2
+                    - 5
+        '400':
+          description: An API key header was sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Session endpoints do not accept an API key
+        '401':
+          description: Wrong credentials, inactive user, or rate-limited (indistinguishable).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Invalid email or password
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+  /api/session/me:
+    get:
+      tags:
+        - 'Core: Session'
+      operationId: core_session_me
+      summary: Current session user
+      description: Returns the user stored in the cookie session. Public route, but requires a logged-in session; 401 otherwise. Rejects API keys with 400 (use any other authenticated endpoint to test a key). Any HTTP method is accepted (no method check).
+      security: []
+      responses:
+        '200':
+          description: Session user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreSessionUserEnvelope'
+        '400':
+          description: An API key header was sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Session endpoints do not accept an API key
+        '401':
+          description: No session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+  /api/session/logout:
+    post:
+      tags:
+        - 'Core: Session'
+      operationId: core_session_logout
+      summary: Log out (destroy session auth)
+      description: Clears the session auth and settings. Always returns 200, even when not logged in. Any HTTP method is accepted (no method check, no CSRF protection). Rejects API keys with 400.
+      security: []
+      responses:
+        '200':
+          description: Logged out.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreOk'
+              example:
+                ok: true
+        '400':
+          description: An API key header was sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Session endpoints do not accept an API key
+  /api/tickets:
+    get:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_index
+      summary: List tickets
+      description: 'Who: any authenticated caller, any role. Note: there is NO per-caller scoping here, so every authenticated principal (including `member` and any agent key) can list every ticket in the system. Ordered newest id first, no pagination or limit. Any HTTP method is accepted by the router (no method check). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Exact status match (open, in_review, consolidated, closed seen in code). Unknown value returns an empty list.
+        - name: reporter_user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by reporting user id. A value of 0 or non-numeric is ignored.
+      responses:
+        '200':
+          description: Tickets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketList'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/create:
+    post:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_create
+      summary: Create a ticket
+      description: 'Who: any authenticated caller, any role (agents included). Reporter user and API key are always taken from the caller, never from the body. Not idempotent: every call creates a new ticket, and `source_ref` is not de-duplicated. Unknown `ticket_type` silently becomes `bug` and unknown `severity` silently becomes `normal`. With `generate_intake_token` a random 64-hex token is generated and returned once as `intake_token` for `POST /api/intake/data-restore-audit`. Non-POST returns 405. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreTicketCreateRequest'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketCreateResponse'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: title is required
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/view/{id}:
+    get:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_view
+      summary: Get one ticket
+      description: 'Who: any authenticated caller, any role. As with the list, there is no ownership check, so any principal can read any ticket by id. Any HTTP method is accepted. A missing id segment (`/api/tickets/view`) yields the generic 404 `Not Found`. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      responses:
+        '200':
+          description: Ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+      x-unverified: true
+  /api/tickets/retest-result/{id}:
+    post:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_retestResult
+      summary: Report an automated retest result
+      description: 'Who: any authenticated caller, any role (intended for retest agents; no role gate in code). `pass` closes the ticket (status closed, close_reason `auto_retest`, closed_at and auto_closed_at set); `fail` moves it to `in_review`. Re-callable: each call overwrites the last retest fields. Non-POST returns 405. Note the 405 check runs before the 404 check. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreRetestResultRequest'
+      responses:
+        '200':
+          description: Updated ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: result must be 'pass' or 'fail'
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/close/{id}:
+    post:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_close
+      summary: Manually close a ticket
+      description: 'Who: roles admin or operator only (agent and charter_agent get 403). Requires a caller-supplied `close_reason` short code (1-20 bytes). Optional `notes` overwrite the staff-only notes field (never returned). Closing an already closed ticket is allowed and just re-stamps closed_at and close_reason. Check order: method (405), role (403), record (404), validation (422). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreTicketCloseRequest'
+      responses:
+        '200':
+          description: Closed ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: close_reason must be 20 characters or fewer
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/self-assign/{id}:
+    post:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_selfAssign
+      summary: Claim an unassigned ticket for the caller
+      description: 'Who: any authenticated caller, any role (agents included). Assigns the ticket to the calling user. Idempotent when the caller already owns it. Refuses with 409 when it is assigned to someone else. No request body. Non-POST returns 405. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      responses:
+        '200':
+          description: Ticket now assigned to the caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '409':
+          description: Already assigned to a different user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Ticket is already assigned to a different user
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Save failed
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/reply/{id}:
+    post:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_reply
+      summary: Post a public staff reply on a ticket
+      description: 'Who: roles admin or operator only (others 403). Public reply, visible to the client that raised the ticket via the messages endpoint (GX-SPEC-05). Does not change the ticket status (a reply on a closed ticket does not reopen it). Idempotency: when `external_ref` is given and a message by the same author on the same ticket already uses it, the original message is returned with `duplicate: true` (HTTP 200) provided visibility and body are identical; if they differ the call is refused with 409. Without `external_ref` every call creates a new message (201). Check order: method (405), role (403), ticket (404), validation (422). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreTicketMessageRequest'
+      responses:
+        '200':
+          description: 'Duplicate external_ref: the original message.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketMessageCreated'
+              example:
+                message:
+                  id: 88
+                  ticket_id: 231
+                  visibility: public
+                  author_label: XTen Support
+                  body: We have reproduced this and a fix is queued.
+                  created_at: '2026-10-27 10:02:11'
+                  external_ref: game-reply-5521
+                  author_user_id: 12
+                  author_api_key_id: 7
+                duplicate: true
+        '201':
+          description: Message created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketMessageCreated'
+              example:
+                message:
+                  id: 88
+                  ticket_id: 231
+                  visibility: public
+                  author_label: XTen Support
+                  body: We have reproduced this and a fix is queued.
+                  created_at: '2026-10-27 10:02:11'
+                  external_ref: game-reply-5521
+                  author_user_id: 12
+                  author_api_key_id: 7
+                duplicate: false
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '409':
+          description: external_ref reused for a different message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: external_ref was already used for a different message
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: body is required and must be at most 10000 characters
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/note/{id}:
+    post:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_note
+      summary: Add an internal staff note to a ticket
+      description: 'Who: roles admin or operator only (others 403). Internal note; never returned to non-staff callers by the messages endpoint. Does not change the ticket status (a reply on a closed ticket does not reopen it). Idempotency: when `external_ref` is given and a message by the same author on the same ticket already uses it, the original message is returned with `duplicate: true` (HTTP 200) provided visibility and body are identical; if they differ the call is refused with 409. Without `external_ref` every call creates a new message (201). Check order: method (405), role (403), ticket (404), validation (422). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreTicketMessageRequest'
+      responses:
+        '200':
+          description: 'Duplicate external_ref: the original message.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketMessageCreated'
+              example:
+                message:
+                  id: 88
+                  ticket_id: 231
+                  visibility: internal
+                  author_label: XTen Support
+                  body: We have reproduced this and a fix is queued.
+                  created_at: '2026-10-27 10:02:11'
+                  external_ref: game-reply-5521
+                  author_user_id: 12
+                  author_api_key_id: 7
+                duplicate: true
+        '201':
+          description: Message created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketMessageCreated'
+              example:
+                message:
+                  id: 88
+                  ticket_id: 231
+                  visibility: internal
+                  author_label: XTen Support
+                  body: We have reproduced this and a fix is queued.
+                  created_at: '2026-10-27 10:02:11'
+                  external_ref: game-reply-5521
+                  author_user_id: 12
+                  author_api_key_id: 7
+                duplicate: false
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '409':
+          description: external_ref reused for a different message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: external_ref was already used for a different message
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: body is required and must be at most 10000 characters
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/tickets/messages/{id}:
+    get:
+      tags:
+        - 'Core: Tickets'
+      operationId: core_tickets_messages
+      summary: List a ticket's conversation
+      description: 'Who: any authenticated caller, with scoping. Staff (admin, operator) see public and internal messages on any ticket, with authorship ids and external_ref. Everyone else sees only public messages, and only on a ticket they raised (same API key that created it, or for a session caller the reporting user); any other ticket returns 404 so ids cannot be probed. Cursor paging: ascending by message id, `after_id` (exclusive) and `limit` (default 100, max 200, silently capped). `has_more` signals another page. An `after_id` that is not a (visible) message of this ticket is 422. Non-GET returns 405. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+        - name: after_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Message id cursor. Non-digit value is a 422; empty is ignored.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+          description: Page size. Non-digit or less than 1 is a 422; above 200 is capped to 200.
+      responses:
+        '200':
+          description: Page of messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreTicketMessages'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: GET required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: after_id and limit must be positive integers
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/kb-articles:
+    get:
+      tags:
+        - 'Core: KB Articles'
+      operationId: core_kbArticles_index
+      summary: List KB articles
+      description: 'Who: any authenticated caller. Read scope depends on role: admin and operator see everything (draft and published, internal and public); agent and charter_agent see published articles of either visibility; every other role (member etc.) sees only published public articles, whatever filters are sent. Newest id first, no pagination. Any HTTP method is accepted by the router. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: enquiry_type
+          in: query
+          schema:
+            type: string
+          description: Enquiry type name. An unknown name returns an empty list.
+        - name: product_ref
+          in: query
+          schema:
+            type: string
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum:
+              - internal
+              - public
+          description: Invalid values are ignored.
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - draft
+              - published
+          description: Invalid values are ignored; forced to published for non-staff.
+      responses:
+        '200':
+          description: Articles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreKbArticleList'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/kb-articles/view/{id}:
+    get:
+      tags:
+        - 'Core: KB Articles'
+      operationId: core_kbArticles_view
+      summary: Get one KB article
+      description: 'Who: any authenticated caller. Read scope depends on role: admin and operator see everything (draft and published, internal and public); agent and charter_agent see published articles of either visibility; every other role (member etc.) sees only published public articles, whatever filters are sent. An article outside the caller''s scope returns 404, same as a missing one. Any HTTP method is accepted. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      responses:
+        '200':
+          description: Article.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreKbArticleEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+      x-unverified: true
+  /api/kb-articles/match:
+    get:
+      tags:
+        - 'Core: KB Articles'
+      operationId: core_kbArticles_match
+      summary: Best-matching published articles for an enquiry type
+      description: 'Who: any authenticated caller. Always published-only for every role; callers who are neither staff nor agent roles additionally get public-only. Returns up to 10 articles of the enquiry type, ranked by keyword score (per term: title 3, summary 2, body 1; case-insensitive substring) then recency. When `q` is given but nothing matches, the type''s published articles are returned unranked (newest-updated first) with `keyword_match: false`. An unknown enquiry type returns `{"articles":[]}` with 200 and no keyword_match key. Any HTTP method is accepted. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: enquiry_type
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Enquiry type name (exact match).
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Free-text, whitespace-split into terms.
+      responses:
+        '200':
+          description: Matches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreKbMatchResponse'
+              example:
+                articles: []
+                keyword_match: true
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: enquiry_type is required
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/kb-articles/create:
+    post:
+      tags:
+        - 'Core: KB Articles'
+      operationId: core_kbArticles_create
+      summary: Create a draft KB article
+      description: 'Who: role admin only (operators are deliberately excluded; agents get 403). Check order: method (405), role (403), record (404), validation (422). Always created as `draft`; publish with the publish endpoint. Not idempotent. Invalid `visibility` silently becomes `internal`. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreKbArticleCreateRequest'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreKbArticleEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: enquiry_type_id must reference an existing enquiry type
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/kb-articles/update/{id}:
+    post:
+      tags:
+        - 'Core: KB Articles'
+      operationId: core_kbArticles_update
+      summary: Update a KB article (partial)
+      description: 'Who: role admin only (operators are deliberately excluded; agents get 403). Check order: method (405), role (403), record (404), validation (422). Only keys present in the body change; an invalid `visibility` is ignored silently; status cannot be changed here. Idempotent (same body, same result). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreKbArticleUpdateRequest'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreKbArticleEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: title cannot be empty
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/kb-articles/publish/{id}:
+    post:
+      tags:
+        - 'Core: KB Articles'
+      operationId: core_kbArticles_publish
+      summary: Publish a KB article
+      description: 'Who: role admin only (operators are deliberately excluded; agents get 403). Check order: method (405), role (403), record (404), validation (422). Sets status published and published_at to now (re-publishing an already published article refreshes published_at). No request body. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric record id. Not cast or validated by the action; a non-numeric value is handed to the database (behaviour unverified, probably a 500).
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      responses:
+        '200':
+          description: Published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreKbArticleEnvelope'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Save failed
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/public-kb/faq:
+    get:
+      tags:
+        - 'Core: Public KB'
+      operationId: core_publicKb_faq
+      summary: Public FAQ feed
+      description: 'Public: no authentication, no API key or session needed. Explicit route registered for GET and OPTIONS (OPTIONS returns 204 with CORS headers). The generic `/api/:controller/:action` route also resolves to this action for any other method, and the action has no method check, so other methods behave like GET. Returns only articles with visibility public AND status published (hard-coded; nothing a caller sends widens it). Newest id first, no pagination. CORS allowed for https://deploy.xten.au and https://xten.au only.'
+      security: []
+      parameters:
+        - name: enquiry_type
+          in: query
+          schema:
+            type: string
+          description: Enquiry type name; an unknown name returns an empty list.
+      responses:
+        '200':
+          description: Public articles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorePublicKbList'
+          headers:
+            Access-Control-Allow-Origin:
+              description: Echoes the Origin when it is https://deploy.xten.au or https://xten.au; absent otherwise.
+              schema:
+                type: string
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+    options:
+      tags:
+        - 'Core: Public KB'
+      operationId: core_publicKb_faq_options
+      summary: CORS preflight for the public FAQ feed
+      description: Public. Returns 204 with Access-Control-Allow-Methods `GET, OPTIONS` and Access-Control-Allow-Headers `Content-Type, Accept`; Allow-Origin only for https://deploy.xten.au or https://xten.au.
+      security: []
+      responses:
+        '204':
+          description: No content; CORS headers set.
+          headers:
+            Access-Control-Allow-Origin:
+              description: Echoes the Origin when it is https://deploy.xten.au or https://xten.au; absent otherwise.
+              schema:
+                type: string
+  /api/intake/data-restore-audit:
+    post:
+      tags:
+        - 'Core: Public Intake'
+      operationId: core_publicIntake_dataRestoreAudit
+      summary: Submit the Data Restore Audit intake form
+      description: 'Public: no API key or session. Authorised instead by the single-use `token` returned once when the ticket was created with `generate_intake_token`. Explicit route registered for POST and OPTIONS (the generic route also reaches the action; non-POST returns 405 from the action; preflight returns 204; CORS allowed for https://deploy.xten.au and https://xten.au). The token is cleared on success so the link cannot be replayed; an unknown token and an already-used token give the same 404. A non-empty `company_website` honeypot returns 200 `{"ok":true}` without saving anything (indistinguishable from success except for status 200 vs 201). Note the check order: token presence (422), token lookup (404), then `intake` validity (422), so a bad `intake` does not consume the token. No rate limiting in code.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreIntakeRequest'
+      responses:
+        '200':
+          description: Honeypot tripped; nothing saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreOk'
+              example:
+                ok: true
+        '201':
+          description: Intake saved and token consumed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreOk'
+              example:
+                ok: true
+          headers:
+            Access-Control-Allow-Origin:
+              description: Echoes the Origin when it is https://deploy.xten.au or https://xten.au; absent otherwise.
+              schema:
+                type: string
+        '404':
+          description: Unknown or already used token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Invalid or already-used intake link
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: intake is required
+        '500':
+          description: Save failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Could not save — please email deploy@xten.au directly
+    options:
+      tags:
+        - 'Core: Public Intake'
+      operationId: core_publicIntake_dataRestoreAudit_options
+      summary: CORS preflight for the intake form
+      description: Public. Returns 204 with Access-Control-Allow-Methods `POST, OPTIONS`; Allow-Origin only for https://deploy.xten.au or https://xten.au.
+      security: []
+      responses:
+        '204':
+          description: No content; CORS headers set.
+          headers:
+            Access-Control-Allow-Origin:
+              description: Echoes the Origin when it is https://deploy.xten.au or https://xten.au; absent otherwise.
+              schema:
+                type: string
+  /api/provision/roles:
+    get:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_roles
+      summary: List roles and whether the API can grant them
+      description: 'Who: role admin required (non-admin key gets 403, no credentials 401). Returns every role ordered by id; `assignable` is false for roles in the forbidden list (admin). Other methods return 405 (the explicit route is GET only, so 405 can only arise via the generic route). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Roles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionRoleList'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: GET required
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/provision/users:
+    post:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_users
+      summary: Create or update a user by email (idempotent upsert)
+      description: 'Who: role admin required (non-admin key gets 403, no credentials 401). Upsert keyed on case-insensitive email. 201 with `created: true` for a new user, 200 with `created: false` when the email existed (name, active flag, primary role and role set are overwritten). The first entry of `role_names` is the primary role (users.role_id). New users get an unusable password hash (agents cannot log in interactively; new `agent` kind users are marked email-verified). Refused: invalid payload (422 `Validation failed` with `errors[]`), unknown role names (422 `Unknown role` with `unknown_roles[]`), granting `admin` (422 via errors[]), and changing an existing user who already holds admin (403). Model save failure is 422 `User could not be saved`; failure saving the role set is 500 `Roles could not be saved`. The user save and role sync are not wrapped in one transaction in code, so a role-sync failure can leave a saved user. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreProvisionUserRequest'
+      responses:
+        '200':
+          description: Existing user updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionUserResponse'
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionUserResponse'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Not admin, or the target user holds admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: An admin user cannot be changed through the provisioning API
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed, unknown role, or user save failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionValidationError'
+              example:
+                error: Validation failed
+                errors:
+                  - kind must be 'agent' or 'person'
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/provision/users/{id}/api-key:
+    post:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_issueKey
+      summary: Issue an API key for a user
+      description: 'Who: role admin required (non-admin key gets 403, no credentials 401). Key-management policy (`mayManageKeysOf`): users whose email is in the rotate-any list (default claude.code@xten.au, travissaron@xten.au, stack@xten.au; override env PROVISION_ROTATE_ANY_EMAILS, comma separated) may target any user; any other admin may target only users who do NOT hold admin; everyone else is refused with 403. The user must be active (422 otherwise). The plaintext token (`sk_` + 48 hex) is returned once, only a SHA-256 hash is stored, response has `Cache-Control: no-store`. Not idempotent: each call creates another key. Check order: method, admin role, user (404), key policy (403), active (422), label (422), expires_in_days (422). The explicit route takes digits only in the id (the generic route `/api/provision/issue-key/{id}` also reaches the action, where a non-numeric id is cast to 0 and gives 404). Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric user id.
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreProvisionIssueKeyRequest'
+      responses:
+        '201':
+          description: Key issued (token shown once).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionKeyIssued'
+          headers:
+            Cache-Control:
+              description: '`no-store`'
+              schema:
+                type: string
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: label is required (at most 100 characters)
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/provision/users/{id}/rotate-keys:
+    post:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_rotateKeys
+      summary: Rotate any permitted user's keys
+      description: 'Who: not role-gated as such (the action only requires a resolvable principal); authorisation is `mayManageKeysOf`. Key-management policy (`mayManageKeysOf`): users whose email is in the rotate-any list (default claude.code@xten.au, travissaron@xten.au, stack@xten.au; override env PROVISION_ROTATE_ANY_EMAILS, comma separated) may target any user; any other admin may target only users who do NOT hold admin; everyone else is refused with 403. Issues a new key (no expiry, label default "rotated by admin") and schedules every other live key of that user to expire at now + `grace_seconds` (never lengthening an existing earlier expiry). Token shown once, `Cache-Control: no-store`. The user must be active. Documented prose (PROVISIONING-API.md) calls this admin-only; in code a non-admin whose email is in the rotate-any list would also pass, and a plain admin rotating their OWN key here is refused (holds admin) despite the 403 message text suggesting otherwise; admins use `/api/provision/api-keys/rotate` for their own. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric user id.
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreProvisionRotateKeysRequest'
+      responses:
+        '201':
+          description: New key issued; old keys scheduled to expire.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionRotateKeysResponse'
+          headers:
+            Cache-Control:
+              description: '`no-store`'
+              schema:
+                type: string
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: grace_seconds must be a whole number from 60 to 3600
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/provision/users/{id}/deactivate:
+    post:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_deactivate
+      summary: Deactivate a user and revoke all their keys
+      description: 'Who: role admin required (non-admin key gets 403, no credentials 401). Sets is_active to 0 and revokes every live key. Refused: deactivating yourself (422) and any user who holds admin (403). Safe to repeat (an already inactive user returns 200 with keys_revoked 0). No request body. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric user id.
+          schema:
+            type: integer
+            minimum: 1
+          example: 42
+      responses:
+        '200':
+          description: Deactivated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionDeactivateResponse'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated but the role check refused the call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Forbidden
+        '404':
+          description: Unknown record (or unknown endpoint for an authenticated caller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not found
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: You cannot deactivate yourself
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/provision/api-keys/rotate:
+    post:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_rotate
+      summary: Rotate the caller's own API key
+      description: 'Who: any API-key holder, any role (admins included), for their OWN key only. A browser session is refused with 403 `This endpoint needs an API key, not a session`. Creates a new key for the same user with the same label and no expiry (token shown once, `Cache-Control: no-store`), and sets the calling key to expire after `grace_seconds` (default 600, 60-3600; never lengthens an existing expiry). Follow with `/api/provision/api-keys/confirm` using the NEW key to kill the old one immediately. Not idempotent: each call issues another key. Body is optional. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreProvisionGraceRequest'
+      responses:
+        '201':
+          description: New key issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionRotateResponse'
+          headers:
+            Cache-Control:
+              description: '`no-store`'
+              schema:
+                type: string
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Session caller (no API key).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: This endpoint needs an API key, not a session
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: grace_seconds must be a whole number from 60 to 3600
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/provision/api-keys/confirm:
+    post:
+      tags:
+        - 'Core: Provision'
+      operationId: core_provision_confirm
+      summary: 'Confirm a rotation: revoke the superseded key now'
+      description: 'Who: any API-key holder, any role, with the NEW key. Revokes every other live key of the same user that has the same label and a non-null expiry (i.e. the keys a rotation scheduled to expire). Keys with no expiry are never touched. Idempotent: repeating returns `revoked: 0`. A session caller gets 403. No request body. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Count of keys revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreProvisionConfirmResponse'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Session caller (no API key).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: This endpoint needs an API key, not a session
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+  /api/watson/close-offer:
+    post:
+      tags:
+        - 'Core: Watson'
+      operationId: core_watson_closeOffer
+      summary: Close a published-price offer in Dolibarr (Third Party, Project, order)
+      description: 'Who: any authenticated caller, any role (no role gate in code; intended for the Watson-scoped key). Accepts only catalogue offers at their published price (`supported_offers` is returned on an unknown code). For each code it creates a Dolibarr sales order (order-first, no invoice; `invoice_id` is null); the first creates the Third Party and Project, later codes reuse them. If the first order fails the call is 502; if a later one fails it is skipped (logged) and the response lists only the orders that succeeded. NOT idempotent: every call creates a new Third Party, Project and order(s); there is no de-duplication. `price_aud`, when sent, is compared only against the FIRST offer code even for multi-code requests. Non-POST returns 405. Check order: method, offer codes (422), customer fields (422), price (422), Dolibarr (502). The ticket (REQ) is created separately via `/api/tickets/create`. Authentication: `X-Api-Key: <key>` or `Authorization: Bearer <key>`; a browser session cookie (from `POST /api/session/login`) is accepted only when no key header is sent. '
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreWatsonCloseRequest'
+      responses:
+        '201':
+          description: Order(s) created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreWatsonCloseResponse'
+        '401':
+          description: No credentials, or the presented API key does not resolve (unknown, revoked, expired, or owner inactive). A presented key is never combined with a session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Not authenticated
+        '405':
+          description: Wrong HTTP method; checked inside the action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: POST required
+        '422':
+          description: Unknown offer code, missing customer fields, or price mismatch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreWatsonOfferError'
+              example:
+                error: Unknown or unsupported offer_code
+                supported_offers:
+                  - DRA
+                  - SS
+                  - PS
+        '500':
+          description: Uncaught server error (logged server-side).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Internal server error
+        '502':
+          description: First Dolibarr order creation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreError'
+              example:
+                error: Dolibarr close creation failed — see app logs, needs manual follow-up
+components:
+  schemas:
+    CoreError:
+      type: object
+      required:
+        - error
+      description: Standard error body used by every endpoint in the core api module. Some errors add extra keys (see CoreProvisionValidationError, CoreWatsonOfferError).
+      properties:
+        error:
+          type: string
+      example:
+        error: Not authenticated
+    CoreProvisionValidationError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: Validation failed
+        errors:
+          type: array
+          items:
+            type: string
+          description: Present for payload validation failures and model save failures.
+        unknown_roles:
+          type: array
+          items:
+            type: string
+          description: Present when error is "Unknown role".
+    CoreWatsonOfferError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        supported_offers:
+          type: array
+          items:
+            type: string
+          description: Present on unknown offer_code; the full list of accepted codes.
+    CoreSessionUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        role_id:
+          type: integer
+          nullable: true
+          description: Primary role id.
+        role_ids:
+          type: array
+          items:
+            type: integer
+          description: Full role set.
+      example:
+        id: 12
+        email: operator@example.invalid
+        role_id: 2
+        role_ids:
+          - 2
+          - 5
+    CoreSessionUserEnvelope:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/CoreSessionUser'
+    CoreOk:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+    CoreLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+      example:
+        email: operator@example.invalid
+        password: <password>
+    CoreTicket:
+      type: object
+      description: Ticket as returned by the API. Staff-only fields (notes, project, intake data and token) are never returned.
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        severity:
+          type: string
+          enum:
+            - low
+            - normal
+            - high
+            - critical
+        ticket_type:
+          type: string
+          description: Written values are bug, issue, feature or support; other stored values may exist.
+        status:
+          type: string
+          description: 'Seen in code: open, in_review, consolidated, closed.'
+        source_ref:
+          type: string
+          nullable: true
+        reporter_user_id:
+          type: integer
+          nullable: true
+        reporter_api_key_id:
+          type: integer
+          nullable: true
+        assigned_to_user_id:
+          type: integer
+          nullable: true
+        consolidated_into_ticket_id:
+          type: integer
+          nullable: true
+        retest_ref:
+          type: string
+          nullable: true
+        retest_agent_key:
+          type: string
+          nullable: true
+        last_retest_result:
+          type: string
+          nullable: true
+          enum:
+            - pass
+            - fail
+            - null
+        last_retest_at:
+          type: string
+          nullable: true
+          description: Server local time, Y-m-d H:i:s.
+        last_retest_notes:
+          type: string
+          nullable: true
+        closed_at:
+          type: string
+          nullable: true
+        close_reason:
+          type: string
+          nullable: true
+          maxLength: 20
+        auto_closed_at:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+          nullable: true
+      example:
+        id: 231
+        title: Directory search returns 500
+        description: Steps to reproduce...
+        severity: high
+        ticket_type: bug
+        status: open
+        source_ref: dir-search-2026-10-27
+        reporter_user_id: 12
+        reporter_api_key_id: 7
+        assigned_to_user_id: null
+        consolidated_into_ticket_id: null
+        retest_ref: null
+        retest_agent_key: null
+        last_retest_result: null
+        last_retest_at: null
+        last_retest_notes: null
+        closed_at: null
+        close_reason: null
+        auto_closed_at: null
+        created_at: '2026-10-27 09:15:02'
+        updated_at: '2026-10-27 09:15:02'
+    CoreTicketEnvelope:
+      type: object
+      properties:
+        ticket:
+          $ref: '#/components/schemas/CoreTicket'
+    CoreTicketList:
+      type: object
+      properties:
+        tickets:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoreTicket'
+    CoreTicketCreateRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: Trimmed; must be non-empty. No length check in the controller.
+        description:
+          type: string
+        severity:
+          type: string
+          description: Canonical value (any case) or SLA code S1-S4. Unrecognised values silently become normal.
+          enum:
+            - low
+            - normal
+            - high
+            - critical
+            - S1
+            - S2
+            - S3
+            - S4
+        ticket_type:
+          type: string
+          enum:
+            - bug
+            - issue
+            - feature
+            - support
+          default: bug
+          description: Unrecognised values silently become bug.
+        source_ref:
+          type: string
+          description: Free-form caller reference. Not unique-checked.
+        retest_agent_key:
+          type: string
+        generate_intake_token:
+          type: boolean
+          description: Any truthy value generates a random single-use intake token, returned once in the response.
+      example:
+        title: 'Data Restore Audit: Example Pty Ltd'
+        description: Customer enquiry via web chat
+        severity: high
+        ticket_type: support
+        source_ref: watson-chat-0001
+        generate_intake_token: true
+    CoreTicketCreateResponse:
+      type: object
+      properties:
+        ticket:
+          $ref: '#/components/schemas/CoreTicket'
+        intake_token:
+          type: string
+          description: 64 hex characters. Only present when generate_intake_token was set; never retrievable again.
+    CoreRetestResultRequest:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum:
+            - pass
+            - fail
+        notes:
+          type: string
+      example:
+        result: pass
+        notes: 'Retest agent: search page now loads.'
+    CoreTicketCloseRequest:
+      type: object
+      required:
+        - close_reason
+      properties:
+        close_reason:
+          type: string
+          maxLength: 20
+          description: Short code, trimmed, 1-20 bytes (strlen).
+        notes:
+          type: string
+          description: Stored on the ticket staff-only notes field; overwrites any existing notes; never returned by the API.
+      example:
+        close_reason: fixed
+        notes: 'Root cause: missing index. Fix: migration 034.'
+    CoreTicketMessageRequest:
+      type: object
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          maxLength: 10000
+          description: Trimmed, non-empty, at most 10000 characters (mb_strlen).
+        external_ref:
+          type: string
+          maxLength: 100
+          description: Optional idempotency key, scoped to (ticket, calling user).
+      example:
+        body: We have reproduced this and a fix is queued.
+        external_ref: game-reply-5521
+    CoreTicketMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        ticket_id:
+          type: integer
+        visibility:
+          type: string
+          enum:
+            - public
+            - internal
+        author_label:
+          type: string
+          description: Always the literal "XTen Support".
+          example: XTen Support
+        body:
+          type: string
+        created_at:
+          type: string
+        external_ref:
+          type: string
+          nullable: true
+          description: Staff view only.
+        author_user_id:
+          type: integer
+          nullable: true
+          description: Staff view only.
+        author_api_key_id:
+          type: integer
+          nullable: true
+          description: Staff view only.
+      example:
+        id: 88
+        ticket_id: 231
+        visibility: public
+        author_label: XTen Support
+        body: We have reproduced this and a fix is queued.
+        created_at: '2026-10-27 10:02:11'
+        external_ref: game-reply-5521
+        author_user_id: 12
+        author_api_key_id: 7
+    CoreTicketMessageCreated:
+      type: object
+      properties:
+        message:
+          $ref: '#/components/schemas/CoreTicketMessage'
+        duplicate:
+          type: boolean
+          description: True when an identical earlier message with the same external_ref was returned instead of creating a new one (status 200).
+    CoreTicketMessages:
+      type: object
+      properties:
+        ticket:
+          type: object
+          properties:
+            id:
+              type: integer
+            status:
+              type: string
+            source_ref:
+              type: string
+              nullable: true
+            closed_at:
+              type: string
+              nullable: true
+            close_reason:
+              type: string
+              nullable: true
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoreTicketMessage'
+        last_id:
+          type: integer
+          description: Id of the last returned message, or the after_id cursor when none were returned (0 if no cursor).
+        has_more:
+          type: boolean
+    CoreKbArticle:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        enquiry_type_id:
+          type: integer
+          nullable: true
+        enquiry_type:
+          type: string
+          nullable: true
+          description: Enquiry type name.
+        product_ref:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          enum:
+            - internal
+            - public
+        status:
+          type: string
+          enum:
+            - draft
+            - published
+        published_at:
+          type: string
+          nullable: true
+        created_by_user_id:
+          type: integer
+          nullable: true
+        updated_by_user_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+          nullable: true
+      example:
+        id: 14
+        title: What does a Data Restore Audit include?
+        body: Full text...
+        summary: Scope of the audit
+        enquiry_type_id: 3
+        enquiry_type: data-restore
+        product_ref: DRA
+        visibility: public
+        status: published
+        published_at: '2026-09-20 08:00:00'
+        created_by_user_id: 1
+        updated_by_user_id: 1
+        created_at: '2026-09-19 12:00:00'
+        updated_at: '2026-09-20 08:00:00'
+    CoreKbArticleList:
+      type: object
+      properties:
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoreKbArticle'
+    CoreKbArticleEnvelope:
+      type: object
+      properties:
+        article:
+          $ref: '#/components/schemas/CoreKbArticle'
+    CoreKbMatchResponse:
+      type: object
+      description: keyword_match is omitted when the enquiry_type is unknown (body is then just an empty articles array).
+      properties:
+        articles:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/CoreKbArticle'
+        keyword_match:
+          type: boolean
+          description: True when q was empty or at least one article matched a term; false means the list is the unranked fallback (newest-updated first).
+    CoreKbArticleCreateRequest:
+      type: object
+      required:
+        - title
+        - enquiry_type_id
+      properties:
+        title:
+          type: string
+          description: Trimmed, non-empty.
+        enquiry_type_id:
+          type: integer
+          description: Must reference an existing enquiry type.
+        body:
+          type: string
+          default: ''
+        summary:
+          type: string
+        product_ref:
+          type: string
+        visibility:
+          type: string
+          enum:
+            - internal
+            - public
+          default: internal
+          description: Any other value silently becomes internal.
+      example:
+        title: What does a Data Restore Audit include?
+        enquiry_type_id: 3
+        body: Full text...
+        summary: Scope of the audit
+        product_ref: DRA
+        visibility: public
+    CoreKbArticleUpdateRequest:
+      type: object
+      description: 'Partial update: only keys present are changed.'
+      properties:
+        title:
+          type: string
+          description: If present must be non-empty after trimming.
+        body:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        enquiry_type_id:
+          type: integer
+          description: If present must reference an existing enquiry type.
+        product_ref:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          enum:
+            - internal
+            - public
+          description: An invalid value is silently ignored (no error).
+      example:
+        summary: Updated summary
+        visibility: public
+    CorePublicKbArticle:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        body:
+          type: string
+        enquiry_type:
+          type: string
+          nullable: true
+        product_ref:
+          type: string
+          nullable: true
+        published_at:
+          type: string
+          nullable: true
+    CorePublicKbList:
+      type: object
+      properties:
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CorePublicKbArticle'
+      example:
+        articles:
+          - id: 14
+            title: What does a Data Restore Audit include?
+            summary: Scope of the audit
+            body: Full text...
+            enquiry_type: data-restore
+            product_ref: DRA
+            published_at: '2026-09-20 08:00:00'
+    CoreIntakeRequest:
+      type: object
+      required:
+        - token
+        - intake
+      properties:
+        token:
+          type: string
+          description: The single-use intake token returned once by ticket creation (generate_intake_token).
+        intake:
+          type: object
+          additionalProperties: true
+          minProperties: 1
+          description: Free-form non-empty JSON object, stored pretty-printed on the ticket. Keys are defined by the landing page, not by this endpoint.
+        company_website:
+          type: string
+          description: 'Honeypot: any non-empty value makes the call return 200 {"ok":true} without saving.'
+      example:
+        token: <64-hex-char intake token>
+        intake:
+          business_name: Example Pty Ltd
+          contact_email: owner@example.invalid
+          systems: Dolibarr 18, MySQL 8
+    CoreProvisionRole:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        assignable:
+          type: boolean
+          description: False for roles the API will never grant (currently admin).
+    CoreProvisionRoleList:
+      type: object
+      properties:
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoreProvisionRole'
+      example:
+        roles:
+          - id: 1
+            name: admin
+            assignable: false
+          - id: 2
+            name: operator
+            assignable: true
+          - id: 5
+            name: agent
+            assignable: true
+    CoreProvisionUserRequest:
+      type: object
+      required:
+        - email
+        - first_name
+        - last_name
+        - kind
+        - role_names
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 150
+          description: Lowercased and trimmed; also the upsert key (case-insensitive).
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        kind:
+          type: string
+          enum:
+            - agent
+            - person
+        role_names:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: De-duplicated, trimmed. First name is the primary role. "admin" is refused.
+        active:
+          type: boolean
+          default: true
+          description: Parsed with FILTER_VALIDATE_BOOLEAN, so "false"/"0"/"no" also work.
+      example:
+        email: tim@example.invalid
+        first_name: Tim
+        last_name: Agent
+        kind: agent
+        role_names:
+          - agent
+          - operator
+        active: true
+    CoreProvisionUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        is_active:
+          type: boolean
+        role_names:
+          type: array
+          items:
+            type: string
+          description: Sorted alphabetically (not primary-first).
+    CoreProvisionUserResponse:
+      type: object
+      properties:
+        created:
+          type: boolean
+        kind:
+          type: string
+          enum:
+            - agent
+            - person
+        user:
+          $ref: '#/components/schemas/CoreProvisionUser'
+      example:
+        created: true
+        kind: agent
+        user:
+          id: 42
+          email: tim@example.invalid
+          first_name: Tim
+          last_name: Agent
+          is_active: true
+          role_names:
+            - agent
+            - operator
+    CoreProvisionApiKey:
+      type: object
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+        prefix:
+          type: string
+          description: First 10 characters of the token.
+          example: sk_1a2b3c4d
+        expires_at:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          nullable: true
+    CoreProvisionIssueKeyRequest:
+      type: object
+      required:
+        - label
+      properties:
+        label:
+          type: string
+          maxLength: 100
+        expires_in_days:
+          type: integer
+          minimum: 1
+          maximum: 3650
+          description: Omit or null/empty for no expiry.
+      example:
+        label: tim prod
+        expires_in_days: 90
+    CoreProvisionKeyIssued:
+      type: object
+      properties:
+        api_key:
+          $ref: '#/components/schemas/CoreProvisionApiKey'
+        token:
+          type: string
+          description: Secret `sk_` + 48 hex characters. Shown once.
+        note:
+          type: string
+      example:
+        api_key:
+          id: 7
+          label: tim prod
+          prefix: sk_1a2b3c4d
+          expires_at: null
+          created_at: '2026-10-28 09:00:00'
+        token: sk_<48 hex characters>
+        note: The token is shown once and cannot be retrieved again.
+    CoreProvisionGraceRequest:
+      type: object
+      properties:
+        grace_seconds:
+          type: integer
+          minimum: 60
+          maximum: 3600
+          default: 600
+      example:
+        grace_seconds: 600
+    CoreProvisionRotateKeysRequest:
+      type: object
+      properties:
+        grace_seconds:
+          type: integer
+          minimum: 60
+          maximum: 3600
+          default: 600
+        label:
+          type: string
+          maxLength: 100
+          default: rotated by admin
+      example:
+        grace_seconds: 600
+        label: tim prod
+    CoreProvisionExpiringKey:
+      type: object
+      properties:
+        id:
+          type: integer
+        expires_at:
+          type: string
+    CoreProvisionRotateKeysResponse:
+      type: object
+      properties:
+        api_key:
+          $ref: '#/components/schemas/CoreProvisionApiKey'
+        token:
+          type: string
+          description: Shown once.
+        expiring_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoreProvisionExpiringKey'
+          description: Every previously live key of the user with its (possibly shortened) expiry.
+        note:
+          type: string
+    CoreProvisionRotateResponse:
+      type: object
+      properties:
+        api_key:
+          $ref: '#/components/schemas/CoreProvisionApiKey'
+        token:
+          type: string
+          description: Shown once.
+        old_key:
+          $ref: '#/components/schemas/CoreProvisionExpiringKey'
+        note:
+          type: string
+    CoreProvisionDeactivateResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/CoreProvisionUser'
+        keys_revoked:
+          type: integer
+      example:
+        user:
+          id: 42
+          email: tim@example.invalid
+          first_name: Tim
+          last_name: Agent
+          is_active: false
+          role_names:
+            - agent
+        keys_revoked: 2
+    CoreProvisionConfirmResponse:
+      type: object
+      properties:
+        revoked:
+          type: integer
+          description: Number of old keys revoked.
+      example:
+        revoked: 1
+    CoreWatsonCloseRequest:
+      type: object
+      required:
+        - customer_name
+      description: Provide offer_code or offer_codes. Provide customer_email (or, as a fallback, customer_contact).
+      properties:
+        offer_code:
+          type: string
+          description: One catalogue code (case-insensitive, trimmed, uppercased).
+          enum:
+            - DRA
+            - SS
+            - PS
+            - CH
+            - DM_FLOOR
+            - DEP-RESTORE
+            - DIR-LIST-FEATURED-M
+            - DIR-LIST-FEATURED-Y
+            - DIR-LIST-PROMINENT-M
+            - DIR-LIST-PROMINENT-Y
+            - DIR-VIDEO-30S-ADDON
+            - DIR-VIDEO-30S-STANDALONE
+            - DIR-BUNDLE-PRO-VID-M
+            - DIR-BUNDLE-PRO-VID-Y
+            - SRV-DIR-VID30
+            - SRV-DIR-VID30-BND
+            - SRV-DIR-VID-UPGRADE-TRAVIS
+            - PPL-VERIFIED-PRO-M
+            - PPL-VERIFIED-PRO-Y
+            - PPL-FEATURED-M
+            - PPL-FEATURED-Y
+        offer_codes:
+          type: array
+          items:
+            type: string
+          description: Several codes for one multi-product purchase; de-duplicated, one order each. Takes precedence over offer_code.
+        customer_name:
+          type: string
+        customer_email:
+          type: string
+          description: Not format-validated.
+        customer_contact:
+          type: string
+          description: Fallback for customer_email.
+        price_aud:
+          type: number
+          description: 'Optional sanity check: must equal the published price of the FIRST offer code, else 422.'
+      example:
+        offer_code: DRA
+        customer_name: Example Pty Ltd
+        customer_email: owner@example.invalid
+        price_aud: 450
+    CoreWatsonOrder:
+      type: object
+      properties:
+        thirdparty_id:
+          type: integer
+        project_id:
+          type: integer
+        order_id:
+          type: integer
+        order_ref:
+          type: string
+        invoice_id:
+          type: integer
+          nullable: true
+          description: 'Always null: closes are order-first, invoiced only after payment.'
+        invoice_ref:
+          type: string
+          nullable: true
+        payment_url:
+          type: string
+          nullable: true
+        offer_code:
+          type: string
+        offer_name:
+          type: string
+        price_aud:
+          type: number
+    CoreWatsonCloseResponse:
+      type: object
+      properties:
+        offer_code:
+          type: string
+          description: First code.
+        offer_codes:
+          type: array
+          items:
+            type: string
+        offer_name:
+          type: string
+          description: Name of the first code.
+        price_aud:
+          type: number
+          description: Sum over orders actually created.
+        dolibarr:
+          allOf:
+            - $ref: '#/components/schemas/CoreWatsonOrder'
+          description: The first order created (duplicate of orders[0]).
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/CoreWatsonOrder'
+      example:
+        offer_code: DRA
+        offer_codes:
+          - DRA
+        offer_name: Data Restore Audit
+        price_aud: 450
+        dolibarr:
+          thirdparty_id: 311
+          project_id: 90
+          order_id: 512
+          order_ref: SO2610-0042
+          invoice_id: null
+          invoice_ref: null
+          payment_url: https://example.invalid/pay/abc
+          offer_code: DRA
+          offer_name: Data Restore Audit
+          price_aud: 450
+        orders:
+          - thirdparty_id: 311
+            project_id: 90
+            order_id: 512
+            order_ref: SO2610-0042
+            invoice_id: null
+            invoice_ref: null
+            payment_url: https://example.invalid/pay/abc
+            offer_code: DRA
+            offer_name: Data Restore Audit
+            price_aud: 450

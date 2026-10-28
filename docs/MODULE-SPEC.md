@@ -765,6 +765,16 @@ Catalogue modules ship under a short proprietary EULA; bespoke
 client-delivered modules ship MIT once delivered — see the design
 brief's licensing sections for the reasoning.
 
+## API documentation
+
+Every HTTP API a module exposes (anything under `/api/...` or a module's own JSON endpoints) is documented in the Stack's OpenAPI description, because agents, games and sites build against it. The description is served to authenticated callers at `GET /api/docs/openapi` and browsed at **Backend > API Docs** (Swagger UI).
+
+- **Where:** one part file per area in `docs/openapi/parts/<area>.yaml` in app_skeleton (`tags:`, `paths:`, `components: schemas:`; prefix your schema names with the module). The shared pieces (authentication, errors, conventions) are in `docs/openapi/base.yaml`.
+- **What each operation states:** the exact path and method, who may call it (public, any key, or the role list), required fields with types and limits as validated, every status the code can return with its JSON shape, idempotency and rate rules, and a unique `operationId` (`<module>_<action>`).
+- **When:** in the same pull request as the route change. Mark an operation `x-unverified: true` if it was written from the code and not run.
+- **Build:** `npm install`, then `node bin/build-openapi.mjs` regenerates `app/modules/api/spec/openapi.json` (commit it). `node bin/build-openapi.mjs --check` fails when the committed JSON is stale or the document does not validate.
+- **Modules outside this repo** (internal, plugins, applications) add their part file to app_skeleton by pull request to this repo, or tell Claude Code.
+
 ## What's still genuinely open
 
 - Non-Composer module discovery (a hand-written module not installed as

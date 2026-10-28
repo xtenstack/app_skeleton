@@ -1,0 +1,2752 @@
+tags:
+  - name: Marketing Addresses
+    description: CRUD (no delete) over abn_lookup.addresses, structured postal addresses tied to ABNs or contacts.
+  - name: Marketing Campaigns
+    description: Read campaigns and change only their send configuration (status, template, daily limit).
+  - name: Marketing Claims
+    description: Read-only check of whether an email address belongs to someone who claimed a directory listing.
+  - name: Marketing Contacts
+    description: 'Tim write-backs: dead-mailbox redirects and campaign reply recording, both of which can change outreach state.'
+  - name: Marketing Leads
+    description: Authenticated lead list, create, update and convert-to-campaign-member.
+  - name: Marketing Mail Templates
+    description: Create, read and edit the email templates campaigns send.
+  - name: Marketing Prospects
+    description: Read campaign prospects and update their outreach status, notes, priority and first paragraph.
+  - name: Marketing Unsubscribes
+    description: 'Global suppression list: check an address or suppress one (entity or address scope).'
+  - name: Marketing Public Lead Capture
+    description: Public CORS landing-page form that stores a lead and notifies staff.
+  - name: Marketing Webhooks
+    description: Signed receiver for Resend (Svix) delivery events that marks bounces and suppresses addresses.
+paths:
+  /marketing/api-addresses/index:
+    get:
+      tags:
+        - Marketing Addresses
+      operationId: mkt_api_addresses_index
+      summary: List addresses
+      description: 'Paged list of rows from abn_lookup.addresses, newest first by default. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: abn
+          in: query
+          required: false
+          description: Exact ABN match (no normalisation).
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          description: 'Case-insensitive substring search (ILIKE) over: abn, locality, state_province, postcode, street_name.'
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: Sort key; unknown values fall back to the default (created).
+          schema:
+            type: string
+            enum:
+              - created
+              - abn
+              - locality
+              - state
+              - postcode
+            default: created
+        - name: dir
+          in: query
+          required: false
+          description: Sort direction; anything other than asc is treated as desc. NULLs always sort last.
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - name: page
+          in: query
+          required: false
+          description: Page number, clamped into 1..total_pages.
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          required: false
+          description: Rows per page (default 25). Not capped in code; 0 or negative values are not guarded (see notes).
+          schema:
+            type: integer
+            default: 25
+      responses:
+        '200':
+          description: Page of addresses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktAddressList'
+              example:
+                addresses:
+                  - id: 1
+                    abn: '11111111111'
+                    contact_id: null
+                    address_type: registered
+                    unit: null
+                    street_number: '1'
+                    street_name: Example
+                    street_type: St
+                    locality: Perth
+                    state_province: WA
+                    postcode: '6000'
+                    country: AU
+                    raw_input: null
+                    gnaf_pid: null
+                    validation_source: null
+                    validated_at: null
+                    extraction_method: api
+                    created_at: '2026-10-01 09:00:00'
+                    updated_at: '2026-10-01 09:00:00'
+                page: 1
+                total_pages: 1
+                total: 1
+                per_page: 25
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+  /marketing/api-addresses/view/{id}:
+    get:
+      tags:
+        - Marketing Addresses
+      operationId: mkt_api_addresses_view
+      summary: Get one address
+      description: 'Fetch an address by numeric id. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Address id.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktAddressEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+  /marketing/api-addresses/create:
+    post:
+      tags:
+        - Marketing Addresses
+      operationId: mkt_api_addresses_create
+      summary: Create an address
+      description: 'Creates an addresses row. No field is required: address_type defaults to "unknown" and extraction_method to "api". abn is not validated or checked against the ABN register. Not idempotent: every call inserts a new row. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktAddressInput'
+            example:
+              abn: '11111111111'
+              address_type: registered
+              street_number: '1'
+              street_name: Example
+              street_type: St
+              locality: Perth
+              state_province: WA
+              postcode: '6000'
+              country: AU
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktAddressEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: invalid address_type
+  /marketing/api-addresses/update/{id}:
+    post:
+      tags:
+        - Marketing Addresses
+      operationId: mkt_api_addresses_update
+      summary: Update an address
+      description: 'Partial update: only keys present in the body are changed (null clears a text field). Setting validation_source to a different value (including null) re-stamps or clears validated_at. Idempotent for identical bodies. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Address id.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktAddressInput'
+            example:
+              validation_source: manual
+              postcode: '6001'
+      responses:
+        '200':
+          description: Updated address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktAddressEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: invalid validation_source
+  /marketing/api-campaigns/index:
+    get:
+      tags:
+        - Marketing Campaigns
+      operationId: mkt_api_campaigns_index
+      summary: List campaigns
+      description: 'All campaigns ordered by campaign_code (not paged). Read-only lookup of send configuration. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Campaigns.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktCampaignList'
+              example:
+                campaigns:
+                  - campaign_code: EXAMPLE-01
+                    title: Example campaign
+                    description: null
+                    status: planning
+                    mail_template_id: null
+                    daily_send_limit: 100
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+  /marketing/api-campaigns/view/{campaignCode}:
+    get:
+      tags:
+        - Marketing Campaigns
+      operationId: mkt_api_campaigns_view
+      summary: Get one campaign
+      description: 'Fetch a campaign by campaign_code. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: campaignCode
+          in: path
+          required: true
+          description: Campaign code, e.g. EXAMPLE-01.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The campaign.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktCampaignEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+  /marketing/api-campaigns/update/{campaignCode}:
+    post:
+      tags:
+        - Marketing Campaigns
+      operationId: mkt_api_campaigns_update
+      summary: Update campaign send configuration
+      description: 'Writable fields are only status, daily_send_limit and mail_template_id; campaign definitions (title, selection, membership) cannot be changed here. A campaign only sends while status is "active" and a mail_template_id is set. Setting status "active" starts sending at the next send cron, so treat it as a go-live action. mail_template_id is not checked for existence in code (a bad id is left to the database foreign key; failure mode unverified). Idempotent. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: campaignCode
+          in: path
+          required: true
+          description: Campaign code.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktCampaignUpdate'
+            example:
+              status: paused
+              daily_send_limit: 200
+      responses:
+        '200':
+          description: Updated campaign.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktCampaignEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: invalid status
+      x-unverified: true
+  /marketing/api-claims/index:
+    get:
+      tags:
+        - Marketing Claims
+      operationId: mkt_api_claims_index
+      summary: Who has claimed a directory listing under an email address
+      description: 'Read-only lookup in directory.claimed_profiles for Tim and other agents: a message from a claimed customer is a human matter, not a sales reply. Only claims with status "verified" or "subscribed" are returned; addresses are matched case-insensitively against claimed_by_email. Accepts up to 10 comma-separated addresses (invalid ones are silently dropped, extras beyond 10 ignored) because the person replying may be an authorised user writing from another address. An empty claims array means no claim. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          description: One or more comma-separated email addresses (max 10 used). At least one valid address is required.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching claims (possibly empty).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktClaimList'
+              example:
+                claims:
+                  - abn: '11111111111'
+                    portal_type: directory
+                    tier: free
+                    status: verified
+                    claimed_by_name: Example Person
+                    matched_email: owner@example.invalid
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: A valid ?email= is required
+  /marketing/api-contacts/redirect:
+    post:
+      tags:
+        - Marketing Contacts
+      operationId: mkt_api_contacts_redirect
+      summary: Dead-mailbox redirect
+      description: 'Tim''s "this mailbox is closing, email X instead" rule. Steps: (1) every ABN that has old_email as an email contact gets each replacement registered as a preferred contact (extraction_method autoresponder_redirect; existing ones just get fetched_at and preferred refreshed); (2) old_email is suppressed at ADDRESS scope (added to the global unsubscribes list, its pending/sent sends marked bounced, each membership it was closing re-opened as "not contacted" if the ABN has another usable unsuppressed email, otherwise set "unsubscribed"). Address scope means the inbox is dead, not that the person opted out; contrast api-unsubscribes/create with scope "entity". Replacements on a different domain than old_email are rejected (listed in rejected[]) unless allow_cross_domain is true, because that usually names a different business. Replacements that are invalid or equal to old_email are also rejected. Idempotent: re-posting refreshes contacts and re-runs the membership pass. Returns 201 even when old_email was already suppressed or matched no ABN (check already_suppressed / abns). Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktRedirectRequest'
+            example:
+              old_email: info@example.invalid
+              new_emails:
+                - sales@example.invalid
+              reason: dead mailbox autoresponder
+              allow_cross_domain: false
+      responses:
+        '201':
+          description: Redirect applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktRedirectResult'
+              example:
+                old_email: info@example.invalid
+                already_suppressed: false
+                new_emails:
+                  - sales@example.invalid
+                rejected:
+                  - email: x@other.example.invalid
+                    why: different domain
+                abns:
+                  - '11111111111'
+                contacts_added: 1
+                memberships: 1
+                members_reopened: 1
+                members_unsubscribed: 0
+                sends_bounced: 1
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: a valid old_email is required
+  /marketing/api-contacts/replied:
+    post:
+      tags:
+        - Marketing Contacts
+      operationId: mkt_api_contacts_replied
+      summary: Record a reply (Tim write-back)
+      description: 'Moves every campaign membership the address was sent to (campaign_sends with status sent) or is an email contact for, from "not contacted"/"sent" to "replied", and appends a stamped note. Automated reply types (out_of_office, bounce_text) are noted only and never change outreach_status. Statuses already past replied (unsubscribed, call booked, quoted, won, lost, no) are never overwritten; those memberships get the note only. This endpoint does not suppress anything: for an opt-out also call api-unsubscribes/create, even when reply_type is "unsubscribe". Idempotent (the note is not re-appended once present, and already-replied memberships only get the note step). Always 200 on success, including when no membership matches (memberships 0). Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktRepliedRequest'
+            example:
+              email: owner@example.invalid
+              reply_type: interested
+              note: Asked for a quote
+              source: tim
+      responses:
+        '200':
+          description: Reply recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktRepliedResult'
+              example:
+                email: owner@example.invalid
+                reply_type: interested
+                memberships: 2
+                marked_replied: 1
+                noted_only: 1
+                kept_statuses:
+                  quoted: 1
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Invalid email or unknown reply_type (the latter also lists the allowed values).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/MktError'
+                  - $ref: '#/components/schemas/MktReplyTypeError'
+              example:
+                error: unknown reply_type
+                reply_types:
+                  - interested
+                  - not_now
+                  - unsubscribe
+                  - out_of_office
+                  - bounce_text
+                  - replied
+  /marketing/api-leads/index:
+    get:
+      tags:
+        - Marketing Leads
+      operationId: mkt_api_leads_index
+      summary: List leads
+      description: 'Newest first, always paged by limit/offset (the table has ~half a million rows; unpaged responses used to exhaust memory). An unrecognised status value is ignored rather than rejected. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by status; values outside the enum are silently ignored.
+          schema:
+            type: string
+            enum:
+              - new
+              - matched
+              - contacted
+              - converted
+              - declined
+        - name: abn
+          in: query
+          required: false
+          description: Exact ABN match.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Page size, clamped to 1..1000.
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip (negative becomes 0).
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Page of leads.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktLeadList'
+              example:
+                total: 1
+                limit: 100
+                offset: 0
+                leads:
+                  - id: 5
+                    source: api
+                    product: null
+                    name: Example Person
+                    org: Example Pty Ltd
+                    email: person@example.invalid
+                    phone: null
+                    system_desc: null
+                    notes: null
+                    abn: null
+                    status: new
+                    created_at: '2026-10-01 09:00:00'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+  /marketing/api-leads/view/{id}:
+    get:
+      tags:
+        - Marketing Leads
+      operationId: mkt_api_leads_view
+      summary: Get one lead
+      description: 'Fetch a lead by numeric id. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Lead id.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The lead.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktLeadEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+  /marketing/api-leads/create:
+    post:
+      tags:
+        - Marketing Leads
+      operationId: mkt_api_leads_create
+      summary: Create a lead
+      description: 'Authenticated twin of the public form. name, org and a syntactically valid email are required (trimmed, non-empty). source defaults to "api". No ABN auto-resolution, honeypot, or notification email happens here; supply abn directly if known (not validated). Not idempotent: duplicates are not detected. A lead is not a campaign member and is never emailed by campaigns until converted. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktLeadCreate'
+            example:
+              name: Example Person
+              org: Example Pty Ltd
+              email: person@example.invalid
+              phone: '0400000000'
+              notes: Met at event
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktLeadEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: name, org, and a valid email are required
+  /marketing/api-leads/update/{id}:
+    post:
+      tags:
+        - Marketing Leads
+      operationId: mkt_api_leads_update
+      summary: Update a lead
+      description: 'Only status, notes and abn are writable; source, name, org, email and phone are fixed after creation (extra keys are ignored). Partial: only present keys change. Idempotent. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Lead id.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktLeadUpdate'
+            example:
+              status: contacted
+              abn: '11111111111'
+      responses:
+        '200':
+          description: Updated lead.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktLeadEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: invalid status
+  /marketing/api-leads/convert/{id}:
+    post:
+      tags:
+        - Marketing Leads
+      operationId: mkt_api_leads_convert
+      summary: Convert a lead into a campaign member
+      description: 'Creates (if missing) an email contact on the lead''s ABN (source internal://leads/<id>), creates (if missing) the campaign_members row for that campaign and ABN (optionally setting priority), and marks the lead "converted". The lead must already have an abn (422 otherwise). The converted contact becomes eligible for that campaign''s sends, but suppression still applies at send time. Idempotent: re-converting reuses the contact and membership. Note the failures of the contact/member/lead saves are not checked, so a 200 does not prove each write succeeded. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Lead id.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktLeadConvert'
+            example:
+              campaign_code: EXAMPLE-01
+              priority: 5
+      responses:
+        '200':
+          description: Converted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktLeadConvertResult'
+              example:
+                lead:
+                  id: 5
+                  source: api
+                  product: null
+                  name: Example Person
+                  org: Example Pty Ltd
+                  email: person@example.invalid
+                  phone: null
+                  system_desc: null
+                  notes: null
+                  abn: '11111111111'
+                  status: converted
+                  created_at: '2026-10-01 09:00:00'
+                campaign_code: EXAMPLE-01
+                abn: '11111111111'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: lead has no abn set -- set one before converting
+  /marketing/api-mail-templates/index:
+    get:
+      tags:
+        - Marketing Mail Templates
+      operationId: mkt_api_mail_templates_index
+      summary: List mail templates
+      description: 'All templates ordered by name (not paged), including full bodies. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Templates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktMailTemplateList'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+  /marketing/api-mail-templates/view/{id}:
+    get:
+      tags:
+        - Marketing Mail Templates
+      operationId: mkt_api_mail_templates_view
+      summary: Get one mail template
+      description: 'Fetch a template by numeric id. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template id.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktMailTemplateEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+  /marketing/api-mail-templates/create:
+    post:
+      tags:
+        - Marketing Mail Templates
+      operationId: mkt_api_mail_templates_create
+      summary: Create a mail template
+      description: 'name and subject (trimmed) and body (non-blank) are required. Not idempotent. Creating a template does not attach it to a campaign; set mail_template_id via api-campaigns/update. Placeholders such as {{first_paragraph}} are rendered at send time. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktMailTemplateInput'
+            example:
+              name: Example template
+              subject: Hello
+              body: |-
+                {{first_paragraph}}
+
+                Kind regards
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktMailTemplateEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: name, subject, and body are required
+  /marketing/api-mail-templates/update/{id}:
+    post:
+      tags:
+        - Marketing Mail Templates
+      operationId: mkt_api_mail_templates_update
+      summary: Update a mail template
+      description: 'Partial update of name, subject, body; any provided field must be non-blank. Edits affect every campaign using the template from its next send. Idempotent. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template id.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktMailTemplateUpdate'
+            example:
+              subject: Updated subject
+      responses:
+        '200':
+          description: Updated template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktMailTemplateEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: subject cannot be blank
+  /marketing/api-prospects/index:
+    get:
+      tags:
+        - Marketing Prospects
+      operationId: mkt_api_prospects_index
+      summary: List a campaign's prospects
+      description: 'Campaign members enriched with qualification score and best contact (view v_campaign_prospects). campaign is required (an unfiltered default once took the app down). Prospects are imported by pipeline, there is no create or delete. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: campaign
+          in: query
+          required: true
+          description: Campaign code (required).
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Filter by outreach_status. Values outside this list are silently ignored; note "unsubscribed" is a real stored status but is NOT in this list, so it cannot be filtered here.
+          schema:
+            type: string
+            enum:
+              - not contacted
+              - sent
+              - replied
+              - call booked
+              - quoted
+              - won
+              - lost
+              - 'no'
+        - name: q
+          in: query
+          required: false
+          description: 'Case-insensitive substring search (ILIKE) over: abn, main_ent_name, domain, best_contact_value, best_contact_person_name.'
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: Sort key; unknown values fall back to the default (score).
+          schema:
+            type: string
+            enum:
+              - score
+              - name
+              - status
+              - updated
+              - priority
+            default: score
+        - name: dir
+          in: query
+          required: false
+          description: Sort direction; anything other than asc is treated as desc. NULLs always sort last.
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - name: page
+          in: query
+          required: false
+          description: Page number, clamped into 1..total_pages.
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          required: false
+          description: Rows per page (default 25). Not capped in code; 0 or negative values are not guarded (see notes).
+          schema:
+            type: integer
+            default: 25
+      responses:
+        '200':
+          description: Page of prospects.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktProspectList'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: campaign query param is required
+  /marketing/api-prospects/view/{campaignCode}/{abn}:
+    get:
+      tags:
+        - Marketing Prospects
+      operationId: mkt_api_prospects_view
+      summary: Get one prospect
+      description: 'Fetch a prospect by campaign code and ABN. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: campaignCode
+          in: path
+          required: true
+          description: Campaign code.
+          schema:
+            type: string
+        - name: abn
+          in: path
+          required: true
+          description: ABN (11 digits, no spaces).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The prospect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktProspectEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+  /marketing/api-prospects/update/{campaignCode}/{abn}:
+    post:
+      tags:
+        - Marketing Prospects
+      operationId: mkt_api_prospects_update
+      summary: Update a prospect
+      description: 'Writable: outreach_status, priority (null or 0-10), first_paragraph, notes. approach_type is read-only. outreach_status is limited to the eight values listed (a stored status of "unsubscribed" cannot be set or restored here: to suppress an address use api-unsubscribes/create). Changing outreach_status stamps status_changed. first_paragraph is the per-prospect text rendered into the campaign email. Idempotent. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: campaignCode
+          in: path
+          required: true
+          description: Campaign code.
+          schema:
+            type: string
+        - name: abn
+          in: path
+          required: true
+          description: ABN.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktProspectUpdate'
+            example:
+              outreach_status: call booked
+              priority: 3
+              notes: Phone call Tuesday
+      responses:
+        '200':
+          description: Updated prospect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktProspectEnvelope'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '404':
+          description: No row with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not found
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: invalid outreach_status
+  /marketing/api-unsubscribes/index:
+    get:
+      tags:
+        - Marketing Unsubscribes
+      operationId: mkt_api_unsubscribes_index
+      summary: Check or list suppressions
+      description: 'The global suppression list (abn_lookup.unsubscribes), keyed by lower-cased email and checked by every send regardless of campaign. With ?email= does an exact case-insensitive lookup (empty list means not suppressed); without it returns the 100 most recent. No paging. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action does not check the method, GET is the intended one.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: email
+          in: query
+          required: false
+          description: Address to look up.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Suppressions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktUnsubscribeList'
+              example:
+                unsubscribes:
+                  - email: person@example.invalid
+                    campaign_code: null
+                    reason: phone request
+                    unsubscribed_at: '2026-10-01 09:00:00'
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+  /marketing/api-unsubscribes/create:
+    post:
+      tags:
+        - Marketing Unsubscribes
+      operationId: mkt_api_unsubscribes_create
+      summary: Suppress an email address
+      description: 'Records a suppression and fans out to every campaign membership and send history sharing the address. Idempotent: re-suppressing is not an error and still re-runs the membership pass (this repairs visibility); only the status differs, 201 for a new suppression and 200 when already_suppressed. scope "entity" (default; anything other than "address" is treated as entity) means the person asked out: every membership that used the address becomes "unsubscribed" (only from "not contacted" or "sent"; later pipeline states such as replied/won are kept, the event row still records it). scope "address" means the inbox is dead or wrong: sends are marked bounced and memberships are re-opened as "not contacted" when the ABN has another usable unsuppressed email, otherwise set "unsubscribed". Because a reply often comes from a different address than the one mailed, unsubscribe_tokens (footer tokens quoted in the reply, minimum 16 chars after stripping non A-Za-z0-9_- characters, max 10) and related_emails (quoted To: addresses, only counted if we actually sent to them, max 10) are resolved to the originally mailed addresses and suppressed with the same scope; see related in the response. The address is lower-cased on storage. Callers: roles admin or agent only (API key via X-Api-Key or Authorization: Bearer, or a logged-in browser session; no CSRF check). The router accepts any HTTP method for this URL; the action returns 405 unless the method is POST.'
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktUnsubscribeRequest'
+            example:
+              email: person@example.invalid
+              reason: phone request
+              scope: entity
+              related_emails:
+                - colleague@example.invalid
+      responses:
+        '200':
+          description: Already suppressed (membership pass re-run).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktUnsubscribeResult'
+        '201':
+          description: Newly suppressed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktUnsubscribeResult'
+              example:
+                unsubscribe:
+                  email: person@example.invalid
+                  campaign_code: null
+                  reason: phone request
+                  unsubscribed_at: '2026-10-01 09:00:00'
+                already_suppressed: false
+                scope: entity
+                memberships: 1
+                members_updated: 1
+                members_reopened: 0
+                sends_bounced: 0
+                events_added: 1
+                related:
+                  colleague@example.invalid: suppressed
+        '401':
+          description: No valid session or API key (revoked, expired, unknown key, or owning user inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Not authenticated
+        '403':
+          description: Authenticated, but the caller holds none of the roles admin or agent (operator, charter_agent and member are refused).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Forbidden
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: a valid email is required
+  /api/leads/health-check:
+    post:
+      tags:
+        - Marketing Public Lead Capture
+      operationId: mkt_public_lead_capture_healthCheck
+      summary: Public landing-page lead form (Data Restore Audit enquiry)
+      description: 'Public, unauthenticated, CORS-enabled endpoint used by the static landing pages on https://deploy.xten.au and https://xten.au. The CORS allow-origin header is only echoed for those two origins, but the origin is not enforced server-side (other callers can still POST). Honeypot: if company_website is non-empty the request is silently dropped and answered with the same {ok:true} 200 (no lead stored), so do not fill it. Required: name, org and a valid email. ABN is resolved best-effort: a supplied abn that has 11 digits, passes the ATO checksum and is an active ABN wins; otherwise a unique match on the email domain (entity_domains) or exact normalised org name against active ABNs; ambiguity or no match leaves the lead unmatched (status "new"; matched leads get status "matched", contacts rows and a domain candidate). A notification email is sent to staff. Not idempotent: each valid POST stores a new lead. Never rejects a submission for a bad abn.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktPublicLeadRequest'
+            example:
+              name: Example Person
+              org: Example Pty Ltd
+              email: person@example.invalid
+              phone: '0400000000'
+              system: Windows file server
+              restored: Never
+              abn: '11222333444'
+              source: health-check-landing
+      responses:
+        '200':
+          description: Honeypot tripped (lead NOT stored) -- indistinguishable from success by design.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktOk'
+              example:
+                ok: true
+        '201':
+          description: Lead stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktOk'
+              example:
+                ok: true
+        '405':
+          description: Non-POST request to a write action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: POST required
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: name, org, and a valid email are required
+        '500':
+          description: The lead could not be saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: Could not save — please email deploy@xten.au directly
+    options:
+      tags:
+        - Marketing Public Lead Capture
+      operationId: mkt_public_lead_capture_healthCheck_preflight
+      summary: CORS preflight
+      description: Browser CORS preflight. Responds 204 with no body and Access-Control-Allow-Methods POST, OPTIONS; Access-Control-Allow-Origin is set only for https://deploy.xten.au and https://xten.au.
+      security: []
+      responses:
+        '204':
+          description: Preflight accepted (no body).
+  /marketing/webhook/resend:
+    post:
+      tags:
+        - Marketing Webhooks
+      operationId: mkt_webhook_resend
+      summary: Resend (Svix) webhook receiver
+      description: 'Called only by Resend''s servers; not for API clients. Authenticated by Svix signature instead of an API key: headers svix-id, svix-timestamp (must be within 300 seconds of server time) and svix-signature (space separated "v1,<base64>" values; any match is accepted) where the signature is base64(HMAC-SHA256(secret_bytes, "<svix-id>.<svix-timestamp>.<raw body>")) and secret_bytes is the base64-decoded part of the configured whsec_ secret. Missing or wrong headers, an expired timestamp or an unconfigured secret all return 401. Events are matched to a send by data.email_id = campaign_sends.provider_message_id. email.bounced marks the send bounced; only a Permanent bounce (data.bounce.type) also suppresses the address at ADDRESS scope (Transient bounces never suppress). email.complained records complained_at and always suppresses the address (entity scope). Every other event type, a missing email_id or an unknown message id returns 200 {ok:true} so Resend does not retry. The method is not checked by the action; Resend sends POST.'
+      security: []
+      parameters:
+        - name: svix-id
+          in: header
+          required: true
+          description: Svix message id.
+          schema:
+            type: string
+        - name: svix-timestamp
+          in: header
+          required: true
+          description: Unix seconds; rejected if more than 300 s from server time.
+          schema:
+            type: string
+        - name: svix-signature
+          in: header
+          required: true
+          description: One or more space-separated "v1,<base64 signature>" values.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MktResendWebhookEvent'
+            example:
+              type: email.bounced
+              data:
+                email_id: example-message-id
+                bounce:
+                  type: Permanent
+      responses:
+        '200':
+          description: Accepted (including ignored events).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktOk'
+              example:
+                ok: true
+                note: no matching send
+        '400':
+          description: Body is not JSON or lacks type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: malformed payload
+        '401':
+          description: Signature verification failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MktError'
+              example:
+                error: invalid signature
+components:
+  schemas:
+    MktError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human readable message (for 422 from save failures, the model messages joined by ", ").
+      required:
+        - error
+    MktReplyTypeError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: unknown reply_type
+        reply_types:
+          type: array
+          items:
+            type: string
+            description: allowed value
+      required:
+        - error
+        - reply_types
+    MktOk:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        note:
+          type: string
+          description: Present on some webhook no-op responses.
+      required:
+        - ok
+    MktAddressInput:
+      type: object
+      properties:
+        abn:
+          type: string
+          nullable: true
+          description: ABN, not validated.
+        contact_id:
+          type: integer
+          nullable: true
+          description: abn_lookup.contacts id.
+        address_type:
+          type: string
+          description: Defaults to "unknown".
+          enum:
+            - unknown
+            - registered
+            - trading
+            - postal
+            - mailing
+        unit:
+          type: string
+          nullable: true
+          description: Unit/suite.
+        street_number:
+          type: string
+          nullable: true
+          description: Street number.
+        street_name:
+          type: string
+          nullable: true
+          description: Street name.
+        street_type:
+          type: string
+          nullable: true
+          description: Street type, e.g. St.
+        locality:
+          type: string
+          nullable: true
+          description: Suburb/city.
+        state_province:
+          type: string
+          nullable: true
+          description: State/province.
+        postcode:
+          type: string
+          nullable: true
+          description: Postcode.
+        country:
+          type: string
+          nullable: true
+          description: Country, default AU (ISO-3166 alpha-2 recommended, not enforced).
+        raw_input:
+          type: string
+          nullable: true
+          description: Original unparsed address.
+        gnaf_pid:
+          type: string
+          nullable: true
+          description: G-NAF persistent id.
+        validation_source:
+          type: string
+          nullable: true
+          enum:
+            - gnaf
+            - openaddresses
+            - manual
+            - null
+          description: Where the address was validated; changing it re-stamps validated_at.
+      description: All keys optional; omitted keys are unchanged (update) or defaulted (create). Non-null scalar values are cast to string. validation_source and address_type are enum-checked (422).
+    MktAddress:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Address id.
+        abn:
+          type: string
+          nullable: true
+          description: ABN, not validated.
+        contact_id:
+          type: integer
+          nullable: true
+          description: abn_lookup.contacts id.
+        address_type:
+          type: string
+          description: Defaults to "unknown".
+          enum:
+            - unknown
+            - registered
+            - trading
+            - postal
+            - mailing
+        unit:
+          type: string
+          nullable: true
+          description: Unit/suite.
+        street_number:
+          type: string
+          nullable: true
+          description: Street number.
+        street_name:
+          type: string
+          nullable: true
+          description: Street name.
+        street_type:
+          type: string
+          nullable: true
+          description: Street type, e.g. St.
+        locality:
+          type: string
+          nullable: true
+          description: Suburb/city.
+        state_province:
+          type: string
+          nullable: true
+          description: State/province.
+        postcode:
+          type: string
+          nullable: true
+          description: Postcode.
+        country:
+          type: string
+          nullable: true
+          description: Country, default AU (ISO-3166 alpha-2 recommended, not enforced).
+        raw_input:
+          type: string
+          nullable: true
+          description: Original unparsed address.
+        gnaf_pid:
+          type: string
+          nullable: true
+          description: G-NAF persistent id.
+        validation_source:
+          type: string
+          nullable: true
+          enum:
+            - gnaf
+            - openaddresses
+            - manual
+            - null
+          description: Where the address was validated; changing it re-stamps validated_at.
+        validated_at:
+          type: string
+          nullable: true
+          description: validated_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+        extraction_method:
+          type: string
+          nullable: true
+          description: Defaults to "api" when created here.
+        created_at:
+          type: string
+          nullable: true
+          description: created_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+        updated_at:
+          type: string
+          nullable: true
+          description: updated_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+    MktAddressEnvelope:
+      type: object
+      properties:
+        address:
+          $ref: '#/components/schemas/MktAddress'
+      required:
+        - address
+    MktAddressList:
+      type: object
+      properties:
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MktAddress'
+        page:
+          type: integer
+          description: Current page.
+        total_pages:
+          type: integer
+          description: Total pages.
+        total:
+          type: integer
+          description: Total rows.
+        per_page:
+          type: integer
+          description: Page size.
+      required:
+        - addresses
+        - page
+        - total_pages
+        - total
+        - per_page
+    MktCampaign:
+      type: object
+      properties:
+        campaign_code:
+          type: string
+          description: Primary key.
+        title:
+          type: string
+          nullable: true
+          description: Title.
+        description:
+          type: string
+          nullable: true
+          description: Description.
+        status:
+          type: string
+          description: Send state.
+          enum:
+            - planning
+            - active
+            - paused
+            - closed
+        mail_template_id:
+          type: integer
+          nullable: true
+          description: Template used for sends; null means never sends.
+        daily_send_limit:
+          type: integer
+          description: Max sends per day.
+    MktCampaignEnvelope:
+      type: object
+      properties:
+        campaign:
+          $ref: '#/components/schemas/MktCampaign'
+      required:
+        - campaign
+    MktCampaignList:
+      type: object
+      properties:
+        campaigns:
+          type: array
+          items:
+            $ref: '#/components/schemas/MktCampaign'
+      required:
+        - campaigns
+    MktCampaignUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          description: New status.
+          enum:
+            - planning
+            - active
+            - paused
+            - closed
+        daily_send_limit:
+          type: integer
+          description: Whole number >= 1 (numeric strings accepted).
+          minimum: 1
+        mail_template_id:
+          type: integer
+          nullable: true
+          description: Template id, or null to unset.
+    MktClaimList:
+      type: object
+      properties:
+        claims:
+          type: array
+          items:
+            type: object
+            properties:
+              abn:
+                type: string
+                description: Claimed ABN.
+              portal_type:
+                type: string
+                description: Portal type.
+              tier:
+                type: string
+                description: Subscription tier.
+              status:
+                type: string
+                description: verified or subscribed.
+                enum:
+                  - verified
+                  - subscribed
+              claimed_by_name:
+                type: string
+                nullable: true
+                description: Claimant name.
+              matched_email:
+                type: string
+                description: Lower-cased claimed_by_email that matched.
+      required:
+        - claims
+    MktRedirectRequest:
+      type: object
+      properties:
+        old_email:
+          type: string
+          description: The closing mailbox; must be a valid email.
+          format: email
+        new_emails:
+          type: array
+          items:
+            type: string
+            description: Replacement address.
+            format: email
+        reason:
+          type: string
+          description: Recorded reason; defaults to "dead mailbox autoresponder".
+        allow_cross_domain:
+          type: boolean
+          default: false
+          description: Permit replacements on a different domain than old_email.
+      required:
+        - old_email
+    MktRedirectResult:
+      type: object
+      properties:
+        old_email:
+          type: string
+          description: Normalised (lower-cased) old address.
+        already_suppressed:
+          type: boolean
+        new_emails:
+          type: array
+          items:
+            type: string
+            description: Accepted replacement.
+        rejected:
+          type: array
+          items:
+            type: object
+            properties:
+              email:
+                type: string
+                description: Rejected address.
+              why:
+                type: string
+                description: invalid or same as old_email | different domain
+        abns:
+          type: array
+          items:
+            type: string
+            description: ABN the old address was a contact for.
+        contacts_added:
+          type: integer
+          description: New contact rows inserted.
+        memberships:
+          type: integer
+          description: Memberships touched.
+        members_reopened:
+          type: integer
+          description: Memberships re-opened as not contacted.
+        members_unsubscribed:
+          type: integer
+          description: Memberships set unsubscribed (nothing else to reach).
+        sends_bounced:
+          type: integer
+          description: Sends marked bounced.
+    MktRepliedRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Replying address.
+          format: email
+        reply_type:
+          type: string
+          description: Defaults to "replied"; case-insensitive.
+          enum:
+            - interested
+            - not_now
+            - unsubscribe
+            - out_of_office
+            - bounce_text
+            - replied
+          default: replied
+        note:
+          type: string
+          description: Free text, first 300 chars stored.
+        source:
+          type: string
+          description: Reporter label, default "tim".
+          default: tim
+      required:
+        - email
+    MktRepliedResult:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Normalised address.
+        reply_type:
+          type: string
+          description: Normalised reply type.
+        memberships:
+          type: integer
+          description: Memberships matched.
+        marked_replied:
+          type: integer
+          description: Moved to replied.
+        noted_only:
+          type: integer
+          description: Only annotated.
+        kept_statuses:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Counts of noted-only memberships by their existing outreach_status.
+    MktLead:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Lead id.
+        source:
+          type: string
+          description: Origin, default "api".
+        product:
+          type: string
+          nullable: true
+          description: Product.
+        name:
+          type: string
+          description: Name.
+        org:
+          type: string
+          description: Organisation.
+        email:
+          type: string
+          description: Email.
+        phone:
+          type: string
+          nullable: true
+          description: Phone.
+        system_desc:
+          type: string
+          nullable: true
+          description: System description.
+        notes:
+          type: string
+          nullable: true
+          description: Notes.
+        abn:
+          type: string
+          nullable: true
+          description: ABN.
+        status:
+          type: string
+          description: Lead status.
+          enum:
+            - new
+            - matched
+            - contacted
+            - converted
+            - declined
+        created_at:
+          type: string
+          nullable: true
+          description: created_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+    MktLeadEnvelope:
+      type: object
+      properties:
+        lead:
+          $ref: '#/components/schemas/MktLead'
+      required:
+        - lead
+    MktLeadList:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Rows matching the filters.
+        limit:
+          type: integer
+          description: Applied limit.
+        offset:
+          type: integer
+          description: Applied offset.
+        leads:
+          type: array
+          items:
+            $ref: '#/components/schemas/MktLead'
+      required:
+        - total
+        - limit
+        - offset
+        - leads
+    MktLeadCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Required, non-empty after trim.
+        org:
+          type: string
+          description: Required, non-empty after trim.
+        email:
+          type: string
+          description: Required, valid email.
+          format: email
+        source:
+          type: string
+          description: Default "api".
+        product:
+          type: string
+          description: Optional.
+        phone:
+          type: string
+          description: Optional.
+        system_desc:
+          type: string
+          description: Optional.
+        notes:
+          type: string
+          description: Optional.
+        abn:
+          type: string
+          description: Optional, not validated.
+      required:
+        - name
+        - org
+        - email
+    MktLeadUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          description: New status.
+          enum:
+            - new
+            - matched
+            - contacted
+            - converted
+            - declined
+        notes:
+          type: string
+          nullable: true
+          description: Notes or null.
+        abn:
+          type: string
+          nullable: true
+          description: ABN or null (not validated).
+    MktLeadConvert:
+      type: object
+      properties:
+        campaign_code:
+          type: string
+          description: Existing campaign code (422 "invalid campaign_code" otherwise).
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 10
+          nullable: true
+          description: Optional member priority 0-10 (422 "priority must be a whole number 0-10" otherwise).
+      required:
+        - campaign_code
+    MktLeadConvertResult:
+      type: object
+      properties:
+        lead:
+          $ref: '#/components/schemas/MktLead'
+        campaign_code:
+          type: string
+          description: Campaign.
+        abn:
+          type: string
+          description: Lead ABN.
+    MktMailTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Template id.
+        name:
+          type: string
+          description: Name.
+        subject:
+          type: string
+          description: Subject.
+        body:
+          type: string
+          description: Body.
+        created_at:
+          type: string
+          nullable: true
+          description: created_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+        updated_at:
+          type: string
+          nullable: true
+          description: updated_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+    MktMailTemplateEnvelope:
+      type: object
+      properties:
+        mail_template:
+          $ref: '#/components/schemas/MktMailTemplate'
+      required:
+        - mail_template
+    MktMailTemplateList:
+      type: object
+      properties:
+        mail_templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/MktMailTemplate'
+      required:
+        - mail_templates
+    MktMailTemplateInput:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Required, non-empty after trim.
+        subject:
+          type: string
+          description: Required, non-empty after trim.
+        body:
+          type: string
+          description: Required, not blank.
+      required:
+        - name
+        - subject
+        - body
+    MktMailTemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Non-blank if present.
+        subject:
+          type: string
+          description: Non-blank if present.
+        body:
+          type: string
+          description: Non-blank if present.
+    MktProspect:
+      type: object
+      properties:
+        campaign_code:
+          type: string
+          description: Campaign.
+        abn:
+          type: string
+          description: ABN.
+        main_ent_name:
+          type: string
+          nullable: true
+          description: Entity name.
+        domain:
+          type: string
+          nullable: true
+          description: Website domain.
+        score:
+          type: integer
+          nullable: true
+          description: Qualification score.
+        band:
+          type: string
+          nullable: true
+          description: Score band.
+        tech:
+          type: string
+          nullable: true
+          description: Detected tech (type not confirmed from code).
+        business_type:
+          type: string
+          nullable: true
+          description: Business type.
+        reasons:
+          type: string
+          nullable: true
+          description: Qualification reasons (type not confirmed from code).
+        outreach_status:
+          type: string
+          description: Pipeline state. "unsubscribed" can appear here though it is not settable via this API.
+          enum:
+            - not contacted
+            - sent
+            - replied
+            - call booked
+            - quoted
+            - won
+            - lost
+            - 'no'
+            - unsubscribed
+        notes:
+          type: string
+          nullable: true
+          description: Notes.
+        first_paragraph:
+          type: string
+          nullable: true
+          description: Per-prospect email paragraph.
+        priority:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 10
+          description: Send priority.
+        approach_type:
+          type: string
+          nullable: true
+          description: Read-only.
+        added_at:
+          type: string
+          nullable: true
+          description: added_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+        status_changed:
+          type: string
+          nullable: true
+          description: status_changed (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+        best_contact_kind:
+          type: string
+          nullable: true
+          description: email, phone etc.
+        best_contact_value:
+          type: string
+          nullable: true
+          description: Best contact (suppressed emails are skipped when picking).
+        best_contact_person_name:
+          type: string
+          nullable: true
+          description: Contact person.
+    MktProspectEnvelope:
+      type: object
+      properties:
+        prospect:
+          $ref: '#/components/schemas/MktProspect'
+      required:
+        - prospect
+    MktProspectList:
+      type: object
+      properties:
+        prospects:
+          type: array
+          items:
+            $ref: '#/components/schemas/MktProspect'
+        page:
+          type: integer
+          description: Page.
+        total_pages:
+          type: integer
+          description: Total pages.
+        total:
+          type: integer
+          description: Total rows.
+        per_page:
+          type: integer
+          description: Page size.
+      required:
+        - prospects
+        - page
+        - total_pages
+        - total
+        - per_page
+    MktProspectUpdate:
+      type: object
+      properties:
+        outreach_status:
+          type: string
+          description: Stamps status_changed when changed.
+          enum:
+            - not contacted
+            - sent
+            - replied
+            - call booked
+            - quoted
+            - won
+            - lost
+            - 'no'
+        priority:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 10
+          description: null or 0-10.
+        first_paragraph:
+          type: string
+          nullable: true
+          description: Text or null.
+        notes:
+          type: string
+          nullable: true
+          description: Text or null.
+    MktUnsubscribe:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Lower-cased address.
+        campaign_code:
+          type: string
+          nullable: true
+          description: Campaign it came from (informational; suppression is global).
+        reason:
+          type: string
+          nullable: true
+          description: Reason.
+        unsubscribed_at:
+          type: string
+          nullable: true
+          description: unsubscribed_at (Postgres timestamp, "YYYY-MM-DD HH:MM:SS", no timezone).
+          example: '2026-10-01 09:00:00'
+    MktUnsubscribeList:
+      type: object
+      properties:
+        unsubscribes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MktUnsubscribe'
+      required:
+        - unsubscribes
+    MktUnsubscribeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Valid email to suppress.
+          format: email
+        campaign_code:
+          type: string
+          description: Optional, recorded only.
+        reason:
+          type: string
+          description: Default "phone request".
+        scope:
+          type: string
+          description: Default entity; any other value is treated as entity.
+          enum:
+            - entity
+            - address
+          default: entity
+        unsubscribe_tokens:
+          type: array
+          items:
+            type: string
+            description: Footer token from a quoted email.
+        related_emails:
+          type: array
+          items:
+            type: string
+            description: 'Quoted To: address.'
+            format: email
+      required:
+        - email
+    MktUnsubscribeResult:
+      type: object
+      properties:
+        unsubscribe:
+          $ref: '#/components/schemas/MktUnsubscribe'
+        already_suppressed:
+          type: boolean
+        scope:
+          type: string
+          description: Applied scope.
+          enum:
+            - entity
+            - address
+        memberships:
+          type: integer
+          description: Memberships that used the address.
+        members_updated:
+          type: integer
+          description: Set to unsubscribed.
+        members_reopened:
+          type: integer
+          description: Re-opened (address scope).
+        sends_bounced:
+          type: integer
+          description: Sends marked bounced (address scope).
+        events_added:
+          type: integer
+          description: Send-history event rows written.
+        related:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - suppressed
+              - already_suppressed
+          description: Originally mailed addresses also suppressed, keyed by address.
+    MktPublicLeadRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Required.
+        org:
+          type: string
+          description: Required.
+        email:
+          type: string
+          description: Required, valid.
+          format: email
+        phone:
+          type: string
+          description: Optional.
+        system:
+          type: string
+          description: Stored as system_desc.
+        restored:
+          type: string
+          description: Ever restored a backup?
+        notes:
+          type: string
+          description: Optional.
+        product:
+          type: string
+          description: Optional.
+        source:
+          type: string
+          description: Default "unknown".
+        abn:
+          type: string
+          description: Optional; ignored if invalid or not active.
+        company_website:
+          type: string
+          description: 'Honeypot: must be empty/absent.'
+      required:
+        - name
+        - org
+        - email
+    MktResendWebhookEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Resend event type, e.g. email.bounced, email.complained, email.delivered.
+        data:
+          type: object
+          properties:
+            email_id:
+              type: string
+              description: Resend message id, matched to campaign_sends.provider_message_id.
+            bounce:
+              type: object
+              properties:
+                type:
+                  type: string
+                  description: Permanent suppresses; anything else does not.
+            bounce_type:
+              type: string
+              description: Fallback location for the bounce type.
+          additionalProperties: true
+      required:
+        - type
+      additionalProperties: true
