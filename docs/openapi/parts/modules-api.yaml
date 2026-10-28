@@ -1875,6 +1875,11 @@ paths:
           required: false
           description: User id or `me`.
           schema: { type: string, example: "12" }
+        - name: target_mode
+          in: query
+          required: false
+          description: "`once`, `ongoing`, or `any` (every local-agent handover)."
+          schema: { type: string, enum: [once, ongoing, any] }
         - name: since
           in: query
           required: false
@@ -2012,7 +2017,7 @@ paths:
       operationId: maama_handovers_update
       summary: Update a handover (any subset of fields) and record a trail entry
       description: |
-        Roles admin, operator, agent. Any subset of subject, type, priority, status, owner_user_id (null clears), target_user_id, source_session, context, content, related, plus an optional `note` recorded on the trail. A text field sent as null or blank is stored as null. A trail entry is written when a note is given or the status changes. Source user is not changeable. 415 for a session caller without a JSON Content-Type; 405 for non-POST.
+        Roles admin, operator, agent. Any subset of subject, type, priority, status, owner_user_id (null clears), target_user_id, source_session, context, content, related, est_time, target_mode, status_note, register_note, plus an optional `note` recorded on the trail and an optional `expect_status` precondition (409 when the status is already different). A text field sent as null or blank is stored as null. A trail entry is written when a note is given or the status changes. Source user is not changeable. 415 for a session caller without a JSON Content-Type; 405 for non-POST.
       security:
         - ApiKeyAuth: []
         - BearerAuth: []
@@ -2059,8 +2064,76 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MaamaError" }
+        "409":
+          description: "`expect_status` given and the handover's status is different."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
         "422":
           description: Invalid field, empty subject, unknown user, or save failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+
+  /maama/api/handovers/claim/{id}:
+    post:
+      tags: [MAAMA]
+      operationId: maama_handovers_claim
+      summary: Claim a handover (compare-and-set Open to In progress)
+      description: |
+        Roles admin, operator, agent. In one statement, sets status `in_progress` and the caller as owner only if the status is still `open` (or the optional `expect_status`), and appends a trail entry. 409 when someone else already changed the status, so two runners or a restart never take the same job. Optional body `{note, expect_status}`. 415 for a session caller without a JSON Content-Type; 405 for non-POST.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string }
+                expect_status: { $ref: "#/components/schemas/MaamaStatus" }
+            example: { note: Claimed by jan-runner. }
+      responses:
+        "200":
+          description: Claimed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handover]
+                properties:
+                  handover: { $ref: "#/components/schemas/MaamaHandoverDetail" }
+        "401":
+          description: No valid session or API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "403":
+          description: Role not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "405":
+          description: Method other than POST.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "409":
+          description: Not claimed; the status is no longer the expected one.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaamaError" }
+        "422":
+          description: Invalid `expect_status`.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MaamaError" }
@@ -3205,11 +3278,15 @@ components:
         type: { type: string, example: handover }
         priority: { $ref: "#/components/schemas/MaamaPriority" }
         status: { $ref: "#/components/schemas/MaamaStatus" }
-        subject: { type: string, maxLength: 200 }
+        subject: { type: string, maxLength: 600 }
         source_session: { type: string, nullable: true }
         context: { type: string, nullable: true }
         content: { type: string, nullable: true }
         related: { type: string, nullable: true }
+        est_time: { type: string, nullable: true, description: "As in the register: `<5m`, `15m`, `2h`, `1h/run`, `?`." }
+        target_mode: { type: string, nullable: true, enum: [once, ongoing], description: Local (Gwen) agent mode; null for other targets. }
+        status_note: { type: string, nullable: true, description: Free text beside status. }
+        register_note: { type: string, nullable: true, description: The register's short Notes column. }
         created_at: { type: string }
         updated_at: { type: string }
     MaamaHandoverDetail:
@@ -3225,21 +3302,26 @@ components:
                   id: { type: integer }
                   actor: { $ref: "#/components/schemas/MaamaUser" }
                   note: { type: string, nullable: true }
+                  actor_label: { type: string, nullable: true, description: Actor string as written in an imported detail file; null for entries made in the module. }
                   status_after: { $ref: "#/components/schemas/MaamaStatus" }
                   created_at: { type: string }
     MaamaHandoverCreateRequest:
       type: object
       required: [subject, target_user_id]
       properties:
-        subject: { type: string, maxLength: 200 }
+        subject: { type: string, maxLength: 600 }
         target_user_id: { type: integer, minimum: 1, description: An existing user id (integer or digit string). }
         priority: { $ref: "#/components/schemas/MaamaPriority" }
         owner_user_id: { type: integer, nullable: true }
-        type: { type: string, maxLength: 50, default: handover }
-        source_session: { type: string, maxLength: 100 }
+        type: { type: string, maxLength: 200, default: handover }
+        source_session: { type: string, maxLength: 300 }
         context: { type: string }
         content: { type: string }
         related: { type: string }
+        est_time: { type: string, maxLength: 40 }
+        target_mode: { type: string, nullable: true, enum: [once, ongoing] }
+        status_note: { type: string, nullable: true }
+        register_note: { type: string, nullable: true }
     MaamaHandoverUpdateRequest:
       type: object
       properties:
@@ -3248,11 +3330,16 @@ components:
         owner_user_id: { type: integer, nullable: true }
         priority: { $ref: "#/components/schemas/MaamaPriority" }
         status: { $ref: "#/components/schemas/MaamaStatus" }
-        type: { type: string, maxLength: 50 }
-        source_session: { type: string, maxLength: 100, nullable: true }
+        type: { type: string, maxLength: 200 }
+        source_session: { type: string, maxLength: 300, nullable: true }
         context: { type: string, nullable: true }
         content: { type: string, nullable: true }
         related: { type: string, nullable: true }
+        est_time: { type: string, maxLength: 40, nullable: true }
+        target_mode: { type: string, nullable: true, enum: [once, ongoing] }
+        status_note: { type: string, nullable: true }
+        register_note: { type: string, nullable: true }
+        expect_status: { $ref: "#/components/schemas/MaamaStatus", description: "Precondition: 409 if the handover's status is not this." }
         note: { type: string, description: Recorded on the trail entry. }
     MaamaNoteRequest:
       type: object
