@@ -40,6 +40,18 @@ return [
         // directory-module authors claims as Tim (user 8), MAA-20260925-007
         'tim_api_token' => '${DOLIBARR_TIM_TOKEN:-}',
     ],
+    // hosting plugin (XTen.Hosting v2). php-fpm does not see the container environment, so the plugin reads these from
+    // config, like everything else here. All empty by default. dolibarr_* is the hosting module's OWN Dolibarr (it never
+    // uses the general dolibarr.api_token above): leave empty and the module does nothing.
+    'hosting' => [
+        'resellers_api_host'     => '${RESELLERS_API_HOST:-}',
+        'resellers_api_username' => '${RESELLERS_API_USERNAME:-}',
+        'resellers_api_password' => '${RESELLERS_API_PASSWORD:-}',
+        'live'                   => '${HOSTING_LIVE:-}',
+        'vault_key'              => '${HOSTING_VAULT_KEY:-}',
+        'dolibarr_base_url'      => '${HOSTING_DOLIBARR_BASE_URL:-}',
+        'dolibarr_token'         => '${HOSTING_DOLIBARR_TOKEN:-}',
+    ],
     // Licence server for paid modules (App_skeleton\LicenseManager).
     // Empty means XTen's own; set LICENSE_SERVER_URL only to use another.
     'licensing' => [
