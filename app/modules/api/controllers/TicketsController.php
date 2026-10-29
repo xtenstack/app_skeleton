@@ -367,6 +367,32 @@ class TicketsController extends ControllerBase
     }
 
     /**
+     * Public follow-up from the service/game that originally raised the
+     * ticket. The API key must be the ticket's reporter key, so a client can
+     * add context to its own ticket without gaining staff reply or note
+     * authority. A follow-up on a closed ticket reopens it (same field reset
+     * as the staff "Reopen" action); other statuses are left alone.
+     */
+    public function clientReplyAction($id)
+    {
+        if (!$this->request->isPost()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'POST required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+
+        if (!$ticket || !$this->raisedByCaller($ticket)) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        return $this->createMessage($id, \TicketMessages::VISIBILITY_PUBLIC, false);
+    }
+
+    /**
      * The ticket's conversation, ascending by message id, after an
      * optional ?after_id= cursor (and ?limit=, default 100, max 200).
      * Staff see public and internal messages. Anyone else sees only the
@@ -466,7 +492,7 @@ class TicketsController extends ControllerBase
         return $userId !== null && $ticket->reporter_user_id !== null && (int) $ticket->reporter_user_id === $userId;
     }
 
-    private function createMessage($id, string $visibility)
+    private function createMessage($id, string $visibility, bool $staffOnly = true)
     {
         if (!$this->request->isPost()) {
             $this->response->setStatusCode(405, 'Method Not Allowed');
@@ -474,7 +500,7 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'POST required']);
         }
 
-        if (!$this->isStaff()) {
+        if ($staffOnly && !$this->isStaff()) {
             $this->response->setStatusCode(403, 'Forbidden');
 
             return $this->response->setJsonContent(['error' => 'Forbidden']);
@@ -519,7 +545,7 @@ class TicketsController extends ControllerBase
                     return $this->response->setJsonContent(['error' => 'external_ref was already used for a different message']);
                 }
 
-                return $this->response->setJsonContent(['message' => $this->serializeMessage($existing, true), 'duplicate' => true]);
+                return $this->response->setJsonContent(['message' => $this->serializeMessage($existing, $staffOnly), 'duplicate' => true]);
             }
         }
 
@@ -537,11 +563,18 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => implode(', ', $message->getMessages())]);
         }
 
+        if (!$staffOnly && $ticket->status === 'closed') {
+            $ticket->status         = 'open';
+            $ticket->closed_at      = null;
+            $ticket->auto_closed_at = null;
+            $ticket->close_reason   = null;
+        }
+
         $ticket->save(); // bumps updated_at so the ticket sorts as recently active
 
         $this->response->setStatusCode(201, 'Created');
 
-        return $this->response->setJsonContent(['message' => $this->serializeMessage($message, true), 'duplicate' => false]);
+        return $this->response->setJsonContent(['message' => $this->serializeMessage($message, $staffOnly), 'duplicate' => false]);
     }
 
     /**
