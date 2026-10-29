@@ -178,6 +178,83 @@ final class ApiTicketMessagesTest extends TestCase
         $this->assertSame(0, \TicketMessages::count(['conditions' => 'ticket_id = :t:', 'bind' => ['t' => (int) $ticket->id]]));
     }
 
+    public function testRaisingClientCanAddPublicFollowUpsAndRetryIdempotently(): void
+    {
+        $ticket = $this->ticketRaisedBy(self::$serviceKeyId, self::$serviceUserId);
+        $client = new HttpClient();
+        $body   = ['body' => 'Additional reproduction details', 'external_ref' => 'xwar-follow-up-1'];
+
+        $created = $client->postJson(
+            "/api/tickets/client-reply/{$ticket->id}",
+            $body,
+            ['X-Api-Key: ' . self::$serviceToken]
+        );
+        $repeat = $client->postJson(
+            "/api/tickets/client-reply/{$ticket->id}",
+            $body,
+            ['X-Api-Key: ' . self::$serviceToken]
+        );
+
+        $this->assertSame(201, $created['status'], $created['body']);
+        $this->assertSame(200, $repeat['status'], $repeat['body']);
+
+        $createdPayload = json_decode($created['body'], true);
+        $repeatPayload  = json_decode($repeat['body'], true);
+
+        $this->assertFalse($createdPayload['duplicate']);
+        $this->assertTrue($repeatPayload['duplicate']);
+        $this->assertSame($createdPayload['message']['id'], $repeatPayload['message']['id']);
+        $this->assertSame('public', $createdPayload['message']['visibility']);
+        $this->assertArrayNotHasKey('author_user_id', $createdPayload['message']);
+        $this->assertArrayNotHasKey('external_ref', $createdPayload['message']);
+        $this->assertSame(1, \TicketMessages::count(['conditions' => 'ticket_id = :t:', 'bind' => ['t' => (int) $ticket->id]]));
+
+        $staff = $this->operator()->getWithHeaders("/api/tickets/messages/{$ticket->id}");
+        $staffPayload = json_decode($staff['body'], true);
+        $this->assertSame('xwar-follow-up-1', $staffPayload['messages'][0]['external_ref']);
+
+        $this->assertSame(
+            404,
+            $client->postJson(
+                "/api/tickets/client-reply/{$ticket->id}",
+                ['body' => 'wrong reporter'],
+                ['X-Api-Key: ' . self::$otherToken]
+            )['status']
+        );
+
+        $ticket->status = 'closed';
+        self::assertTrue($ticket->save());
+        $closedReply = $client->postJson(
+            "/api/tickets/client-reply/{$ticket->id}",
+            ['body' => 'Follow-up after closure'],
+            ['X-Api-Key: ' . self::$serviceToken]
+        );
+        $this->assertSame(201, $closedReply['status'], $closedReply['body']);
+        $ticket->refresh();
+        $this->assertSame('open', $ticket->status);
+        $this->assertNull($ticket->closed_at);
+        $this->assertNull($ticket->close_reason);
+    }
+
+    public function testClientReplyRejectsAnonymousInternalVisibilityAndBadBodies(): void
+    {
+        $ticket = $this->ticketRaisedBy(self::$serviceKeyId, self::$serviceUserId);
+        $client = new HttpClient();
+        $url    = "/api/tickets/client-reply/{$ticket->id}";
+        $auth   = ['X-Api-Key: ' . self::$serviceToken];
+
+        $this->assertSame(401, $client->postJson($url, ['body' => 'hi'])['status']);
+        $this->assertSame(422, $client->postJson($url, ['body' => '  '], $auth)['status']);
+        $this->assertSame(422, $client->postJson($url, ['body' => 'x', 'external_ref' => str_repeat('r', 101)], $auth)['status']);
+
+        $forced = $client->postJson($url, ['body' => 'try internal', 'visibility' => 'internal'], $auth);
+        $this->assertSame(201, $forced['status'], $forced['body']);
+        $this->assertSame('public', json_decode($forced['body'], true)['message']['visibility']);
+
+        $client->postJson($url, ['body' => 'one', 'external_ref' => 'r1'], $auth);
+        $this->assertSame(409, $client->postJson($url, ['body' => 'changed', 'external_ref' => 'r1'], $auth)['status']);
+    }
+
     public function testCursorReturnsOnlyLaterMessagesAndRejectsAnUnknownCursor(): void
     {
         $ticket   = $this->ticketRaisedBy(self::$serviceKeyId, self::$serviceUserId);
