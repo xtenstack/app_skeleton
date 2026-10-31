@@ -129,6 +129,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         php8.3-curl \
         php8.3-mbstring \
         php8.3-intl \
+        php8.3-xml \
         msmtp \
         msmtp-mta \
         postgresql-client-18 \
