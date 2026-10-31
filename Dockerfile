@@ -43,7 +43,14 @@ FROM composer:2 AS vendor
 
 WORKDIR /app
 
-COPY composer.json composer.lock composer.local.jso[n] ./
+# auth.json (gitignored, optional) carries the credentials of a private
+# Composer repository named in composer.local.json, such as XTen's module
+# feed (docs/INTERNAL-MODULES.md, "Installing from the XTen module
+# feed"). Composer reads it from the project directory; the glob makes
+# the COPY a no-op when there is none. It stays in this vendor stage:
+# only vendor/ is copied forward, so the credentials never reach the
+# runtime image.
+COPY composer.json composer.lock composer.local.jso[n] auth.jso[n] ./
 COPY --from=internal-modules . /internal
 COPY --from=plugin-modules . /plugins
 COPY --from=application-modules . /applications

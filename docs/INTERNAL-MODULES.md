@@ -90,6 +90,53 @@ creates all three. An application module that depends on a plugin (Invo
 needs `xtendeploy/contacts`) needs the plugin's path repository present
 too.
 
+## Installing from the XTen module feed
+
+Paid catalogue modules (Contacts, Transactions, the AI SSA suite, ...) are
+delivered to a customer's instance from XTen's **private Composer
+repository** (the "module feed"), not from a sibling checkout: the module
+repos stay private and the feed is what the order gives access to. The
+instance needs two untracked files beside `composer.json`:
+
+```json
+// composer.local.json: the feed, and the modules this instance bought
+{
+    "repositories": [
+        { "type": "composer", "url": "https://<feed host>/composer/" }
+    ],
+    "require": {
+        "xtendeploy/contacts": "^1.2",
+        "xtendeploy/transactions": "^1.1"
+    }
+}
+```
+
+```json
+// auth.json: the credentials XTen issued with the order (never committed)
+{
+    "http-basic": {
+        "<feed host>": { "username": "<instance>", "password": "<feed password>" }
+    }
+}
+```
+
+Then `composer update`, `./run migrate run`, `./run modules sync`,
+`./run modules enable <key>`, and the licence key under **Licences**
+(docs/MODULE-SPEC.md, "Licensing"). Upgrading is `composer update
+xtendeploy/<module>` followed by `./run migrate run`. Versions are the
+feed's own (`contacts/v1.2.0` tags on the module monorepo); the
+Configuration page shows the installed one.
+
+The Docker build reads both files: `composer.local.json` as before and
+`auth.json` through the same `COPY` in the vendor stage (both are
+optional, both gitignored). `auth.json` never reaches the runtime image.
+`composer.lock` stays a trap here too: the feed's packages must not be
+committed into it (see below).
+
+A free module released under MIT (Announcements, Forum) needs no feed and
+no key: a `vcs` repository pointing at its public GitHub repo, or the path
+mechanism above, is enough.
+
 ## Setup
 
 ```bash
