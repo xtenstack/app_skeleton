@@ -133,7 +133,7 @@ class Tickets extends \Phalcon\Mvc\Model
             'bind'       => ['email' => $email],
         ]);
 
-        if ($assignee) {
+        if ($assignee instanceof \Users) {
             $this->assigned_to_user_id = (int) $assignee->id;
         }
     }
