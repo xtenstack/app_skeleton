@@ -144,12 +144,16 @@ forum.xten.au {
 # "username bcrypt-hash" lines into /opt/composer-feed/auth/users.caddy by
 # /opt/composer-feed/bin/feed-login sync (host cron, every minute; it reloads
 # Caddy when the file changes). Both paths are bind mounts in
-# docker-compose.prod.yml. An empty users file is valid and denies everyone.
+# docker-compose.prod.yml. An empty users file is valid and denies everyone;
+# the import is a glob so that a host without the mount (CI, local dev, where
+# the file does not exist) still gets a valid config (Caddy only warns on a
+# glob that matches nothing; a plain path that is missing is a hard error,
+# which took CI down on the first push of this block).
 # No CSP block: nothing here is a page.
 packages.xten.au {
     root * /composer-feed
     basic_auth {
-        import /composer-feed-auth/users.caddy
+        import /composer-feed-auth/*.caddy
     }
     header Cache-Control "no-store"
     file_server
