@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App_skeleton\Modules\Api\Controllers;
 
+use App_skeleton\Audit;
+
 /**
  * Scope: create + list + view + retest-result reporting, plus (as of
  * REQ-168) a manual closeAction() for admin/operator callers only, and
@@ -30,6 +32,12 @@ namespace App_skeleton\Modules\Api\Controllers;
  */
 class TicketsController extends ControllerBase
 {
+    /**
+     * Attachment types the API accepts — the same allowlist as the backend
+     * upload (TicketAttachmentActions::ALLOWED_ATTACHMENT_TYPES); keep the
+     * two in step. Type is detected from the file's content, never from
+     * the client's filename.
+     */
     private const ALLOWED_ATTACHMENT_TYPES = [
         'image/jpeg'      => 'jpg',
         'image/png'       => 'png',
@@ -41,6 +49,15 @@ class TicketsController extends ControllerBase
     ];
 
     private const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+    /**
+     * Uploads per principal user within UPLOAD_RATE_LIMIT_WINDOW before a
+     * 429. Higher than the backend's 20 because one relay key (a game's
+     * ticket bridge, e.g. XWar Legacy) uploads on behalf of all of that
+     * game's players.
+     */
+    private const UPLOAD_RATE_LIMIT_MAX    = 60;
+    private const UPLOAD_RATE_LIMIT_WINDOW = '-15 minutes';
 
     public function indexAction()
     {
@@ -182,6 +199,17 @@ class TicketsController extends ControllerBase
      * has the same allowlist and storage convention; this endpoint is the
      * server-to-server bridge used by XWar Legacy's in-game ticket form.
      */
+    /**
+     * Attach a file to a ticket (stack-internal ticket 99: XWar Legacy
+     * relays in-game ticket uploads here). Multipart POST; the first
+     * uploaded file is used. Who: staff (admin, operator) on any ticket;
+     * anyone else only on a ticket they raised (same key, or the reporting
+     * session user) — any other ticket is 404 so ids cannot be probed.
+     * Optional `external_ref` (up to 100 chars, unique per ticket) makes a
+     * retry after a timeout safe: a repeat with the same reference returns
+     * the attachment stored the first time (200, duplicate true) rather
+     * than a second copy.
+     */
     public function uploadAttachmentAction($id)
     {
         if (!$this->request->isPost()) {
@@ -197,6 +225,31 @@ class TicketsController extends ControllerBase
             $this->response->setStatusCode(404, 'Not Found');
 
             return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $externalRef = trim((string) $this->request->getPost('external_ref', 'string', ''));
+
+        if (strlen($externalRef) > 100) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'external_ref must be 100 characters or fewer']);
+        }
+
+        if ($externalRef !== '') {
+            $existing = $this->findAttachmentByRef((int) $ticket->id, $externalRef);
+
+            if ($existing) {
+                return $this->response->setJsonContent(['attachment' => $this->serializeAttachment($existing, $staff), 'duplicate' => true]);
+            }
+        }
+
+        $userId = (int) $this->principal['user_id'];
+
+        if ($this->isApiUploadRateLimited($userId)) {
+            $this->response->setStatusCode(429, 'Too Many Requests');
+            Audit::recordEvent('attachment_upload_blocked', $userId, ['ticket_id' => (int) $ticket->id, 'via' => 'api']);
+
+            return $this->response->setJsonContent(['error' => 'Too many uploads — wait a few minutes and try again']);
         }
 
         if (!$this->request->hasFiles()) {
@@ -228,6 +281,7 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'File must be between 1 byte and 10MB']);
         }
 
+        /** @psalm-suppress UndefinedConstant BASE_PATH is defined by the web bootstrap. */
         $dir = BASE_PATH . '/storage/ticket-attachments/' . (int) $ticket->id;
 
         if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
@@ -251,27 +305,114 @@ class TicketsController extends ControllerBase
         $attachment->original_filename   = str_replace('"', '', $file->getName());
         $attachment->mime_type           = $mime;
         $attachment->size_bytes          = $size;
-        $attachment->uploaded_by_user_id = (int) $this->principal['user_id'];
+        $attachment->uploaded_by_user_id = $userId;
+        $attachment->external_ref        = $externalRef !== '' ? $externalRef : null;
 
-        if (!$attachment->save()) {
+        try {
+            $saved = $attachment->save();
+        } catch (\Throwable $e) {
+            // The unique (ticket_id, external_ref) index is the usual cause:
+            // a concurrent retry stored the same reference between the
+            // lookup above and this insert. Resolved below like a repeat.
+            $saved = false;
+        }
+
+        if (!$saved) {
             unlink($path);
+
+            if ($externalRef !== '') {
+                $existing = $this->findAttachmentByRef((int) $ticket->id, $externalRef);
+
+                if ($existing) {
+                    return $this->response->setJsonContent(['attachment' => $this->serializeAttachment($existing, $staff), 'duplicate' => true]);
+                }
+            }
+
             $this->response->setStatusCode(422, 'Unprocessable Entity');
 
-            return $this->response->setJsonContent(['error' => implode(', ', $attachment->getMessages())]);
+            return $this->response->setJsonContent(['error' => implode(', ', array_map('strval', $attachment->getMessages()))]);
         }
 
         $this->response->setStatusCode(201, 'Created');
 
+        return $this->response->setJsonContent(['attachment' => $this->serializeAttachment($attachment, $staff), 'duplicate' => false]);
+    }
+
+    /**
+     * A ticket's attachments, ascending by id. Same scoping as
+     * messagesAction(): staff on any ticket, otherwise only a ticket the
+     * caller raised (404 for any other).
+     */
+    public function attachmentsAction($id)
+    {
+        if (!$this->request->isGet()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'GET required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+        $staff  = $this->isStaff();
+
+        if (!$ticket || (!$staff && !$this->raisedByCaller($ticket))) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
         return $this->response->setJsonContent([
-            'attachment' => [
-                'id'                => (int) $attachment->id,
-                'ticket_id'         => (int) $attachment->ticket_id,
-                'original_filename' => $attachment->original_filename,
-                'mime_type'         => $attachment->mime_type,
-                'size_bytes'        => (int) $attachment->size_bytes,
-                'created_at'        => $attachment->created_at,
-            ],
+            'ticket_id'   => (int) $ticket->id,
+            'attachments' => $this->serializeAttachments((int) $ticket->id, $staff),
         ]);
+    }
+
+    /**
+     * Streams one attachment's bytes with its stored mime type and the
+     * original filename as a download. Scoping as attachmentsAction().
+     */
+    public function downloadAttachmentAction($id, $attachmentId)
+    {
+        if (!$this->request->isGet()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'GET required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+
+        if (!$ticket || (!$this->isStaff() && !$this->raisedByCaller($ticket))) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $attachment = \TicketAttachments::findFirst([
+            'conditions' => 'id = :attachment_id: AND ticket_id = :ticket_id:',
+            'bind'       => ['attachment_id' => (int) $attachmentId, 'ticket_id' => (int) $ticket->id],
+        ]);
+
+        if (!$attachment instanceof \TicketAttachments) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $path = BASE_PATH . '/storage/ticket-attachments/' . (int) $attachment->ticket_id . '/' . $attachment->filename;
+
+        if (!is_file($path)) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Attachment file is missing on disk']);
+        }
+
+        // setFileToSend() streams via Response::send()'s own readfile(), not
+        // the content string the bootstrap echoes, so this sends and exits
+        // itself — same as the backend/frontend download actions.
+        $this->response->setContentType((string) $attachment->mime_type);
+        $this->response->setHeader('X-Content-Type-Options', 'nosniff');
+        $this->response->setFileToSend($path, str_replace('"', '', (string) $attachment->original_filename), true);
+        $this->response->send();
+        exit;
     }
 
     public function retestResultAction($id)
@@ -573,9 +714,13 @@ class TicketsController extends ControllerBase
                 'closed_at'    => $ticket->closed_at,
                 'close_reason' => $ticket->close_reason,
             ],
-            'messages' => array_map(fn (\TicketMessages $m) => $this->serializeMessage($m, $staff), $messages),
-            'last_id'  => $last,
-            'has_more' => $hasMore,
+            'messages'    => array_map(fn (\TicketMessages $m) => $this->serializeMessage($m, $staff), $messages),
+            'last_id'     => $last,
+            'has_more'    => $hasMore,
+            // Ticket-level, not paged: a file belongs to the ticket, not to
+            // one message, and this lets a staff reply's files reach the
+            // client that raised the ticket.
+            'attachments' => $this->serializeAttachments((int) $ticket->id, $staff),
         ]);
     }
 
@@ -708,6 +853,58 @@ class TicketsController extends ControllerBase
             $out['external_ref']       = $message->external_ref;
             $out['author_user_id']     = $message->author_user_id !== null ? (int) $message->author_user_id : null;
             $out['author_api_key_id']  = $message->author_api_key_id !== null ? (int) $message->author_api_key_id : null;
+        }
+
+        return $out;
+    }
+
+    private function findAttachmentByRef(int $ticketId, string $externalRef): ?\TicketAttachments
+    {
+        $found = \TicketAttachments::findFirst([
+            'conditions' => 'ticket_id = :ticket_id: AND external_ref = :external_ref:',
+            'bind'       => ['ticket_id' => $ticketId, 'external_ref' => $externalRef],
+        ]);
+
+        return $found instanceof \TicketAttachments ? $found : null;
+    }
+
+    private function isApiUploadRateLimited(int $userId): bool
+    {
+        $since = date('Y-m-d H:i:s', strtotime(self::UPLOAD_RATE_LIMIT_WINDOW));
+
+        return \TicketAttachments::count([
+            'conditions' => 'uploaded_by_user_id = :user_id: AND created_at >= :since:',
+            'bind'       => ['user_id' => $userId, 'since' => $since],
+        ]) >= self::UPLOAD_RATE_LIMIT_MAX;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function serializeAttachments(int $ticketId, bool $staffView): array
+    {
+        $rows = \TicketAttachments::find([
+            'conditions' => 'ticket_id = :ticket_id:',
+            'bind'       => ['ticket_id' => $ticketId],
+            'order'      => 'id ASC',
+        ]);
+
+        return array_map(fn (\TicketAttachments $a) => $this->serializeAttachment($a, $staffView), iterator_to_array($rows, false));
+    }
+
+    private function serializeAttachment(\TicketAttachments $attachment, bool $staffView): array
+    {
+        $out = [
+            'id'                => (int) $attachment->id,
+            'ticket_id'         => $attachment->ticket_id,
+            'original_filename' => $attachment->original_filename,
+            'mime_type'         => $attachment->mime_type,
+            'size_bytes'        => $attachment->size_bytes,
+            'created_at'        => $attachment->created_at,
+            'download_path'     => '/api/tickets/download-attachment/' . (int) $attachment->ticket_id . '/' . (int) $attachment->id,
+        ];
+
+        if ($staffView) {
+            $out['external_ref']        = $attachment->external_ref;
+            $out['uploaded_by_user_id'] = $attachment->uploaded_by_user_id !== null ? (int) $attachment->uploaded_by_user_id : null;
         }
 
         return $out;
