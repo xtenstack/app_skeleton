@@ -6,6 +6,8 @@ declare(strict_types=1);
  * stored outside public/ and served through
  * TicketsController::downloadAttachmentAction() rather than statically, since
  * attachment contents (e.g. a customer's phpinfo() dump) can be sensitive.
+ *
+ * @method static TicketAttachments|null findFirstById(int $id)
  */
 class TicketAttachments extends \Phalcon\Mvc\Model
 {
@@ -17,6 +19,12 @@ class TicketAttachments extends \Phalcon\Mvc\Model
     public $size_bytes;
     public $uploaded_by_user_id;
     public $created_at;
+
+    /**
+     * Caller-supplied retry key, unique per ticket (migration 030). Set only
+     * by API uploads; see Api\Controllers\TicketsController::uploadAttachmentAction().
+     */
+    public $external_ref;
 
     public function initialize(): void
     {
