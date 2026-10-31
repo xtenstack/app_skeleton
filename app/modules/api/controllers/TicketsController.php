@@ -30,6 +30,18 @@ namespace App_skeleton\Modules\Api\Controllers;
  */
 class TicketsController extends ControllerBase
 {
+    private const ALLOWED_ATTACHMENT_TYPES = [
+        'image/jpeg'      => 'jpg',
+        'image/png'       => 'png',
+        'image/webp'      => 'webp',
+        'image/gif'       => 'gif',
+        'text/plain'      => 'txt',
+        'text/html'       => 'html',
+        'application/pdf' => 'pdf',
+    ];
+
+    private const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
     public function indexAction()
     {
         $conditions = [];
@@ -161,6 +173,105 @@ class TicketsController extends ControllerBase
         }
 
         return $this->response->setJsonContent(['ticket' => $this->serialize($ticket)]);
+    }
+
+    /**
+     * Accept one attachment from the service that raised a ticket. The
+     * service API key is scoped to its own ticket, while staff may attach a
+     * file to any ticket they can triage. The browser-facing frontend already
+     * has the same allowlist and storage convention; this endpoint is the
+     * server-to-server bridge used by XWar Legacy's in-game ticket form.
+     */
+    public function uploadAttachmentAction($id)
+    {
+        if (!$this->request->isPost()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'POST required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+        $staff  = $this->isStaff();
+
+        if (!$ticket || (!$staff && !$this->raisedByCaller($ticket))) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        if (!$this->request->hasFiles()) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'attachment is required']);
+        }
+
+        $file = $this->request->getUploadedFiles()[0] ?? null;
+
+        if (!$file) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'attachment is required']);
+        }
+
+        $mime = $file->getRealType();
+        $size = (int) $file->getSize();
+
+        if (!isset(self::ALLOWED_ATTACHMENT_TYPES[$mime])) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'Unsupported file type']);
+        }
+
+        if ($size < 1 || $size > self::MAX_ATTACHMENT_BYTES) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'File must be between 1 byte and 10MB']);
+        }
+
+        $dir = BASE_PATH . '/storage/ticket-attachments/' . (int) $ticket->id;
+
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            $this->response->setStatusCode(500, 'Internal Server Error');
+
+            return $this->response->setJsonContent(['error' => 'Attachment storage is not writable']);
+        }
+
+        $filename = bin2hex(random_bytes(16)) . '.' . self::ALLOWED_ATTACHMENT_TYPES[$mime];
+        $path     = $dir . '/' . $filename;
+
+        if (!$file->moveTo($path)) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => 'Could not save attachment']);
+        }
+
+        $attachment                      = new \TicketAttachments();
+        $attachment->ticket_id           = (int) $ticket->id;
+        $attachment->filename            = $filename;
+        $attachment->original_filename   = str_replace('"', '', $file->getName());
+        $attachment->mime_type           = $mime;
+        $attachment->size_bytes          = $size;
+        $attachment->uploaded_by_user_id = (int) $this->principal['user_id'];
+
+        if (!$attachment->save()) {
+            unlink($path);
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => implode(', ', $attachment->getMessages())]);
+        }
+
+        $this->response->setStatusCode(201, 'Created');
+
+        return $this->response->setJsonContent([
+            'attachment' => [
+                'id'                => (int) $attachment->id,
+                'ticket_id'         => (int) $attachment->ticket_id,
+                'original_filename' => $attachment->original_filename,
+                'mime_type'         => $attachment->mime_type,
+                'size_bytes'        => (int) $attachment->size_bytes,
+                'created_at'        => $attachment->created_at,
+            ],
+        ]);
     }
 
     public function retestResultAction($id)
