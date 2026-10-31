@@ -15734,7 +15734,7 @@
         ],
         "operationId": "forum_events_create",
         "summary": "Submit a game event envelope",
-        "description": "Authenticated by `Authorization: Bearer <per-game key>` (or `X-Api-Key`): the key belongs to a per-game Stack service user. Authentication happens before the body is parsed. Any role resolves, but the principal's user id must equal the registered game's `service_user_id`; otherwise 403.\nOrder of checks: 401 (no/invalid key) -> 400 (body is not a JSON object; a JSON array or empty body counts) -> 404 (`game_key` missing, unknown, or the game is disabled) -> 403 (key not authorised for that game) -> 422 (envelope or payload invalid) -> store.\nIdempotency: `event_id` is unique. A replay of a stored `event_id` answers 202 `duplicate:true` and is not re-validated against the stored payload (the first accepted payload wins). The event is stored as pending and applied to Flarum asynchronously by the queue worker; 202 means stored, not applied. Every 4xx is permanent for the game (dead-letter), per the contract; the game treats any 2xx as delivered. Events for one lane (entity, or the player for membership events) are applied in `occurred_at` order.\n`event_id` must equal `{game_key}:{event_type}:{entity_key}:{sequence}`; the sequence is chosen by the game, unique per emission, and kept on retry.\nEvent types: user.upsert, alliance.upsert, membership.active, membership.revoked, alliance.archived, tutorial.post.upsert. Source of truth: plugins/forum/src/Envelope.php and plugins/docs/Forum-Service-Interface-v0.1.md.\n",
+        "description": "Authenticated by `Authorization: Bearer <per-game key>` (or `X-Api-Key`): the key belongs to a per-game Stack service user. Authentication happens before the body is parsed. Any role resolves, but the principal's user id must equal the registered game's `service_user_id`; otherwise 403.\nOrder of checks: 401 (no/invalid key) -> 400 (body is not a JSON object; a JSON array or empty body counts) -> 404 (`game_key` missing, unknown, or the game is disabled) -> 403 (key not authorised for that game) -> 422 (envelope or payload invalid) -> store.\nIdempotency: `event_id` is unique. A replay of a stored `event_id` answers 202 `duplicate:true` and is not re-validated against the stored payload (the first accepted payload wins). The event is stored as pending and applied to Flarum asynchronously by the queue worker; 202 means stored, not applied. Every 4xx is permanent for the game (dead-letter), per the contract; the game treats any 2xx as delivered. Events for one lane (entity, or the player for membership events) are applied in `occurred_at` order.\n`event_id` must equal `{game_key}:{event_type}:{entity_key}:{sequence}`; the sequence is chosen by the game, unique per emission, and kept on retry.\nEvent types: user.upsert, alliance.upsert, membership.active, membership.revoked, alliance.archived, tutorial.post.upsert. Source of truth: src/Envelope.php in the public repo xtenstack/forum and docs/Forum-Service-Interface-v0.1.md in XTenDeploy/plugins.\n",
         "security": [
           {
             "ApiKeyAuth": []
@@ -20144,11 +20144,11 @@
     },
     {
       "name": "Announcements",
-      "description": "Staff, agent and customer notices (plugins/announcements). Read for any authenticated principal, filtered by audience; create/publish is admin only and idempotent on source + external_id."
+      "description": "Staff, agent and customer notices (public repo xtenstack/announcements). Read for any authenticated principal, filtered by audience; create/publish is admin only and idempotent on source + external_id."
     },
     {
       "name": "Forum",
-      "description": "Headless Forum plugin (plugins/forum). Games push identity, alliance, membership and tutorial events to one endpoint; the plugin stores them idempotently and adapts them to Flarum asynchronously."
+      "description": "Headless Forum plugin (public repo xtenstack/forum). Games push identity, alliance, membership and tutorial events to one endpoint; the plugin stores them idempotently and adapts them to Flarum asynchronously."
     },
     {
       "name": "Catalogue",
