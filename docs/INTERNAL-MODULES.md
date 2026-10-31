@@ -50,8 +50,8 @@ picked up live.
 
 ## Plugin modules (`../plugins`)
 
-The public plugin-module monorepo, [XTenDeploy/plugins](https://github.com/XTenDeploy/plugins)
-(one top-level folder per plugin, e.g. `announcements/`), installs by
+The plugin-module monorepo, [XTenDeploy/plugins](https://github.com/XTenDeploy/plugins)
+(one top-level folder per plugin, e.g. `contacts/`), installs by
 exactly the same mechanism, with its own sibling checkout and its own
 `path` glob in `composer.local.json`:
 
@@ -63,7 +63,7 @@ exactly the same mechanism, with its own sibling checkout and its own
     ],
     "require": {
         "xtenstack/requirements-module": "*",
-        "xtendeploy/announcements": "*"
+        "xtendeploy/contacts": "*"
     }
 }
 ```
@@ -133,9 +133,37 @@ optional, both gitignored). `auth.json` never reaches the runtime image.
 `composer.lock` stays a trap here too: the feed's packages must not be
 committed into it (see below).
 
-A free module released under MIT (Announcements, Forum) needs no feed and
-no key: a `vcs` repository pointing at its public GitHub repo, or the path
-mechanism above, is enough.
+## Free public modules (Announcements, Forum)
+
+A free module released under MIT needs no feed and no key. Announcements
+and Forum live only in their own public repositories,
+[xtenstack/announcements](https://github.com/xtenstack/announcements) and
+[xtenstack/forum](https://github.com/xtenstack/forum) (their copies left
+XTenDeploy/plugins on 31 Oct 2026): a `vcs` repository per module in
+`composer.local.json`, pinned to a release tag, is the whole install. No
+`auth.json`, no sibling checkout, and the Docker vendor stage resolves
+them unchanged (composer:2 ships git; the GitHub API is used anonymously).
+
+```json
+{
+    "repositories": [
+        { "type": "vcs", "url": "https://github.com/xtenstack/announcements" },
+        { "type": "vcs", "url": "https://github.com/xtenstack/forum" }
+    ],
+    "require": {
+        "xtendeploy/announcements": "1.0.1",
+        "xtendeploy/forum": "0.1.2"
+    }
+}
+```
+
+Then the usual `composer update xtendeploy/announcements xtendeploy/forum`
+(or a rebuild with `docker/deploy.sh`), `./run migrate run`,
+`./run modules sync`, `./run modules enable announcements` / `forum`.
+Upgrading is the same with the new tag in `require`; each repo's
+`CHANGELOG.md` lists the tags. Stack-internal has installed both this way
+since 31 Oct 2026 (announcements v1.0.1, forum v0.1.2). A local clone of
+either repo also works through a `path` repository, for development.
 
 ## Setup
 
