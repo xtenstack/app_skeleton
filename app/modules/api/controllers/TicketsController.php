@@ -397,6 +397,7 @@ class TicketsController extends ControllerBase
             return $this->response->setJsonContent(['error' => 'Not found']);
         }
 
+        /** @psalm-suppress UndefinedConstant BASE_PATH is defined by the web bootstrap. */
         $path = BASE_PATH . '/storage/ticket-attachments/' . (int) $attachment->ticket_id . '/' . $attachment->filename;
 
         if (!is_file($path)) {
