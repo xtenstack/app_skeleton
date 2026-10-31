@@ -134,3 +134,23 @@ forum.xten.au {
     encode gzip
     reverse_proxy forum-app-1:8000
 }
+
+# packages.xten.au: XTen's private Composer repository, the "module feed"
+# that delivers paid catalogue modules to customer instances
+# (MAA-20261030-014, 31 Oct 2026). Static files only: /opt/composer-feed/public
+# (packages.json + dist/*.zip, built and rsynced by XTenDeploy/composer-feed's
+# bin/publish). One HTTP basic-auth login per customer instance: the active
+# rows of stack-internal's lice_feed_logins (licensing module), exported as
+# "username bcrypt-hash" lines into /opt/composer-feed/auth/users.caddy by
+# /opt/composer-feed/bin/feed-login sync (host cron, every minute; it reloads
+# Caddy when the file changes). Both paths are bind mounts in
+# docker-compose.prod.yml. An empty users file is valid and denies everyone.
+# No CSP block: nothing here is a page.
+packages.xten.au {
+    root * /composer-feed
+    basic_auth {
+        import /composer-feed-auth/users.caddy
+    }
+    header Cache-Control "no-store"
+    file_server
+}

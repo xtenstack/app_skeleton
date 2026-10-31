@@ -94,15 +94,18 @@ too.
 
 Paid catalogue modules (Contacts, Transactions, the AI SSA suite, ...) are
 delivered to a customer's instance from XTen's **private Composer
-repository** (the "module feed"), not from a sibling checkout: the module
-repos stay private and the feed is what the order gives access to. The
-instance needs two untracked files beside `composer.json`:
+repository** (the "module feed" at `https://packages.xten.au/`), not from a
+sibling checkout: the module repos stay private and the feed is what the
+order gives access to. The feed login (one per instance) and the licence
+key are issued when the order's invoice is paid and emailed with these
+instructions. The instance needs two untracked files beside
+`composer.json`:
 
 ```json
 // composer.local.json: the feed, and the modules this instance bought
 {
     "repositories": [
-        { "type": "composer", "url": "https://<feed host>/composer/" }
+        { "type": "composer", "url": "https://packages.xten.au/" }
     ],
     "require": {
         "xtendeploy/contacts": "^1.2",
@@ -115,7 +118,7 @@ instance needs two untracked files beside `composer.json`:
 // auth.json: the credentials XTen issued with the order (never committed)
 {
     "http-basic": {
-        "<feed host>": { "username": "<instance>", "password": "<feed password>" }
+        "packages.xten.au": { "username": "<instance>", "password": "<feed password>" }
     }
 }
 ```
