@@ -108,13 +108,18 @@ final class ApiTicketAttachmentsDeleteTest extends TestCase
     /** @return array{0: \TicketAttachments, 1: string} the row and the file path on disk */
     private function attachmentOn(\Tickets $ticket): array
     {
+        // phpunit runs as root in CI while the web server runs as www-data:
+        // the directory and file must be deletable by the web process, as
+        // they are when the upload endpoint itself created them.
         $dir = BASE_PATH . '/storage/ticket-attachments/' . (int) $ticket->id;
         if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+            mkdir($dir, 0777, true);
         }
+        @chmod($dir, 0777);
         $filename = bin2hex(random_bytes(8)) . '.txt';
         $path     = $dir . '/' . $filename;
         file_put_contents($path, "phpunit attachment\n");
+        @chmod($path, 0666);
 
         $attachment                      = new \TicketAttachments();
         $attachment->ticket_id           = (int) $ticket->id;
@@ -142,6 +147,7 @@ final class ApiTicketAttachmentsDeleteTest extends TestCase
 
         $this->assertSame(200, $res['status'], $res['body']);
         $this->assertNull(\TicketAttachments::findFirstById((int) $attachment->id));
+        clearstatcache(true, $path);
         $this->assertFileDoesNotExist($path);
     }
 
@@ -168,6 +174,7 @@ final class ApiTicketAttachmentsDeleteTest extends TestCase
 
         $res = $this->deleteAs(self::$adminToken, (int) $ticket->id, (int) $attachment->id);
         $this->assertSame(200, $res['status'], $res['body']);
+        clearstatcache(true, $path);
         $this->assertFileDoesNotExist($path);
     }
 
