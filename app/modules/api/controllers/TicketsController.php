@@ -414,7 +414,14 @@ class TicketsController extends ControllerBase
         // mime type is set AFTER it (later headers win when PHP sends them)
         // or every download is labelled as a generic binary (MAA-20261102-002).
         $this->response->setFileToSend($path, str_replace('"', '', (string) $attachment->original_filename), true);
-        $this->response->setHeader('Content-Type', (string) $attachment->mime_type);
+        // The API bootstrap already registered a Content-Type (JSON) slot, so
+        // setting it again only rewrites that earlier slot and the raw
+        // octet-stream header added by setFileToSend() is still sent last.
+        // Drop both and add the stored type as the final Content-Type.
+        $headers = $this->response->getHeaders();
+        $headers->remove('Content-Type');
+        $headers->remove('Content-Type: application/octet-stream');
+        $this->response->setRawHeader('Content-Type: ' . (string) $attachment->mime_type);
         $this->response->setHeader('X-Content-Type-Options', 'nosniff');
         $this->response->send();
         exit;
