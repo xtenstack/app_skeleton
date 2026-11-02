@@ -53,6 +53,10 @@
 # pulled in without the public repo hard-requiring it.
 /composer.local.json
 
+# Credentials for a private Composer repository (the XTen module feed),
+# read by Composer and by the Docker vendor stage. Never committed.
+/auth.json
+
 # Docker Compose local stack — DB creds and stateful volumes (uploads,
 # logs, the encryption key), see docker-compose.yml/.env.example.
 /.env

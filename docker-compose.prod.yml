@@ -82,6 +82,14 @@ services:
       # xwar.xten.au and game.xten.au/play.xten.au -- same again.
       - /opt/xwar/public:/xwar-public:ro
       - /opt/game/public:/game-public:ro
+      # packages.xten.au (the private Composer module feed, see its block in
+      # docker/Caddyfile): the built feed and the per-customer basic-auth
+      # users file, both maintained on the host by XTenDeploy/composer-feed's
+      # scripts. The auth directory must exist with a users.caddy (empty is
+      # fine) before Caddy starts, or the import fails and Caddy refuses the
+      # whole config.
+      - /opt/composer-feed/public:/composer-feed:ro
+      - /opt/composer-feed/auth:/composer-feed-auth:ro
   # xtmk merged into this instance 2026-09-25: this stack's db now runs on
   # the former xten-marketing database volume (21 GB, including the
   # abn_lookup + gnaf reference schemas), with prod's own tables restored into

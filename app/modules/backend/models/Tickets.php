@@ -15,7 +15,11 @@ use App_skeleton\Models\SoftDeletes;
  * which lets an agent claim a currently-unassigned ticket for itself —
  * see that method's docblock. So: agents can end up as
  * assigned_to_user_id via self-claim, but never via being assigned by
- * someone else.
+ * someone else. One more deliberate exception (Travis, 31 Oct 2026):
+ * a creation-time DEFAULT for the game stream — see
+ * beforeValidationOnCreate() / isGameStreamTicket(). That is the system
+ * filling an empty assignee from a rule, not a person reassigning, so
+ * assignAction()'s refusal is untouched.
  *
  * @method static Tickets|null findFirstById(int $id)
  */
@@ -72,6 +76,66 @@ class Tickets extends \Phalcon\Mvc\Model
     public function beforeSave(): void
     {
         $this->updated_at = date('Y-m-d H:i:s');
+    }
+
+    /**
+     * Game-stream default assignee (Travis, 31 Oct 2026): tickets relayed
+     * from, or raised about, XWar Legacy / xwar / game / games are the
+     * Codex (GPT) user's work, so a new ticket with no assignee defaults
+     * to that user instead of waiting for a hand assignment. The user is
+     * looked up by email from the `tickets_game_stream_assignee` setting
+     * (default below); an empty setting turns the rule off, a missing
+     * user leaves the ticket unassigned. Reassignment stays human-only.
+     */
+    public const GAME_STREAM_ASSIGNEE_SETTING = 'tickets_game_stream_assignee';
+    public const GAME_STREAM_ASSIGNEE_DEFAULT = 'openai.chatgpt@xten.au';
+
+    /** First `:`-segment of source_ref (lower-cased) that marks a relayed game ticket. */
+    public const GAME_STREAM_SOURCE_PREFIXES = ['xwar-legacy', 'xwar', 'game', 'games', 'play'];
+
+    private const GAME_STREAM_TITLE_PATTERN = '/\b(xwar|x-war|game|games|solitaire|mahjong|sudoku|klondike)\b/i';
+
+    /**
+     * Pure rule: does this ticket belong to the game stream? Matches a
+     * relayed source_ref by its prefix (e.g. `xwar-legacy:2:204:13`) or,
+     * for hand-filed tickets, a game word in the title.
+     */
+    public static function isGameStreamTicket(?string $sourceRef, string $title): bool
+    {
+        $prefix = strtolower(trim((string) strtok((string) $sourceRef, ':')));
+
+        if ($prefix !== '' && in_array($prefix, self::GAME_STREAM_SOURCE_PREFIXES, true)) {
+            return true;
+        }
+
+        return (bool) preg_match(self::GAME_STREAM_TITLE_PATTERN, $title);
+    }
+
+    public function beforeValidationOnCreate(): void
+    {
+        if (!empty($this->assigned_to_user_id) || !self::isGameStreamTicket($this->source_ref, (string) $this->title)) {
+            return;
+        }
+
+        $email = self::GAME_STREAM_ASSIGNEE_DEFAULT;
+        $di    = $this->getDI();
+
+        if ($di !== null && $di->has('settings')) {
+            $email = trim((string) $di->getShared('settings')->get(self::GAME_STREAM_ASSIGNEE_SETTING, self::GAME_STREAM_ASSIGNEE_DEFAULT));
+        }
+
+        if ($email === '') {
+            return;
+        }
+
+        $assignee = \Users::findFirst([
+            'conditions' => 'email = :email: AND deleted_at IS NULL',
+            'bind'       => ['email' => $email],
+        ]);
+
+        if ($assignee instanceof \Users) {
+            $this->assigned_to_user_id = (int) $assignee->id;
+        }
     }
 
     /**

@@ -89,7 +89,7 @@ $this->flash->clear();
         <div class="content">
           <div class="container-fluid">
             <?= $flashHtml ?>
-<?php if ($licenseNotice['grace'] || $licenseNotice['unlicensed']): ?>
+<?php if ($licenseNotice['grace'] || $licenseNotice['unlicensed'] || ($licenseNotice['expiring'] ?? [])): ?>
             <?= $this->partial('partials/license-notice', ['licenseNotice' => $licenseNotice]) ?>
 <?php endif; ?>
             <?= $this->getContent() ?>
