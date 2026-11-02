@@ -409,11 +409,81 @@ class TicketsController extends ControllerBase
         // setFileToSend() streams via Response::send()'s own readfile(), not
         // the content string the bootstrap echoes, so this sends and exits
         // itself — same as the backend/frontend download actions.
-        $this->response->setContentType((string) $attachment->mime_type);
-        $this->response->setHeader('X-Content-Type-Options', 'nosniff');
+        // Order matters: setFileToSend(..., attachment: true) adds a raw
+        // "Content-Type: application/octet-stream" header, so the stored
+        // mime type is set AFTER it (later headers win when PHP sends them)
+        // or every download is labelled as a generic binary (MAA-20261102-002).
         $this->response->setFileToSend($path, str_replace('"', '', (string) $attachment->original_filename), true);
+        $this->response->setHeader('Content-Type', (string) $attachment->mime_type);
+        $this->response->setHeader('X-Content-Type-Options', 'nosniff');
         $this->response->send();
         exit;
+    }
+
+    /**
+     * Delete one attachment (MAA-20261102-002: a player removing a file from
+     * their in-game ticket, relayed by the game's key). POST. Staff may delete
+     * on any ticket; anyone else only on a ticket they raised, and only while
+     * it is not closed (409 otherwise). Unknown ticket/attachment, or a ticket
+     * the caller did not raise, is 404 so ids cannot be probed. Removes the
+     * file from disk and the row; audited.
+     */
+    public function deleteAttachmentAction($id, $attachmentId)
+    {
+        if (!$this->request->isPost() && !$this->request->isDelete()) {
+            $this->response->setStatusCode(405, 'Method Not Allowed');
+
+            return $this->response->setJsonContent(['error' => 'POST or DELETE required']);
+        }
+
+        $ticket = \Tickets::findFirstById($id);
+        $staff  = $this->isStaff();
+
+        if (!$ticket || (!$staff && !$this->raisedByCaller($ticket))) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        $attachment = \TicketAttachments::findFirst([
+            'conditions' => 'id = :attachment_id: AND ticket_id = :ticket_id:',
+            'bind'       => ['attachment_id' => (int) $attachmentId, 'ticket_id' => (int) $ticket->id],
+        ]);
+
+        if (!$attachment instanceof \TicketAttachments) {
+            $this->response->setStatusCode(404, 'Not Found');
+
+            return $this->response->setJsonContent(['error' => 'Not found']);
+        }
+
+        if (!$staff && (string) $ticket->status === 'closed') {
+            $this->response->setStatusCode(409, 'Conflict');
+
+            return $this->response->setJsonContent(['error' => 'Ticket is closed; attachments can no longer be removed']);
+        }
+
+        /** @psalm-suppress UndefinedConstant BASE_PATH is defined by the web bootstrap. */
+        $path = BASE_PATH . '/storage/ticket-attachments/' . (int) $attachment->ticket_id . '/' . $attachment->filename;
+        $meta = [
+            'ticket_id'         => (int) $ticket->id,
+            'attachment_id'     => (int) $attachment->id,
+            'original_filename' => (string) $attachment->original_filename,
+            'via'               => 'api',
+        ];
+
+        if (!$attachment->delete()) {
+            $this->response->setStatusCode(422, 'Unprocessable Entity');
+
+            return $this->response->setJsonContent(['error' => implode(', ', array_map('strval', $attachment->getMessages()))]);
+        }
+
+        if (is_file($path)) {
+            @unlink($path);
+        }
+
+        Audit::recordEvent('attachment_deleted', (int) $this->principal['user_id'], $meta);
+
+        return $this->response->setJsonContent(['deleted' => true, 'attachment_id' => (int) $attachmentId, 'ticket_id' => (int) $ticket->id]);
     }
 
     public function retestResultAction($id)
